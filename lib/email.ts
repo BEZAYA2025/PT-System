@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 
 const resendApiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
+const fromEmail = (process.env.FROM_EMAIL || "onboarding@resend.dev").trim();
 const notifyEmail = process.env.WAITLIST_NOTIFY_EMAIL;
 
 let client: Resend | null = null;
@@ -14,7 +14,10 @@ function getClient(): Resend {
   return client;
 }
 
-const FROM = `PT System <${fromEmail}>`;
+// Accept either a raw address ("hello@ptsystem.ai") or a pre-formatted
+// "Name <email>" value. Wrap only when the env var is a bare address —
+// otherwise we'd produce "PT System <PT System <hello@…>>" which Resend rejects.
+const FROM = fromEmail.includes("<") ? fromEmail : `PT System <${fromEmail}>`;
 
 export type ConfirmationVars = {
   to: string;
