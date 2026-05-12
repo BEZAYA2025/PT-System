@@ -143,8 +143,27 @@
   }
 }
 
+@keyframes aven-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+}
+
+.aven-pulse {
+  animation: aven-pulse 2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
+  }
+  .aven-pulse {
+    animation: none;
   }
 }
