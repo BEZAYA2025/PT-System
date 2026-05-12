@@ -20,8 +20,13 @@ const helperClasses = "mt-2 text-xs text-muted-foreground";
 
 const errorClasses = "mt-2 text-xs text-red-400";
 
+type SubmitState =
+  | { kind: "idle" }
+  | { kind: "success" }
+  | { kind: "duplicate" };
+
 export function WaitlistForm() {
-  const [submitted, setSubmitted] = useState(false);
+  const [state, setState] = useState<SubmitState>({ kind: "idle" });
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
@@ -35,7 +40,8 @@ export function WaitlistForm() {
       name: "",
       markets: [],
       challenge: "",
-      referral: "",
+      source: "",
+      website: "",
     },
   });
 
@@ -47,22 +53,44 @@ export function WaitlistForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 422) {
         setSubmitError(
-          typeof data?.error === "string"
-            ? data.error
-            : "Something went wrong. Please try again.",
+          typeof data?.message === "string"
+            ? data.message
+            : "Please check the form and try again.",
         );
         return;
       }
-      setSubmitted(true);
+      if (res.status === 429) {
+        setSubmitError("Too many requests. Please try again later.");
+        return;
+      }
+      if (!res.ok) {
+        setSubmitError("Something went wrong. Please try again.");
+        return;
+      }
+
+      if (data?.message === "Already on list") {
+        setState({ kind: "duplicate" });
+        return;
+      }
+      setState({ kind: "success" });
     } catch {
-      setSubmitError("Network error. Please try again.");
+      setSubmitError("Connection issue. Please try again.");
     }
   };
 
-  if (submitted) {
+  if (state.kind === "success" || state.kind === "duplicate") {
+    const heading =
+      state.kind === "duplicate"
+        ? "You're already on the list."
+        : "You're on the list.";
+    const body =
+      state.kind === "duplicate"
+        ? "We've got your email — we'll be in touch when Beta opens."
+        : "We'll be in touch when Beta opens.";
     return (
       <div
         role="status"
@@ -76,10 +104,10 @@ export function WaitlistForm() {
           <span className="size-2 rounded-full bg-emerald" />
         </div>
         <h2 className="mt-5 text-2xl font-semibold tracking-tight text-foreground">
-          You&apos;re on the list.
+          {heading}
         </h2>
         <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-          We&apos;ll be in touch when Beta opens.
+          {body}
         </p>
       </div>
     );
@@ -92,6 +120,22 @@ export function WaitlistForm() {
       className="space-y-8"
       aria-describedby={submitError ? "form-error" : undefined}
     >
+      {/* Honeypot — hidden from users, attractive to bots. */}
+      <input
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          left: "-9999px",
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+        }}
+        {...register("website")}
+      />
+
       <div>
         <label htmlFor="email" className={labelClasses}>
           Email
@@ -205,18 +249,23 @@ export function WaitlistForm() {
           className={`${fieldClasses} mt-2 resize-y`}
           {...register("challenge")}
         />
+        {errors.challenge && (
+          <p role="alert" className={errorClasses}>
+            {errors.challenge.message}
+          </p>
+        )}
       </div>
 
       <div>
-        <label htmlFor="referral" className={labelClasses}>
+        <label htmlFor="source" className={labelClasses}>
           How did you hear about us?{" "}
           <span className="font-normal text-muted-foreground">(optional)</span>
         </label>
         <input
-          id="referral"
+          id="source"
           type="text"
           className={`${fieldClasses} mt-2`}
-          {...register("referral")}
+          {...register("source")}
         />
       </div>
 

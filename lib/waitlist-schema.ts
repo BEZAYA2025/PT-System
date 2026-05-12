@@ -29,16 +29,33 @@ export const waitlistSchema = z.object({
   email: z
     .string()
     .min(1, "Email is required.")
-    .email("Please enter a valid email address."),
-  name: z.string().min(1, "Name is required.").max(120),
+    .email("Please enter a valid email address.")
+    .max(255),
+  name: z.string().min(2, "Name is required.").max(120),
   experience: z.enum(tradingExperienceValues, {
     message: "Please pick an option.",
   }),
   markets: z
     .array(z.enum(marketValues))
     .min(1, "Pick at least one market."),
-  challenge: z.string().max(2000).optional().or(z.literal("")),
-  referral: z.string().max(280).optional().or(z.literal("")),
+  challenge: z.string().max(1000).optional().or(z.literal("")),
+  source: z.string().max(500).optional().or(z.literal("")),
+  // Honeypot — bots fill it; real users never see it. The route handler
+  // checks for a non-empty value and silently accepts the request without
+  // persisting anything. Keep this permissive in zod so bots get a 200.
+  website: z.string().max(500).optional().or(z.literal("")),
 });
 
 export type WaitlistInput = z.infer<typeof waitlistSchema>;
+
+export function experienceLabel(value: string): string {
+  return (
+    tradingExperienceOptions.find((o) => o.value === value)?.label ?? value
+  );
+}
+
+export function marketLabels(values: string[]): string[] {
+  return values.map(
+    (v) => marketOptions.find((o) => o.value === v)?.label ?? v,
+  );
+}
