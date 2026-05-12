@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Reveal } from "@/components/Reveal";
 
 export function Founder() {
@@ -5,14 +6,24 @@ export function Founder() {
     <section id="founder" className="scroll-mt-16 px-6 py-24 sm:py-32 lg:py-40">
       <div className="mx-auto grid max-w-5xl gap-12 md:grid-cols-[280px_1fr] md:gap-16 lg:grid-cols-[320px_1fr]">
         <Reveal>
-          <div
-            aria-hidden="true"
-            className="relative mx-auto flex aspect-square w-full max-w-[280px] items-center justify-center overflow-hidden rounded-2xl border border-border bg-surface md:mx-0"
-          >
-            <span className="font-sans text-7xl font-semibold tracking-tight text-foreground/70">
-              PT
-            </span>
-            <div className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.03]" />
+          <div className="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl border border-border bg-surface md:mx-0 lg:max-w-[320px]">
+            <Image
+              src="/paul.jpg"
+              alt="Paul Theobald"
+              width={640}
+              height={640}
+              priority
+              sizes="(min-width: 1024px) 320px, (min-width: 768px) 280px, 80vw"
+              className="h-full w-full object-cover"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-t from-background/40 via-transparent to-transparent"
+            />
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/[0.04]"
+            />
           </div>
         </Reveal>
 

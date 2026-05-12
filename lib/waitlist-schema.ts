@@ -8,7 +8,7 @@ export const tradingExperienceOptions = [
 ] as const;
 
 export const marketOptions = [
-  { value: "btc-eth-futures", label: "BTC/ETH Futures" },
+  { value: "btc-eth-futures", label: "Crypto Futures" },
   { value: "spot-crypto", label: "Spot Crypto" },
   { value: "stocks-etfs", label: "Stocks/ETFs" },
   { value: "forex", label: "Forex" },

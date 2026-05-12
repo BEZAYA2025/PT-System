@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { motion, useReducedMotion } from "framer-motion";
+import { CircleCheck } from "lucide-react";
 import {
   waitlistSchema,
   type WaitlistInput,
@@ -11,7 +14,7 @@ import {
 } from "@/lib/waitlist-schema";
 
 const fieldClasses =
-  "w-full rounded-lg border border-border bg-surface/40 px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald";
+  "w-full rounded-lg border border-border bg-surface px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 transition-colors focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald";
 
 const labelClasses =
   "block text-sm font-medium text-foreground";
@@ -20,10 +23,68 @@ const helperClasses = "mt-2 text-xs text-muted-foreground";
 
 const errorClasses = "mt-2 text-xs text-red-400";
 
+// Browsers render <option> using OS-native colors by default. Force dark
+// fill + foreground inline so the dropdown panel matches the rest of the form
+// in Chromium / Firefox / Edge.
+const optionStyle: React.CSSProperties = {
+  backgroundColor: "#141414",
+  color: "#f5f5f5",
+};
+
 type SubmitState =
   | { kind: "idle" }
   | { kind: "success" }
   | { kind: "duplicate" };
+
+function SuccessCard({ kind }: { kind: "success" | "duplicate" }) {
+  const reduce = useReducedMotion();
+  const heading =
+    kind === "duplicate" ? "You're already on the list." : "You're on the list.";
+  const body =
+    kind === "duplicate"
+      ? "We've got your email — we'll be in touch when Beta opens."
+      : "We'll be in touch when Beta opens.";
+
+  return (
+    <motion.div
+      role="status"
+      aria-live="polite"
+      initial={reduce ? { opacity: 1 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+      className="rounded-2xl border border-emerald/30 bg-emerald/[0.04] p-10 text-center sm:p-12"
+    >
+      <motion.div
+        initial={reduce ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.6 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{
+          duration: 0.5,
+          delay: 0.1,
+          ease: [0.16, 1, 0.3, 1],
+        }}
+        className="mx-auto inline-flex"
+      >
+        <CircleCheck
+          aria-hidden="true"
+          strokeWidth={1.5}
+          className="size-14 text-emerald sm:size-16"
+        />
+      </motion.div>
+      <h2 className="mt-6 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+        {heading}
+      </h2>
+      <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+        {body}
+      </p>
+      <Link
+        href="/"
+        className="mt-8 inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
+      >
+        ← Back to home
+      </Link>
+    </motion.div>
+  );
+}
 
 export function WaitlistForm() {
   const [state, setState] = useState<SubmitState>({ kind: "idle" });
@@ -83,34 +144,7 @@ export function WaitlistForm() {
   };
 
   if (state.kind === "success" || state.kind === "duplicate") {
-    const heading =
-      state.kind === "duplicate"
-        ? "You're already on the list."
-        : "You're on the list.";
-    const body =
-      state.kind === "duplicate"
-        ? "We've got your email — we'll be in touch when Beta opens."
-        : "We'll be in touch when Beta opens.";
-    return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="rounded-2xl border border-emerald/30 bg-emerald/[0.04] p-8 text-center sm:p-10"
-      >
-        <div
-          aria-hidden="true"
-          className="mx-auto flex size-10 items-center justify-center rounded-full border border-emerald/40 bg-emerald/10"
-        >
-          <span className="size-2 rounded-full bg-emerald" />
-        </div>
-        <h2 className="mt-5 text-2xl font-semibold tracking-tight text-foreground">
-          {heading}
-        </h2>
-        <p className="mt-3 text-base leading-relaxed text-muted-foreground">
-          {body}
-        </p>
-      </div>
-    );
+    return <SuccessCard kind={state.kind} />;
   }
 
   return (
@@ -185,14 +219,14 @@ export function WaitlistForm() {
             id="experience"
             defaultValue=""
             aria-invalid={errors.experience ? "true" : undefined}
-            className={`${fieldClasses} appearance-none pr-10`}
+            className={`${fieldClasses} appearance-none pr-10 [color-scheme:dark]`}
             {...register("experience")}
           >
-            <option value="" disabled>
+            <option value="" disabled style={optionStyle}>
               Select an option
             </option>
             {tradingExperienceOptions.map((o) => (
-              <option key={o.value} value={o.value}>
+              <option key={o.value} value={o.value} style={optionStyle}>
                 {o.label}
               </option>
             ))}
