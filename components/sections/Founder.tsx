@@ -9,7 +9,7 @@ export function Founder() {
           <div className="relative mx-auto aspect-square w-full max-w-[280px] overflow-hidden rounded-2xl border border-border bg-surface md:mx-0 lg:max-w-[320px]">
             <Image
               src="/paul.jpg"
-              alt="Paul Theobald"
+              alt="Paul"
               width={640}
               height={640}
               priority
@@ -43,7 +43,7 @@ export function Founder() {
           <Reveal delay={0.2}>
             <div className="mt-8 space-y-6 text-base leading-[1.8] text-muted-foreground sm:text-lg">
               <p>
-                Paul Theobald has been trading crypto professionally for over a
+                Paul has been trading crypto professionally for over a
                 decade. His focus: BTC and ETH perpetual futures. His method:
                 Wave Riding, refined through thousands of trades, real losses,
                 and disciplined recovery.

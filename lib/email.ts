@@ -60,7 +60,7 @@ function confirmationHtml(name: string): string {
     Hi ${safeName},
   </p>
   <p style="font-size: 16px; line-height: 1.7; color: #a0a0a0;">
-    Thanks for joining. You're now on the list for Beta access to PT System &mdash; an AI trading mentor built on Paul Theobald's Wave Riding Method.
+    Thanks for joining. You're now on the list for Beta access to PT System &mdash; an AI trading mentor built on Paul's Wave Riding Method.
   </p>
   <p style="font-size: 16px; line-height: 1.7; color: #a0a0a0;">
     We'll be in touch when Beta opens. Until then, we're focused on building Phase 2 &mdash; member onboarding, multi-tenant infrastructure, and refining Aven's depth.
@@ -80,7 +80,7 @@ function confirmationText(name: string): string {
 
 Hi ${name},
 
-Thanks for joining. You're now on the list for Beta access to PT System — an AI trading mentor built on Paul Theobald's Wave Riding Method.
+Thanks for joining. You're now on the list for Beta access to PT System — an AI trading mentor built on Paul's Wave Riding Method.
 
 We'll be in touch when Beta opens. Until then, we're focused on building Phase 2 — member onboarding, multi-tenant infrastructure, and refining Aven's depth.
 

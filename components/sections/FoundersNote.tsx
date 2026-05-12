@@ -30,7 +30,7 @@ export function FoundersNote() {
 
         <Reveal delay={0.15}>
           <p className="mt-10 font-mono text-sm tracking-wide text-muted-foreground">
-            — Paul Theobald
+            — Paul
           </p>
         </Reveal>
       </div>

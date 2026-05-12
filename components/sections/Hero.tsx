@@ -36,7 +36,7 @@ export function Hero() {
           {...fade(0.2)}
           className="mt-6 text-2xl font-normal text-muted-foreground sm:text-3xl md:text-4xl"
         >
-          Paul Theobald&apos;s AI trading mentor.
+          Paul&apos;s AI trading mentor.
         </motion.p>
 
         <motion.p

@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 
 export const siteConfig = {
   name: "PT System",
-  title: "PT System — AI Trading Mentor by Paul Theobald",
+  title: "PT System — AI Trading Mentor by Paul",
   description:
-    "Meet Aven, your AI trading partner. Trained on the Wave Riding Method by Paul Theobald. Real-time aware. Live trades transparent.",
+    "Meet Aven, your AI trading partner. Trained on the Wave Riding Method by Paul. Real-time aware. Live trades transparent.",
   url: "https://ptsystem.ai",
 } as const;
 
@@ -16,8 +16,8 @@ export const baseMetadata: Metadata = {
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  authors: [{ name: "Paul Theobald" }],
-  creator: "Paul Theobald",
+  authors: [{ name: "Paul" }],
+  creator: "Paul",
   publisher: "PT System",
   alternates: {
     canonical: "/",
