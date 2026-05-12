@@ -1,20 +1,38 @@
+import type { ReactNode } from "react";
 import { Reveal } from "@/components/Reveal";
+import { ConfluenceChart } from "@/components/visuals/ConfluenceChart";
+import { FibLevelsViz } from "@/components/visuals/FibLevelsViz";
+import { TrendlineViz } from "@/components/visuals/TrendlineViz";
+import { IndicatorWaveViz } from "@/components/visuals/IndicatorWaveViz";
 
-const pillars = [
+type Tool = {
+  number: string;
+  title: string;
+  body: string;
+  visual: ReactNode;
+};
+
+const tools: Tool[] = [
   {
+    number: "01",
     title: "Fibonacci Levels",
     body:
       "Drawn from anchor highs and lows. Golden Pocket (0.618–0.65) is the strongest reversal zone.",
+    visual: <FibLevelsViz />,
   },
   {
+    number: "02",
     title: "Trendlines (Rays)",
     body:
       "From swing points, projected forward. Resistance and support that adapts with structure.",
+    visual: <TrendlineViz />,
   },
   {
+    number: "03",
     title: "Indicators",
     body:
       "RSI, MACD, EMA cluster, VMC Cipher. Confirmation only — never the entry signal alone.",
+    visual: <IndicatorWaveViz />,
   },
 ];
 
@@ -26,39 +44,45 @@ export function WaveRidingMethod() {
     >
       <div className="mx-auto max-w-5xl">
         <Reveal>
-          <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+          <ConfluenceChart />
+        </Reveal>
+
+        <Reveal delay={0.15}>
+          <h2 className="mt-16 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl sm:mt-20">
             Three tools. Two confirmations. One method.
           </h2>
         </Reveal>
 
-        <Reveal delay={0.1}>
+        <Reveal delay={0.22}>
           <p className="mt-8 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
             Paul&apos;s method is built on three pillars.
           </p>
         </Reveal>
 
-        <div className="mt-12 grid gap-px overflow-hidden rounded-2xl border border-border bg-border sm:mt-16 md:grid-cols-3">
-          {pillars.map((pillar, idx) => (
-            <Reveal key={pillar.title} delay={0.15 + idx * 0.08}>
-              <article className="flex h-full flex-col gap-3 bg-background p-6 sm:p-8">
-                <div
-                  aria-hidden="true"
-                  className="font-mono text-xs text-muted-foreground"
-                >
-                  0{idx + 1}
+        <div className="mt-12 grid gap-5 sm:mt-16 md:grid-cols-3 md:gap-6">
+          {tools.map((tool, idx) => (
+            <Reveal key={tool.number} delay={0.3 + idx * 0.1}>
+              <article className="flex h-full flex-col gap-5 rounded-2xl border border-border bg-surface p-6 transition-colors duration-300 hover:border-emerald/20 sm:p-7">
+                <div className="overflow-hidden rounded-lg border border-border/80 bg-background/30 p-3">
+                  {tool.visual}
                 </div>
-                <h3 className="text-xl font-semibold tracking-tight text-foreground">
-                  {pillar.title}
-                </h3>
-                <p className="text-[15px] leading-[1.7] text-muted-foreground">
-                  {pillar.body}
-                </p>
+                <div className="flex flex-col gap-2">
+                  <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                    Tool {tool.number}
+                  </p>
+                  <h3 className="text-xl font-semibold tracking-tight text-foreground">
+                    {tool.title}
+                  </h3>
+                  <p className="text-[14px] leading-[1.7] text-muted-foreground sm:text-[15px]">
+                    {tool.body}
+                  </p>
+                </div>
               </article>
             </Reveal>
           ))}
         </div>
 
-        <Reveal delay={0.4}>
+        <Reveal delay={0.6}>
           <p className="mt-12 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
             A setup is valid when at least two of three confirm the same zone.
             Confluence isn&apos;t a bonus —{" "}
