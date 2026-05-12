@@ -14,7 +14,7 @@ Phase 1 — Foundation setup. Minimal placeholder deployed.
 - [Inter](https://fonts.google.com/specimen/Inter) + [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono) via `next/font`
 - Deployed on [Vercel](https://vercel.com)
 
-## Development
+## Development 
 
 ```bash
 npm install
