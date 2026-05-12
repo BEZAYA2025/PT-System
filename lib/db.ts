@@ -10,7 +10,8 @@ export type WaitlistRow = {
   source: string | null;
   ip_address: string | null;
   user_agent: string | null;
-  created_at: string;
+  // Neon returns TIMESTAMPTZ as a JS Date, not a string. Reflect that here.
+  created_at: Date;
 };
 
 export type WaitlistInsert = {

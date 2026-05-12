@@ -157,7 +157,10 @@ export async function POST(request: NextRequest) {
       challenge: row.challenge,
       source: row.source,
       ip: row.ip_address,
-      createdAt: row.created_at,
+      createdAt:
+        row.created_at instanceof Date
+          ? row.created_at.toISOString()
+          : String(row.created_at),
     }),
   ]);
 
