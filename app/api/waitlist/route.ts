@@ -141,6 +141,12 @@ export async function POST(request: NextRequest) {
 
   const row = insertResult.row;
 
+  console.log("[waitlist] dispatching emails", {
+    to: row.email,
+    notifyConfigured: Boolean(process.env.WAITLIST_NOTIFY_EMAIL),
+    fromConfigured: Boolean(process.env.FROM_EMAIL),
+  });
+
   const [confirmation, notification] = await Promise.allSettled([
     sendConfirmationEmail({ to: row.email, name: row.name }),
     sendNotificationEmail({
@@ -151,21 +157,33 @@ export async function POST(request: NextRequest) {
       challenge: row.challenge,
       source: row.source,
       ip: row.ip_address,
-      createdAt: row.created_at,
+      createdAt:
+        row.created_at instanceof Date
+          ? row.created_at.toISOString()
+          : String(row.created_at),
     }),
   ]);
 
   if (confirmation.status === "rejected") {
-    console.error("[waitlist] confirmation email failed", {
-      email: row.email,
-      reason: confirmation.reason,
-    });
+    console.error(
+      "[waitlist] confirmation email failed:",
+      confirmation.reason instanceof Error
+        ? confirmation.reason.message
+        : String(confirmation.reason),
+    );
+  } else {
+    console.log("[waitlist] confirmation email sent", { to: row.email });
   }
+
   if (notification.status === "rejected") {
-    console.error("[waitlist] notification email failed", {
-      email: row.email,
-      reason: notification.reason,
-    });
+    console.error(
+      "[waitlist] notification email failed:",
+      notification.reason instanceof Error
+        ? notification.reason.message
+        : String(notification.reason),
+    );
+  } else {
+    console.log("[waitlist] notification email sent");
   }
 
   return NextResponse.json({ ok: true }, { status: 200, headers });

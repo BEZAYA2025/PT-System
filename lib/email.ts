@@ -1,20 +1,29 @@
 import { Resend } from "resend";
 
-const resendApiKey = process.env.RESEND_API_KEY;
-const fromEmail = process.env.FROM_EMAIL || "onboarding@resend.dev";
-const notifyEmail = process.env.WAITLIST_NOTIFY_EMAIL;
-
 let client: Resend | null = null;
 
 function getClient(): Resend {
   if (!client) {
-    if (!resendApiKey) throw new Error("RESEND_API_KEY is not set");
-    client = new Resend(resendApiKey);
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) throw new Error("RESEND_API_KEY is not set");
+    client = new Resend(apiKey);
   }
   return client;
 }
 
-const FROM = `PT System <${fromEmail}>`;
+function getFrom(): string {
+  const raw = (process.env.FROM_EMAIL || "onboarding@resend.dev").trim();
+  // Accept either a raw address or a pre-formatted "Name <email>" value.
+  // Wrap only when the env var is a bare address — otherwise we'd produce
+  // "PT System <PT System <hello@…>>" which Resend rejects.
+  return raw.includes("<") ? raw : `PT System <${raw}>`;
+}
+
+function getNotifyEmail(): string {
+  const value = (process.env.WAITLIST_NOTIFY_EMAIL || "").trim();
+  if (!value) throw new Error("WAITLIST_NOTIFY_EMAIL is not set");
+  return value;
+}
 
 export type ConfirmationVars = {
   to: string;
@@ -32,8 +41,8 @@ export type NotificationVars = {
   createdAt: string;
 };
 
-function escapeHtml(value: string): string {
-  return value
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
@@ -113,25 +122,42 @@ IP:         ${v.ip ?? "n/a"}
 `;
 }
 
+// The Resend SDK does NOT reject on API errors — it returns
+// { data: null, error }. Convert that to a thrown Error so callers can
+// detect failure via Promise rejection / try-catch / allSettled.
+function unwrap(
+  label: string,
+  result: { data: unknown; error: unknown } | { error: unknown },
+) {
+  const error = (result as { error: unknown }).error;
+  if (error) {
+    const err = error as { name?: string; message?: string; statusCode?: number };
+    throw new Error(
+      `Resend ${label} failed: ${err.name ?? "Error"} ${err.statusCode ?? ""} ${err.message ?? JSON.stringify(error)}`.trim(),
+    );
+  }
+  return (result as { data: unknown }).data;
+}
+
 export async function sendConfirmationEmail(vars: ConfirmationVars) {
-  return getClient().emails.send({
-    from: FROM,
+  const result = await getClient().emails.send({
+    from: getFrom(),
     to: vars.to,
     subject: "You're on the PT System waitlist",
     html: confirmationHtml(vars.name),
     text: confirmationText(vars.name),
   });
+  return unwrap("confirmation", result);
 }
 
 export async function sendNotificationEmail(vars: NotificationVars) {
-  if (!notifyEmail) {
-    throw new Error("WAITLIST_NOTIFY_EMAIL is not set");
-  }
-  return getClient().emails.send({
-    from: FROM,
-    to: notifyEmail,
+  const to = getNotifyEmail();
+  const result = await getClient().emails.send({
+    from: getFrom(),
+    to,
     subject: `New PT System signup: ${vars.name}`,
     html: notificationHtml(vars),
     text: notificationText(vars),
   });
+  return unwrap("notification", result);
 }
