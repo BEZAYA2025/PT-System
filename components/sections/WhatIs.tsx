@@ -22,9 +22,9 @@ export function WhatIs() {
             </p>
             <p>
               PT System is none of those. It&apos;s a personal trading
-              mentor — Paul Theobald&apos;s decade of professional crypto
-              trading, transferred into an AI partner that thinks like him,
-              speaks like him, and teaches like him.
+              mentor — Paul&apos;s decade of professional crypto trading,
+              transferred into an AI partner that thinks like him, speaks
+              like him, and teaches like him.
             </p>
             <p>
               Members don&apos;t copy Paul&apos;s trades. They learn his method.

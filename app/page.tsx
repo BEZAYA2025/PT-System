@@ -1,6 +1,8 @@
 import { Hero } from "@/components/sections/Hero";
 import { WhatIs } from "@/components/sections/WhatIs";
 import { MeetAven } from "@/components/sections/MeetAven";
+import { DataFlow } from "@/components/sections/DataFlow";
+import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WaveRidingMethod } from "@/components/sections/WaveRidingMethod";
 import { Founder } from "@/components/sections/Founder";
 import { Different } from "@/components/sections/Different";
@@ -15,6 +17,8 @@ export default function Home() {
         <Hero />
         <WhatIs />
         <MeetAven />
+        <DataFlow />
+        <HowItWorks />
         <WaveRidingMethod />
         <Founder />
         <Different />
