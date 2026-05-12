@@ -7,7 +7,7 @@ type Stage = {
 };
 
 const stages: Stage[] = [
-  { label: "Binance Futures API", via: "positions · fills · pnl" },
+  { label: "Exchange API", via: "Binance · Bybit · OKX · more" },
   { label: "PT System Backend", via: "multi-TF · liquidity · macro" },
   { label: "Aven", via: "reasoning in Paul's voice" },
   { label: "You", via: "via Telegram or Web" },
@@ -50,7 +50,7 @@ export function DataFlow() {
                     <div className="my-6 flex flex-col items-center gap-3 sm:my-8">
                       <span
                         aria-hidden="true"
-                        className="block h-12 w-px bg-border sm:h-16"
+                        className="block h-12 w-px bg-gradient-to-b from-border via-border to-emerald/30 sm:h-16"
                       />
                       {stage.via && (
                         <span className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -60,7 +60,7 @@ export function DataFlow() {
                       <ArrowDown
                         aria-hidden="true"
                         strokeWidth={1.5}
-                        className="size-4 text-muted-foreground/70"
+                        className="size-4 text-emerald/80"
                       />
                     </div>
                   </Reveal>
