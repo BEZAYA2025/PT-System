@@ -44,24 +44,20 @@ export function WaveRidingMethod() {
     >
       <div className="mx-auto max-w-5xl">
         <Reveal>
-          <ConfluenceChart />
-        </Reveal>
-
-        <Reveal delay={0.15}>
-          <h2 className="mt-16 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl sm:mt-20">
+          <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
             Three tools. Two confirmations. One method.
           </h2>
         </Reveal>
 
-        <Reveal delay={0.22}>
-          <p className="mt-8 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
-            Paul&apos;s method is built on three pillars.
+        <Reveal delay={0.1}>
+          <p className="mt-6 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
+            The framework Aven applies to every setup.
           </p>
         </Reveal>
 
         <div className="mt-12 grid gap-5 sm:mt-16 md:grid-cols-3 md:gap-6">
           {tools.map((tool, idx) => (
-            <Reveal key={tool.number} delay={0.3 + idx * 0.1}>
+            <Reveal key={tool.number} delay={0.18 + idx * 0.08}>
               <article className="flex h-full flex-col gap-5 rounded-2xl border border-border bg-surface p-6 transition-colors duration-300 hover:border-emerald/20 sm:p-7">
                 <div className="overflow-hidden rounded-lg border border-border/80 bg-background/30 p-3">
                   {tool.visual}
@@ -82,14 +78,20 @@ export function WaveRidingMethod() {
           ))}
         </div>
 
-        <Reveal delay={0.6}>
-          <p className="mt-12 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
-            A setup is valid when at least two of three confirm the same zone.
-            Confluence isn&apos;t a bonus —{" "}
-            <span className="text-foreground">it&apos;s the rule.</span> Less
-            than two means waiting.
-          </p>
-        </Reveal>
+        <div className="mx-auto mt-20 max-w-3xl sm:mt-24">
+          <Reveal>
+            <ConfluenceChart />
+          </Reveal>
+
+          <Reveal delay={0.15}>
+            <p className="mt-10 text-center text-base leading-[1.8] text-muted-foreground sm:text-lg">
+              A setup is valid when at least two of three confirm the same
+              zone. Confluence isn&apos;t a bonus —{" "}
+              <span className="text-foreground">it&apos;s the rule.</span>{" "}
+              Less than two means waiting.
+            </p>
+          </Reveal>
+        </div>
       </div>
     </section>
   );

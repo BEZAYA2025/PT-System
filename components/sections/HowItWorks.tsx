@@ -1,192 +1,184 @@
-"use client";
-
-import { useRef, type ReactNode } from "react";
-import {
-  motion,
-  useReducedMotion,
-  useScroll,
-  useTransform,
-} from "framer-motion";
+import type { ReactNode } from "react";
 import {
   Activity,
-  ArrowRight,
-  GraduationCap,
+  MessageCircle,
   Plug,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
+import { Reveal } from "@/components/Reveal";
+import { DataFlowConnector } from "@/components/visuals/DataFlowConnector";
 
-type Step = {
+type Position = "left" | "right";
+
+type Stage = {
   number: string;
-  name: string;
   title: string;
-  body: string;
+  description: string;
   Icon: LucideIcon;
-  preview: ReactNode;
+  position: Position;
+  visual: ReactNode;
 };
 
-function PreviewFrame({ children }: { children: ReactNode }) {
+function Chips({
+  items,
+  badge,
+}: {
+  items: string[];
+  badge?: string;
+}) {
   return (
-    <div className="rounded-lg border border-border/80 bg-background/50 p-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
-      {children}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {items.map((label) => (
+        <span
+          key={label}
+          className="inline-flex items-center rounded-md border border-border bg-background/40 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+        >
+          {label}
+        </span>
+      ))}
+      {badge && (
+        <span className="inline-flex items-center rounded-md border border-emerald/30 bg-emerald/10 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-emerald">
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
 
-const steps: Step[] = [
+// Mini multi-timeframe chart for STAGE 02 — 3 overlapping wavy lines.
+function TimeframeMiniViz() {
+  return (
+    <svg
+      viewBox="0 0 220 64"
+      role="img"
+      aria-label="Three overlapping timeframes"
+      className="h-16 w-full"
+    >
+      <rect
+        x="0"
+        y="0"
+        width="220"
+        height="64"
+        fill="#0a0a0a"
+        stroke="#1f1f1f"
+        strokeWidth="0.5"
+        rx="4"
+      />
+      <path
+        d="M 8 38 Q 50 28, 90 36 T 170 32 T 212 38"
+        fill="none"
+        stroke="#3a3a3a"
+        strokeWidth="1.2"
+      />
+      <path
+        d="M 8 30 Q 50 42, 90 28 T 170 36 T 212 26"
+        fill="none"
+        stroke="#a0a0a0"
+        strokeWidth="1.2"
+        opacity="0.7"
+      />
+      <path
+        d="M 8 44 Q 50 22, 90 40 T 170 26 T 212 32"
+        fill="none"
+        stroke="#10b981"
+        strokeWidth="1.4"
+        opacity="0.85"
+      />
+    </svg>
+  );
+}
+
+// Mini chat preview for STAGE 03.
+function ReasoningMiniViz() {
+  return (
+    <div className="rounded-lg border border-emerald/20 bg-emerald/[0.04] p-3 font-mono text-[11px] leading-relaxed">
+      <div className="text-[10px] uppercase tracking-[0.16em] text-emerald">
+        Aven
+      </div>
+      <div className="mt-1 text-foreground/85">
+        Confluence: <span className="text-emerald">3</span> sources.
+      </div>
+      <div className="text-foreground/85">
+        Score: <span className="font-semibold text-emerald">8/10</span>
+      </div>
+    </div>
+  );
+}
+
+const stages: Stage[] = [
   {
     number: "01",
-    name: "Connect",
-    title: "Bring your exchange.",
-    body:
-      "Read-only API key from Binance, Bybit, OKX, or any major exchange. 30 seconds to set up. PT System sees your positions, your fills, your PnL. It never trades for you.",
+    title: "Your Exchange, Connected",
+    description:
+      "Read-only API key from Binance, Bybit, OKX, or any major exchange. 30 seconds setup. PT System sees your trades. It never trades for you.",
     Icon: Plug,
-    preview: (
-      <PreviewFrame>
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-foreground/80">Exchange</span>
-          <ArrowRight
-            aria-hidden="true"
-            strokeWidth={1.5}
-            className="size-3 text-emerald/80"
-          />
-          <span className="text-foreground/80">PT System</span>
-        </div>
-        <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-emerald/80">
-          Read-only · API key
-        </div>
-      </PreviewFrame>
+    position: "left",
+    visual: (
+      <Chips
+        items={["Binance", "Bybit", "OKX", "+more"]}
+        badge="Read-Only"
+      />
     ),
   },
   {
     number: "02",
-    name: "Trade",
-    title: "You trade. PT System listens.",
-    body:
-      "Every fill is tracked. Every position state — entry, mark, ROI, liquidation distance — synced in real time from your exchange. No manual logging.",
+    title: "Multi-Timeframe Analysis",
+    description:
+      "Every fill, every position synced live. The backend analyzes timeframes from 15m to weekly, plus liquidity, funding, and macro context.",
     Icon: Activity,
-    preview: (
-      <PreviewFrame>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-foreground/90">BTCUSDT · LONG</span>
-          <span className="font-medium text-emerald">+6.2%</span>
-        </div>
-        <div className="mt-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground/80">
-          synced · live
-        </div>
-      </PreviewFrame>
-    ),
+    position: "right",
+    visual: <TimeframeMiniViz />,
   },
   {
     number: "03",
-    name: "Spar",
-    title: "Ask Aven anything.",
-    body:
-      "About your setup. Your open trade. The market context. Aven sees your numbers, applies Paul's method, answers in Paul's voice.",
+    title: "Aven's Reasoning",
+    description:
+      "Aven combines your trade context with the method's framework. Generates setup scores, recommendations, and risk warnings — in conversation, not commands.",
     Icon: Sparkles,
-    preview: (
-      <PreviewFrame>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-emerald">
-          You · 14:22
-        </div>
-        <div className="mt-1.5 font-sans text-[12px] text-foreground/85">
-          how does my trade look?
-        </div>
-      </PreviewFrame>
-    ),
+    position: "left",
+    visual: <ReasoningMiniViz />,
   },
   {
     number: "04",
-    name: "Learn",
-    title: "Get better every day.",
-    body:
-      "Morning briefings with multi-TF state. Post-trade reviews with score lookback. Pattern feedback when discipline slips. Method, not luck.",
-    Icon: GraduationCap,
-    preview: (
-      <PreviewFrame>
-        <div className="text-[10px] uppercase tracking-[0.14em] text-emerald">
-          Morning · 7:00
-        </div>
-        <div className="mt-1.5 text-foreground/85">
-          BTC <span className="text-emerald">81,200</span> · RSI{" "}
-          <span className="text-emerald">64</span>
-        </div>
-        <div className="text-foreground/70">
-          Setup <span className="text-emerald">7/10</span>
-        </div>
-      </PreviewFrame>
-    ),
+    title: "Get Guidance",
+    description:
+      "Receive insights via Telegram chat or web dashboard. Morning briefings, setup checks, mid-trade questions, post-trade reviews.",
+    Icon: MessageCircle,
+    position: "right",
+    visual: <Chips items={["Telegram", "Web Dashboard"]} badge="24/7" />,
   },
 ];
 
-const easeOut = [0.16, 1, 0.3, 1] as const;
+const justifyClass: Record<Position, string> = {
+  left: "md:justify-start",
+  right: "md:justify-end",
+};
 
-function StepCard({ step, delay }: { step: Step; delay: number }) {
-  const reduce = useReducedMotion();
+function StageCard({ stage }: { stage: Stage }) {
   return (
-    <motion.article
-      initial={reduce ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.7, delay, ease: easeOut }}
-      className="group relative flex h-full min-h-[360px] flex-col gap-5 overflow-hidden rounded-2xl border border-border bg-surface p-7 transition-all duration-300 hover:-translate-y-1 hover:border-emerald/20 hover:shadow-[0_0_60px_-15px_rgba(16,185,129,0.25)] sm:p-8"
-    >
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute right-4 top-2 select-none bg-gradient-to-b from-emerald/[0.07] to-foreground/[0.02] bg-clip-text font-sans text-[112px] font-semibold leading-none tracking-tight text-transparent sm:text-[128px]"
-      >
-        {step.number}
-      </span>
-
-      <div className="relative flex size-10 items-center justify-center rounded-full border border-emerald/20 bg-emerald/[0.08] transition-transform duration-300 group-hover:scale-105">
-        <step.Icon
-          aria-hidden="true"
-          strokeWidth={1.6}
-          className="size-5 text-emerald"
-        />
-      </div>
-
-      <div className="relative flex flex-1 flex-col gap-3">
-        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-          <span>Step {step.number}</span>
-          <span aria-hidden="true" className="mx-2 text-border">
-            /
-          </span>
-          <span className="text-emerald/85">{step.name}</span>
-        </p>
-        <h3 className="text-xl font-semibold tracking-tight text-foreground sm:text-[22px]">
-          {step.title}
+    <div className={`flex justify-center ${justifyClass[stage.position]}`}>
+      <article className="group w-full max-w-[420px] rounded-2xl border border-border bg-surface p-6 transition-all duration-300 hover:-translate-y-0.5 hover:border-emerald/20 sm:p-7">
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-full border border-emerald/20 bg-emerald/[0.08] transition-transform duration-300 group-hover:scale-105">
+            <stage.Icon
+              aria-hidden="true"
+              strokeWidth={1.6}
+              className="size-5 text-emerald"
+            />
+          </div>
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+            Step {stage.number}
+          </p>
+        </div>
+        <h3 className="mt-5 text-xl font-semibold tracking-tight text-foreground sm:text-[22px]">
+          {stage.title}
         </h3>
-        <p className="text-[14px] leading-[1.7] text-muted-foreground sm:text-[15px]">
-          {step.body}
+        <p className="mt-3 text-[14px] leading-[1.7] text-muted-foreground sm:text-[15px]">
+          {stage.description}
         </p>
-      </div>
-
-      <div className="relative">{step.preview}</div>
-    </motion.article>
-  );
-}
-
-function ProgressLine() {
-  const ref = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    offset: ["start 70%", "end 30%"],
-  });
-  const fill = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
-
-  return (
-    <div
-      ref={ref}
-      aria-hidden="true"
-      className="pointer-events-none absolute left-0 right-0 top-1/2 hidden h-px -translate-y-1/2 overflow-hidden lg:block"
-    >
-      <div className="absolute inset-0 bg-border/80" />
-      <motion.div
-        className="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald/40 via-emerald to-emerald/40"
-        style={{ width: reduce ? "100%" : fill }}
-      />
+        <div className="mt-5">{stage.visual}</div>
+      </article>
     </div>
   );
 }
@@ -197,28 +189,54 @@ export function HowItWorks() {
       id="how-it-works"
       className="scroll-mt-16 px-6 py-24 sm:py-32 lg:py-40"
     >
-      <div className="mx-auto max-w-6xl">
-        <motion.h2
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.6, ease: easeOut }}
-          className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
-        >
-          How PT System works.
-        </motion.h2>
+      <div className="mx-auto max-w-5xl">
+        <Reveal>
+          <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+            How PT System works.
+          </h2>
+        </Reveal>
 
-        <div className="relative mt-14 sm:mt-20">
-          <ProgressLine />
-          <div className="relative grid gap-6 md:grid-cols-2 md:gap-8 lg:grid-cols-4 lg:gap-6">
-            {steps.map((step, idx) => (
-              <StepCard
-                key={step.number}
-                step={step}
-                delay={0.05 + idx * 0.15}
-              />
-            ))}
-          </div>
+        <Reveal delay={0.1}>
+          <p className="mt-6 max-w-2xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
+            From your exchange to your screen, in real time.
+          </p>
+        </Reveal>
+
+        <div className="mt-14 flex flex-col sm:mt-20">
+          {stages.map((stage, idx) => {
+            const next = stages[idx + 1];
+            return (
+              <div key={stage.number} className="flex flex-col">
+                <Reveal delay={0.05 + idx * 0.1}>
+                  <StageCard stage={stage} />
+                </Reveal>
+
+                {next && (
+                  <>
+                    {/* Desktop: bezier connector with traveling emerald dots. */}
+                    <Reveal
+                      delay={0.05 + idx * 0.1 + 0.05}
+                      className="hidden md:block"
+                    >
+                      <DataFlowConnector
+                        direction={
+                          stage.position === "left"
+                            ? "left-to-right"
+                            : "right-to-left"
+                        }
+                      />
+                    </Reveal>
+
+                    {/* Mobile: simple vertical gradient line. */}
+                    <div
+                      aria-hidden="true"
+                      className="mx-auto my-5 block h-10 w-px bg-gradient-to-b from-border to-emerald/40 md:hidden"
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </section>
