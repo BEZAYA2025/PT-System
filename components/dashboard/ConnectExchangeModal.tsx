@@ -17,13 +17,18 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 
+// All exchanges (Binance / Bybit / OKX) ship today with the same
+// exchange_type default of "binance" — no UI dropdown yet. When we add
+// Bybit/OKX selection this becomes a real form field.
+const DEFAULT_EXCHANGE_TYPE = "binance";
+
 const apiKeySchema = z.object({
-  api_key: z
+  exchange_api_key: z
     .string()
     .min(10, { error: "That looks too short — double-check the key." })
     .max(200)
     .trim(),
-  api_secret: z
+  exchange_api_secret: z
     .string()
     .min(10, { error: "That looks too short — double-check the secret." })
     .max(200)
@@ -53,7 +58,7 @@ export function ConnectExchangeModal({
     formState: { errors, isSubmitting },
   } = useForm<ApiKeyInput>({
     resolver: zodResolver(apiKeySchema),
-    defaultValues: { api_key: "", api_secret: "" },
+    defaultValues: { exchange_api_key: "", exchange_api_secret: "" },
   });
 
   const handleClose = () => {
@@ -71,10 +76,9 @@ export function ConnectExchangeModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          // Backend schema is generic: api_key_encrypted, api_secret_encrypted.
-          // Frontend stays exchange-agnostic.
-          api_key: values.api_key,
-          api_secret: values.api_secret,
+          exchange_api_key: values.exchange_api_key,
+          exchange_api_secret: values.exchange_api_secret,
+          exchange_type: DEFAULT_EXCHANGE_TYPE,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -165,39 +169,39 @@ export function ConnectExchangeModal({
           </div>
 
           <div>
-            <label htmlFor="api_key" className={labelClasses}>
+            <label htmlFor="exchange_api_key" className={labelClasses}>
               API key
             </label>
             <input
-              id="api_key"
+              id="exchange_api_key"
               type="text"
               autoComplete="off"
-              aria-invalid={errors.api_key ? "true" : undefined}
+              aria-invalid={errors.exchange_api_key ? "true" : undefined}
               className={`${inputClasses} mt-2 font-mono text-sm`}
-              {...register("api_key")}
+              {...register("exchange_api_key")}
             />
-            {errors.api_key && (
+            {errors.exchange_api_key && (
               <p role="alert" className={errorClasses}>
-                {errors.api_key.message}
+                {errors.exchange_api_key.message}
               </p>
             )}
           </div>
 
           <div>
-            <label htmlFor="api_secret" className={labelClasses}>
+            <label htmlFor="exchange_api_secret" className={labelClasses}>
               API secret
             </label>
             <input
-              id="api_secret"
+              id="exchange_api_secret"
               type="password"
               autoComplete="off"
-              aria-invalid={errors.api_secret ? "true" : undefined}
+              aria-invalid={errors.exchange_api_secret ? "true" : undefined}
               className={`${inputClasses} mt-2 font-mono text-sm`}
-              {...register("api_secret")}
+              {...register("exchange_api_secret")}
             />
-            {errors.api_secret && (
+            {errors.exchange_api_secret && (
               <p role="alert" className={errorClasses}>
-                {errors.api_secret.message}
+                {errors.exchange_api_secret.message}
               </p>
             )}
           </div>
