@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { requireUser, getDashboardSnapshot } from "@/lib/dal";
+import {
+  computeSetupSteps,
+  readSetupDismissed,
+  setupAllComplete,
+} from "@/lib/setup-steps";
 import { TierBadge } from "@/components/dashboard/TierBadge";
 import { QuotaIndicator } from "@/components/dashboard/QuotaIndicator";
 import { TradesTable } from "@/components/dashboard/TradesTable";
+import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
+import { SetupStatusIndicator } from "@/components/dashboard/SetupStatusIndicator";
 import { cardClasses } from "@/lib/ui";
 
 export const metadata: Metadata = {
@@ -14,7 +21,14 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const snapshot = await getDashboardSnapshot();
+  const [snapshot, setupDismissed] = await Promise.all([
+    getDashboardSnapshot(),
+    readSetupDismissed(),
+  ]);
+
+  const setupSteps = computeSetupSteps(user);
+  const allComplete = setupAllComplete(setupSteps);
+  const showStatusPill = allComplete || setupDismissed;
 
   return (
     <main id="main" className="px-6 py-10 sm:px-10 sm:py-14">
@@ -23,11 +37,20 @@ export default async function DashboardPage() {
           <div>
             <p className="text-sm text-muted-foreground">Welcome back</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {user.email}
+              {user.display_name || user.email}
             </h1>
           </div>
-          <TierBadge tier={user.tier} />
+          <div className="flex items-center gap-2">
+            {showStatusPill && <SetupStatusIndicator />}
+            <TierBadge tier={user.tier} />
+          </div>
         </header>
+
+        <SetupProgressCard
+          steps={setupSteps}
+          initiallyDismissed={setupDismissed}
+          displayName={user.display_name}
+        />
 
         <section className={cardClasses}>
           <QuotaIndicator
@@ -54,16 +77,14 @@ export default async function DashboardPage() {
             <h2 className="text-lg font-semibold tracking-tight text-foreground">
               Your open trades
             </h2>
-            <p className="text-xs text-muted-foreground">
-              from your Binance account
-            </p>
+            <p className="text-xs text-muted-foreground">from your exchange</p>
           </div>
           <TradesTable
             trades={snapshot?.open_trades ?? []}
             emptyMessage={
               user.binance_api_key_connected
                 ? "No open trades right now."
-                : "No open trades — connect your Binance API key in Settings."
+                : "Connect your exchange (above) and your open positions show up here."
             }
           />
         </section>

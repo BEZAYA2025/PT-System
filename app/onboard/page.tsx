@@ -12,20 +12,25 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+// Mirrors the backend payload of POST /api/auth/validate-signup-token:
+// either {email, subscription_tier, expires_at} on success or
+// {error: "..."} on 4xx — there is no `valid` flag and the tier field is
+// `subscription_tier`, not `tier`. The earlier shape mismatch made every
+// valid token appear expired.
 interface ValidateResponse {
-  valid: boolean;
   email?: string;
-  tier?: string;
+  subscription_tier?: string;
   expires_at?: string;
-  message?: string;
+  error?: string;
 }
 
 export default async function OnboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; debug?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token, debug } = await searchParams;
+  const debugMode = debug === "1";
 
   const safeToken = typeof token === "string" ? token.trim() : "";
 
@@ -42,14 +47,16 @@ export default async function OnboardPage({
   );
 
   if (!result.ok) {
-    return <Expired reason={result.message || "This setup link is invalid or has expired."} />;
+    const reason = debugMode
+      ? `[E1 backend-not-ok] status=${result.status} msg=${result.message}`
+      : result.message || "This setup link is invalid or has expired.";
+    return <Expired reason={reason} />;
   }
-  if (!result.data?.valid || !result.data.email || !result.data.tier) {
-    return (
-      <Expired
-        reason={result.data?.message || "This setup link is invalid or has expired."}
-      />
-    );
+  if (!result.data?.email || !result.data.subscription_tier) {
+    const reason = debugMode
+      ? `[E2 missing-fields] data=${JSON.stringify(result.data ?? null)}`
+      : result.data?.error || "This setup link is invalid or has expired.";
+    return <Expired reason={reason} />;
   }
 
   return (
@@ -65,11 +72,11 @@ export default async function OnboardPage({
 
           <div className="mt-10 sm:mt-12">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Finish setting up your account
+              Activate your account
             </h1>
             <p className="mt-3 text-base text-muted-foreground">
-              Two minutes. Set a password and connect a read-only Binance API
-              key so Aven can see your trades.
+              Set a password and pick a display name. You&apos;ll wire up
+              Telegram and Binance from the dashboard right after.
             </p>
           </div>
 
@@ -77,7 +84,7 @@ export default async function OnboardPage({
             <OnboardForm
               token={safeToken}
               email={result.data.email}
-              tier={result.data.tier}
+              tier={result.data.subscription_tier}
             />
           </div>
         </div>

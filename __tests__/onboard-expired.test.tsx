@@ -3,11 +3,12 @@ import OnboardPage from "@/app/onboard/page";
 
 // The onboard page is a Server Component that calls backendFetch. Mock the
 // module to bypass the network and exercise the "Expired" branch when token
-// validation fails (e.g. invalid token).
+// validation fails. Backend returns `{error: "..."}` on bad tokens — the page
+// reads `error` (not `message`) for the user-facing reason.
 jest.mock("@/lib/backend", () => ({
   backendFetch: jest.fn(async () => ({
     ok: true,
-    data: { valid: false, message: "Token expired." },
+    data: { error: "Token expired." },
   })),
 }));
 

@@ -19,10 +19,13 @@ export type SubscriptionStatus =
 export interface CurrentUser {
   id: string;
   email: string;
+  display_name: string | null;
   tier: Tier;
   telegram_username: string | null;
   subscription_status: SubscriptionStatus;
   subscription_period_end: string | null;
+  /** Backend field stays named binance_* for historical reasons but the UI
+   *  treats this as a generic exchange-API connection (Binance/Bybit/OKX). */
   binance_api_key_connected: boolean;
   binance_api_key_added_at: string | null;
   aven_quota_used: number;
