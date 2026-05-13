@@ -72,11 +72,11 @@ export default async function OnboardPage({
 
           <div className="mt-10 sm:mt-12">
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Finish setting up your account
+              Activate your account
             </h1>
             <p className="mt-3 text-base text-muted-foreground">
-              Two minutes. Set a password and connect a read-only Binance API
-              key so Aven can see your trades.
+              Set a password and pick a display name. You&apos;ll wire up
+              Telegram and Binance from the dashboard right after.
             </p>
           </div>
 
