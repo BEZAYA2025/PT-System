@@ -29,15 +29,9 @@ export function Founder() {
           </Reveal>
 
           <div>
-            <Reveal delay={0.05}>
-              <p className="font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Lead Trader
-              </p>
-            </Reveal>
-
             <Reveal delay={0.12}>
-              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
-                Built by a trader, not a marketer.
+              <h2 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl">
+                Built by a trader, for traders.
               </h2>
             </Reveal>
 
