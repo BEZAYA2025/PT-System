@@ -5,7 +5,6 @@ import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WaveRidingMethod } from "@/components/sections/WaveRidingMethod";
 import { Status } from "@/components/sections/Status";
 import { Founder } from "@/components/sections/Founder";
-import { FoundersNote } from "@/components/sections/FoundersNote";
 import { Footer } from "@/components/sections/Footer";
 
 export default function Home() {
@@ -19,7 +18,6 @@ export default function Home() {
         <WaveRidingMethod />
         <Status />
         <Founder />
-        <FoundersNote />
       </main>
       <Footer />
     </>
