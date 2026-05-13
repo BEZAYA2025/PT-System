@@ -12,12 +12,16 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+// Mirrors the backend payload of POST /api/auth/validate-signup-token:
+// either {email, subscription_tier, expires_at} on success or
+// {error: "..."} on 4xx — there is no `valid` flag and the tier field is
+// `subscription_tier`, not `tier`. The earlier shape mismatch made every
+// valid token appear expired.
 interface ValidateResponse {
-  valid: boolean;
   email?: string;
-  tier?: string;
+  subscription_tier?: string;
   expires_at?: string;
-  message?: string;
+  error?: string;
 }
 
 export default async function OnboardPage({
@@ -44,10 +48,10 @@ export default async function OnboardPage({
   if (!result.ok) {
     return <Expired reason={result.message || "This setup link is invalid or has expired."} />;
   }
-  if (!result.data?.valid || !result.data.email || !result.data.tier) {
+  if (!result.data?.email || !result.data.subscription_tier) {
     return (
       <Expired
-        reason={result.data?.message || "This setup link is invalid or has expired."}
+        reason={result.data?.error || "This setup link is invalid or has expired."}
       />
     );
   }
@@ -77,7 +81,7 @@ export default async function OnboardPage({
             <OnboardForm
               token={safeToken}
               email={result.data.email}
-              tier={result.data.tier}
+              tier={result.data.subscription_tier}
             />
           </div>
         </div>
