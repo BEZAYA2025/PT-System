@@ -27,9 +27,10 @@ interface ValidateResponse {
 export default async function OnboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ token?: string }>;
+  searchParams: Promise<{ token?: string; debug?: string }>;
 }) {
-  const { token } = await searchParams;
+  const { token, debug } = await searchParams;
+  const debugMode = debug === "1";
 
   const safeToken = typeof token === "string" ? token.trim() : "";
 
@@ -46,14 +47,16 @@ export default async function OnboardPage({
   );
 
   if (!result.ok) {
-    return <Expired reason={result.message || "This setup link is invalid or has expired."} />;
+    const reason = debugMode
+      ? `[E1 backend-not-ok] status=${result.status} msg=${result.message}`
+      : result.message || "This setup link is invalid or has expired.";
+    return <Expired reason={reason} />;
   }
   if (!result.data?.email || !result.data.subscription_tier) {
-    return (
-      <Expired
-        reason={result.data?.error || "This setup link is invalid or has expired."}
-      />
-    );
+    const reason = debugMode
+      ? `[E2 missing-fields] data=${JSON.stringify(result.data ?? null)}`
+      : result.data?.error || "This setup link is invalid or has expired.";
+    return <Expired reason={reason} />;
   }
 
   return (
