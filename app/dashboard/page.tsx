@@ -5,12 +5,12 @@ import {
   type MetricsView,
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
+import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
 import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import {
-  mockBrief,
   mockMessages,
   mockYourTrades,
   mockPaulsTrades,
@@ -24,26 +24,23 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// ITERATION 2 — TopStripMetrics now polls /api/proxy/snapshot every 60s.
-// Server fetches an initial seed via getRawSnapshot so the first paint shows
-// real numbers (no skeleton flash) when the backend is reachable. When the
-// backend is down or returns an unexpected shape, the client surfaces a
-// retry-able error banner without breaking the page.
-//
-// Remaining sections (DailyBriefCard, AvenChat, TradesGrid) still render
-// mock fixtures — they get wired in iterations 3, 4, and 5.
+// ITERATION 3 — Daily Brief now reads from /api/cockpit/snapshot via the
+// defensive shapeBrief() adapter. NotificationBell evolved into the full
+// NotificationCenter (Portal dropdown + bottom-sheet on mobile, mark-read,
+// detail modal). Notifications still mock; backend wires in iteration 6.
 
 export default async function DashboardPage() {
-  const raw = (await getRawSnapshot()) as RawSnapshotMetrics | null;
+  const raw = await getRawSnapshot();
   const initialMetrics: MetricsView | null = raw
-    ? buildMetricsView(raw, Date.now())
+    ? buildMetricsView(raw as RawSnapshotMetrics, Date.now())
     : null;
+  const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
 
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
       <TopStripMetrics initial={initialMetrics} />
 
-      <DailyBriefCard brief={mockBrief} />
+      <DailyBriefCard brief={initialBrief} />
 
       <AvenChat
         initialMessages={mockMessages}

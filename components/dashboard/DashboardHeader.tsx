@@ -8,15 +8,16 @@ import {
   IconX,
   IconLogout,
 } from "@tabler/icons-react";
-import { NotificationBell } from "./NotificationBell";
+import { NotificationCenter } from "./NotificationCenter";
+import type { NotificationItem } from "@/lib/mock-dashboard";
 
 interface Props {
   displayName: string;
   email: string;
-  unread: number;
+  notifications: NotificationItem[];
 }
 
-export function DashboardHeader({ displayName, email, unread }: Props) {
+export function DashboardHeader({ displayName, email, notifications }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -36,10 +37,7 @@ export function DashboardHeader({ displayName, email, unread }: Props) {
             PT System
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
-            <span
-              aria-hidden
-              className="relative flex size-1.5"
-            >
+            <span aria-hidden className="relative flex size-1.5">
               <span
                 className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
                 style={{ animationDuration: "2s" }}
@@ -55,7 +53,7 @@ export function DashboardHeader({ displayName, email, unread }: Props) {
           <span className="hidden text-sm text-muted-foreground md:inline">
             {displayName}
           </span>
-          <NotificationBell unread={unread} />
+          <NotificationCenter initial={notifications} />
           <Link
             href="/dashboard/settings"
             aria-label="Settings"
@@ -73,19 +71,22 @@ export function DashboardHeader({ displayName, email, unread }: Props) {
           </button>
         </div>
 
-        {/* Mobile menu trigger */}
-        <button
-          type="button"
-          aria-label="Open menu"
-          onClick={() => setMobileOpen((v) => !v)}
-          className="inline-flex size-10 items-center justify-center rounded-full border border-border bg-surface text-foreground sm:hidden"
-        >
-          {mobileOpen ? (
-            <IconX size={18} stroke={1.75} />
-          ) : (
-            <IconMenu2 size={18} stroke={1.75} />
-          )}
-        </button>
+        {/* Mobile right cluster — bell stays accessible */}
+        <div className="flex items-center gap-2 sm:hidden">
+          <NotificationCenter initial={notifications} />
+          <button
+            type="button"
+            aria-label="Open menu"
+            onClick={() => setMobileOpen((v) => !v)}
+            className="inline-flex size-10 items-center justify-center rounded-full border border-border bg-surface text-foreground"
+          >
+            {mobileOpen ? (
+              <IconX size={18} stroke={1.75} />
+            ) : (
+              <IconMenu2 size={18} stroke={1.75} />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile drawer */}
@@ -115,7 +116,6 @@ export function DashboardHeader({ displayName, email, unread }: Props) {
               <IconLogout size={16} stroke={1.75} />
               Sign out
             </button>
-            <NotificationBell unread={unread} />
           </div>
         </div>
       )}

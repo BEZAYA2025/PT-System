@@ -244,6 +244,80 @@ export const mockPaulsTrades: { active: MockTrade[]; recent: MockTrade[] } = {
   ],
 };
 
+export type NotificationKind = "setup" | "trade" | "system";
+
+export interface NotificationItem {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  detail: string;
+  ts: string;
+  read: boolean;
+  /** Optional context shown in the detail modal (e.g. confluence list). */
+  context?: string[];
+}
+
+export const mockNotifications: NotificationItem[] = [
+  {
+    id: "n1",
+    kind: "setup",
+    title: "Setup detected: BTC Zone #1 at $78,879",
+    detail: "4H Fib 0.5 + Daily Fib 0.5 + 1H Ray",
+    ts: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    read: false,
+    context: [
+      "4H Fibonacci 0.5 retracement aligns with daily 0.5",
+      "1H descending ray meets the zone",
+      "Funding still neutral — no crowd here yet",
+    ],
+  },
+  {
+    id: "n2",
+    kind: "trade",
+    title: "SL Distance Warning #2: ETH position approaching invalidation",
+    detail: "0.8% from SL",
+    ts: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
+    read: false,
+    context: [
+      "Mark price 3,712 vs SL 3,683",
+      "Position size 0.8x — well within risk limits",
+      "Consider trim or trail if structure breaks 3,690",
+    ],
+  },
+  {
+    id: "n3",
+    kind: "setup",
+    title: "Confluence forming: SOL liquidity sweep below 198",
+    detail: "Bid wall at 197.40 holding · F&G greed weakening",
+    ts: new Date(Date.now() - 1000 * 60 * 47).toISOString(),
+    read: false,
+  },
+  {
+    id: "n4",
+    kind: "trade",
+    title: "TP hit: AVAX +7.3% closed",
+    detail: "Position closed at 41.20 — +2.9R",
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+    read: true,
+  },
+  {
+    id: "n5",
+    kind: "system",
+    title: "Welcome to PT System, baba!",
+    detail: "Connect your exchange to start trading",
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+    read: true,
+  },
+  {
+    id: "n6",
+    kind: "trade",
+    title: "Position closed: BTC long +2.06%",
+    detail: "Filled at 71,280 — duration 8h",
+    ts: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+    read: true,
+  },
+];
+
 export interface MockUserView {
   email: string;
   displayName: string;

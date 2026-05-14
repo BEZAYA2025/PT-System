@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/dal";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { mockUserView } from "@/lib/mock-dashboard";
+import { mockUserView, mockNotifications } from "@/lib/mock-dashboard";
 
 export default async function DashboardLayout({
   children,
@@ -10,9 +10,9 @@ export default async function DashboardLayout({
   // Auth-gate: redirects to /signin when no access_token cookie.
   const user = await requireUser();
 
-  // ITERATION 1 — display_name + unread come from a mock fixture so the
-  // skeleton renders end-to-end. Iteration 5 wires display_name from DAL
-  // (after the onboarding-refactor lands) and unread from a real source.
+  // ITERATION 3 — display_name fallback to email until DAL exposes it
+  // (post onboarding-refactor merge). Notifications come from a mock
+  // fixture; iteration 6 swaps in /api/proxy/notifications.
   const displayName = mockUserView.displayName;
 
   return (
@@ -20,7 +20,7 @@ export default async function DashboardLayout({
       <DashboardHeader
         displayName={displayName}
         email={user.email}
-        unread={mockUserView.unreadNotifications}
+        notifications={mockNotifications}
       />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {children}
