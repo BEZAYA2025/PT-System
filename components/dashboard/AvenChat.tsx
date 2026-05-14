@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBrandTelegram,
   IconChevronUp,
   IconDeviceLaptop,
+  IconLoader2,
   IconMessageCircle,
   IconMicrophone,
   IconPlayerStopFilled,
@@ -389,6 +390,43 @@ interface ChatInputProps {
   limitReached: boolean;
 }
 
+function formatRecordingDuration(s: number): string {
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+function SoundWaveBars() {
+  // Five emerald bars riding three offset keyframe curves — gives the
+  // panel an obvious "audio is being captured" pulse without external deps.
+  const curves = [
+    { name: "pt-wave-a", delay: "0ms" },
+    { name: "pt-wave-b", delay: "120ms" },
+    { name: "pt-wave-c", delay: "240ms" },
+    { name: "pt-wave-a", delay: "360ms" },
+    { name: "pt-wave-b", delay: "480ms" },
+  ];
+  return (
+    <span aria-hidden className="flex h-6 items-center gap-[3px]">
+      {curves.map((c, i) => (
+        <span
+          key={i}
+          className="block w-[3px] rounded-full bg-emerald"
+          style={{
+            animation: `${c.name} 0.9s ease-in-out infinite`,
+            animationDelay: c.delay,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes pt-wave-a { 0%, 100% { height: 4px; } 50% { height: 20px; } }
+        @keyframes pt-wave-b { 0%, 100% { height: 8px; } 50% { height: 24px; } }
+        @keyframes pt-wave-c { 0%, 100% { height: 6px; } 50% { height: 14px; } }
+      `}</style>
+    </span>
+  );
+}
+
 function ChatInput({
   input,
   setInput,
@@ -405,6 +443,22 @@ function ChatInput({
   const recording = voice.recording;
   const transcribing = voice.transcribing;
   const micDisabled = limitReached || !voice.supported;
+
+  // Live elapsed counter while recording. Resets to 0 the moment voice
+  // toggles off so the panel doesn't flash a stale value next time round.
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!recording) {
+      setElapsed(0);
+      return;
+    }
+    const start = Date.now();
+    setElapsed(0);
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000));
+    }, 250);
+    return () => clearInterval(id);
+  }, [recording]);
 
   return (
     <form
@@ -449,15 +503,22 @@ function ChatInput({
           }}
           disabled={micDisabled || transcribing}
           className={[
-            "inline-flex size-11 shrink-0 items-center justify-center rounded-full border transition-colors",
+            "relative inline-flex shrink-0 items-center justify-center rounded-full border-2 transition-all",
             recording
-              ? "border-emerald bg-emerald/[0.18] text-emerald shadow-[0_0_28px_-4px_rgba(16,185,129,0.7)] animate-pulse"
+              ? "size-12 border-emerald bg-emerald/[0.22] text-emerald shadow-[0_0_32px_-2px_rgba(16,185,129,0.85)]"
               : transcribing
-                ? "border-emerald/40 bg-emerald/[0.06] text-emerald"
-                : "border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground",
+                ? "size-11 border-emerald/40 bg-emerald/[0.06] text-emerald"
+                : "size-11 border-border bg-background text-muted-foreground hover:border-foreground/30 hover:text-foreground",
             micDisabled && !recording ? "opacity-50" : "",
           ].join(" ")}
         >
+          {recording && (
+            <span
+              aria-hidden
+              className="absolute inset-0 rounded-full border-2 border-emerald/60 animate-ping"
+              style={{ animationDuration: "1.3s" }}
+            />
+          )}
           {recording ? (
             <IconPlayerStopFilled size={16} stroke={2} />
           ) : (
@@ -470,7 +531,7 @@ function ChatInput({
             type="button"
             onClick={cancelVoice}
             aria-label="Cancel recording"
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:border-red-400/40 hover:text-red-300"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-full border border-red-400/40 bg-background text-red-300 transition-colors hover:bg-red-500/[0.08]"
           >
             <IconX size={18} stroke={1.75} />
           </button>
@@ -479,27 +540,58 @@ function ChatInput({
         <label htmlFor="aven-input" className="sr-only">
           Ask Aven anything
         </label>
-        <textarea
-          id="aven-input"
-          rows={1}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          placeholder={
-            recording
-              ? "Recording…"
-              : transcribing
-                ? "Transcribing…"
-                : "Ask Aven anything…"
-          }
-          disabled={limitReached || recording}
-          className="block max-h-32 min-h-[44px] w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald disabled:opacity-50"
-        />
+
+        {recording ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-[44px] flex-1 items-center gap-3 rounded-2xl border-2 border-emerald/60 bg-emerald/[0.06] px-4 shadow-[0_0_24px_-6px_rgba(16,185,129,0.45)]"
+          >
+            <SoundWaveBars />
+            <span className="font-mono text-sm font-semibold text-emerald">
+              Recording {formatRecordingDuration(elapsed)}
+            </span>
+            <span className="ml-auto hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
+              Tap mic to send · X to cancel
+            </span>
+          </div>
+        ) : transcribing ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-[44px] flex-1 items-center gap-3 rounded-2xl border border-emerald/40 bg-emerald/[0.06] px-4"
+          >
+            <IconLoader2
+              size={16}
+              className="animate-spin text-emerald"
+              aria-hidden
+            />
+            <span className="font-mono text-sm text-emerald">
+              Transcribing your voice…
+            </span>
+          </div>
+        ) : (
+          <textarea
+            id="aven-input"
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Ask Aven anything…"
+            disabled={limitReached}
+            className="block max-h-32 min-h-[44px] w-full resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald disabled:opacity-50"
+          />
+        )}
 
         <button
           type="button"
           onClick={send}
-          disabled={limitReached || input.trim().length === 0 || recording}
+          disabled={
+            limitReached ||
+            input.trim().length === 0 ||
+            recording ||
+            transcribing
+          }
           aria-label="Send"
           className="inline-flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald text-background transition-colors hover:bg-emerald-hover disabled:cursor-not-allowed disabled:opacity-50"
         >

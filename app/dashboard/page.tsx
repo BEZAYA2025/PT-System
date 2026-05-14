@@ -57,15 +57,15 @@ export default async function DashboardPage() {
         <MarketPulse initial={initialMetrics} />
       </MotionSection>
 
-      <MotionSection tour="brief" delay={0.1}>
-        <DailyBriefCard brief={initialBrief} />
-      </MotionSection>
-
-      <MotionSection tour="aven" delay={0.16}>
+      <MotionSection tour="aven" delay={0.1}>
         <AvenChat
           initialMessages={history.messages}
           initialHasOlder={history.hasMore}
         />
+      </MotionSection>
+
+      <MotionSection tour="brief" delay={0.16}>
+        <DailyBriefCard brief={initialBrief} />
       </MotionSection>
 
       <MotionSection tour="trades" delay={0.22}>
