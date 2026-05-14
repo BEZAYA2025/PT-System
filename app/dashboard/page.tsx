@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import { getRawSnapshot } from "@/lib/dal";
+import {
+  buildMetricsView,
+  type MetricsView,
+  type RawSnapshotMetrics,
+} from "@/lib/metrics";
 import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import {
-  mockMetrics,
   mockBrief,
   mockMessages,
   mockYourTrades,
@@ -19,17 +24,24 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// ITERATION 1 — Skeleton with mock fixtures. Each section is replaced by a
-// real backend call in subsequent iterations:
-//   - Iteration 2: TopStrip ← /api/coinglass/*
-//   - Iteration 3: DailyBriefCard ← /api/cockpit/snapshot.latest_briefing
-//   - Iteration 4: TradesGrid ← /api/cockpit/snapshot.{open_trades,public_trades}
-//   - Iteration 5: AvenChat ← /api/proxy/aven/{history,chat,quota,voice}
+// ITERATION 2 — TopStripMetrics now polls /api/proxy/snapshot every 60s.
+// Server fetches an initial seed via getRawSnapshot so the first paint shows
+// real numbers (no skeleton flash) when the backend is reachable. When the
+// backend is down or returns an unexpected shape, the client surfaces a
+// retry-able error banner without breaking the page.
+//
+// Remaining sections (DailyBriefCard, AvenChat, TradesGrid) still render
+// mock fixtures — they get wired in iterations 3, 4, and 5.
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const raw = (await getRawSnapshot()) as RawSnapshotMetrics | null;
+  const initialMetrics: MetricsView | null = raw
+    ? buildMetricsView(raw, Date.now())
+    : null;
+
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
-      <TopStripMetrics metrics={mockMetrics} />
+      <TopStripMetrics initial={initialMetrics} />
 
       <DailyBriefCard brief={mockBrief} />
 

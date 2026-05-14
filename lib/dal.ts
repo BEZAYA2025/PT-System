@@ -100,3 +100,19 @@ export const getDashboardSnapshot = cache(
     return res.data;
   },
 );
+
+// Loose-typed snapshot fetch for callers that read fields beyond the
+// strictly-typed DashboardSnapshot (e.g. the live TopStrip metrics, whose
+// backend shape is still being finalized).
+export const getRawSnapshot = cache(
+  async (): Promise<Record<string, unknown> | null> => {
+    const token = await getAccessToken();
+    if (!token) return null;
+    const res = await backendFetch<Record<string, unknown>>(
+      "/api/cockpit/snapshot",
+      { method: "GET", token },
+    );
+    if (!res.ok) return null;
+    return res.data;
+  },
+);
