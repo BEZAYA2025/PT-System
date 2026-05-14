@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { X } from "lucide-react";
+import { IconX } from "@tabler/icons-react";
 
 interface ModalProps {
   open: boolean;
@@ -69,7 +69,7 @@ export function Modal({
           aria-label="Close"
           className="absolute right-4 top-4 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
         >
-          <X aria-hidden className="size-4" />
+          <IconX size={16} stroke={1.75} />
         </button>
         <h2
           id="modal-title"

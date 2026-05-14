@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { requireUser, getDashboardSnapshot } from "@/lib/dal";
 import {
-  computeSetupSteps,
-  readSetupDismissed,
-  setupAllComplete,
-} from "@/lib/setup-steps";
-import { TierBadge } from "@/components/dashboard/TierBadge";
-import { QuotaIndicator } from "@/components/dashboard/QuotaIndicator";
-import { TradesTable } from "@/components/dashboard/TradesTable";
-import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
-import { SetupStatusIndicator } from "@/components/dashboard/SetupStatusIndicator";
-import { cardClasses } from "@/lib/ui";
+  getInitialAvenHistory,
+  getRawSnapshot,
+  requireUser,
+} from "@/lib/dal";
+import {
+  buildMetricsView,
+  type MetricsView,
+  type RawSnapshotMetrics,
+} from "@/lib/metrics";
+import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
+import { shapeTrades } from "@/lib/trades";
+import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
+import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
+import { AvenChat } from "@/components/dashboard/AvenChat";
+import { TradesGrid } from "@/components/dashboard/TradesGrid";
+import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
+import { MotionSection } from "@/components/dashboard/MotionSection";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -19,141 +25,52 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
+// ITERATION 7 — Coached spotlight tour for first-time members and proper
+// daily-greeting integration.
+//   - SpotlightTour mounts only when user.first_login_completed === false.
+//     The 6-step flow targets sections via data-tour selectors (resilient to
+//     component refactors) and POSTs first-login-complete on Done/Skip.
+//   - The synthetic greeting injection from iter 5 is gone. The greeting is
+//     now a real Aven message stamped meta.greeting=true on the backend; the
+//     bubble surfaces a subtle "Daily greeting" badge.
+
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [snapshot, setupDismissed] = await Promise.all([
-    getDashboardSnapshot(),
-    readSetupDismissed(),
+  const [raw, history] = await Promise.all([
+    getRawSnapshot(),
+    getInitialAvenHistory(50),
   ]);
+  const fetchedAt = Date.now();
+  const initialMetrics: MetricsView | null = raw
+    ? buildMetricsView(raw as RawSnapshotMetrics, fetchedAt)
+    : null;
+  const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
+  const initialTrades = raw ? shapeTrades(raw, fetchedAt) : null;
 
-  const setupSteps = computeSetupSteps(user);
-  const allComplete = setupAllComplete(setupSteps);
-  const showStatusPill = allComplete || setupDismissed;
+  const showTour = user.first_login_completed === false;
 
   return (
-    <main id="main" className="px-6 py-10 sm:px-10 sm:py-14">
-      <div className="mx-auto max-w-5xl space-y-10">
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-              {user.display_name || user.email}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {showStatusPill && <SetupStatusIndicator />}
-            <TierBadge tier={user.tier} />
-          </div>
-        </header>
+    <main id="main" className="space-y-8 sm:space-y-10">
+      <MotionSection tour="market" delay={0.04}>
+        <TopStripMetrics initial={initialMetrics} />
+      </MotionSection>
 
-        <SetupProgressCard
-          steps={setupSteps}
-          initiallyDismissed={setupDismissed}
-          displayName={user.display_name}
+      <MotionSection tour="brief" delay={0.1}>
+        <DailyBriefCard brief={initialBrief} />
+      </MotionSection>
+
+      <MotionSection tour="aven" delay={0.16}>
+        <AvenChat
+          initialMessages={history.messages}
+          initialHasOlder={history.hasMore}
         />
+      </MotionSection>
 
-        <section className={cardClasses}>
-          <QuotaIndicator
-            used={user.aven_quota_used}
-            limit={user.aven_quota_limit}
-          />
-        </section>
+      <MotionSection tour="trades" delay={0.22}>
+        <TradesGrid initial={initialTrades} />
+      </MotionSection>
 
-        <section className="space-y-4">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Paul&apos;s latest trades
-            </h2>
-            <p className="text-xs text-muted-foreground">last 5 closed</p>
-          </div>
-          <TradesTable
-            trades={snapshot?.public_trades?.slice(0, 5) ?? []}
-            emptyMessage="No recent trades yet — Paul will surface here when the next idea fires."
-          />
-        </section>
-
-        <section className="space-y-4">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Your open trades
-            </h2>
-            <p className="text-xs text-muted-foreground">from your exchange</p>
-          </div>
-          <TradesTable
-            trades={snapshot?.open_trades ?? []}
-            emptyMessage={
-              user.binance_api_key_connected
-                ? "No open trades right now."
-                : "Connect your exchange (above) and your open positions show up here."
-            }
-          />
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Last Aven briefing
-          </h2>
-          {snapshot?.latest_briefing ? (
-            <article className={cardClasses}>
-              <p className="text-xs text-muted-foreground">
-                {new Date(
-                  snapshot.latest_briefing.created_at,
-                ).toLocaleString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </p>
-              <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-foreground">
-                {snapshot.latest_briefing.body}
-              </p>
-              {user.tier === "vip" && snapshot.latest_briefing.voice_url && (
-                <audio
-                  controls
-                  src={snapshot.latest_briefing.voice_url}
-                  className="mt-4 w-full"
-                />
-              )}
-            </article>
-          ) : (
-            <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
-              No briefing yet today — Aven posts shortly after market open.
-            </p>
-          )}
-        </section>
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Recent alerts
-          </h2>
-          {snapshot?.recent_alerts && snapshot.recent_alerts.length > 0 ? (
-            <ul className="divide-y divide-border rounded-lg border border-border">
-              {snapshot.recent_alerts.slice(0, 5).map((a) => (
-                <li
-                  key={a.id}
-                  className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-baseline sm:justify-between"
-                >
-                  <p className="text-sm text-foreground">{a.message}</p>
-                  <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                    {a.kind.replace("_", " ")} ·{" "}
-                    {new Date(a.created_at).toLocaleString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
-              No alerts in the last 24 hours.
-            </p>
-          )}
-        </section>
-      </div>
+      {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
     </main>
   );
 }
