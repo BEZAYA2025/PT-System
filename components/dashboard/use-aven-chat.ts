@@ -1,0 +1,494 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  shapeChatPost,
+  shapeMessage,
+  shapeQuota,
+  type ChatMessage,
+  type QuotaState,
+  type SendStatus,
+} from "@/lib/aven";
+
+const POLLING_FALLBACK_INTERVAL_MS = 5_000;
+const SSE_ERROR_THRESHOLD = 3;
+
+interface UseAvenChatOptions {
+  initialMessages: ChatMessage[];
+  initialQuota?: QuotaState | null;
+}
+
+interface VoiceState {
+  recording: boolean;
+  transcribing: boolean;
+  supported: boolean;
+  error: string | null;
+}
+
+export function useAvenChat({
+  initialMessages,
+  initialQuota = null,
+}: UseAvenChatOptions) {
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
+  const [quota, setQuota] = useState<QuotaState | null>(initialQuota);
+  const [thinking, setThinking] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const [voice, setVoice] = useState<VoiceState>({
+    recording: false,
+    transcribing: false,
+    supported: true,
+    error: null,
+  });
+  const [streamConnected, setStreamConnected] = useState(false);
+
+  // Refs ----------------------------------------------------------------------
+  const dedupRef = useRef<Set<string>>(new Set());
+  const lastChatIdRef = useRef<number>(0);
+  const esRef = useRef<EventSource | null>(null);
+  const sseErrorCountRef = useRef<number>(0);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recorderStreamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const cancelRecordingRef = useRef<boolean>(false);
+
+  // Helpers -------------------------------------------------------------------
+  const trackHighestId = useCallback((id: string) => {
+    const n = Number(id);
+    if (Number.isFinite(n) && n > lastChatIdRef.current) {
+      lastChatIdRef.current = n;
+    }
+  }, []);
+
+  const appendIfNew = useCallback(
+    (msg: ChatMessage) => {
+      if (dedupRef.current.has(msg.id)) return;
+      dedupRef.current.add(msg.id);
+      trackHighestId(msg.id);
+      setMessages((prev) => [...prev, msg]);
+    },
+    [trackHighestId],
+  );
+
+  // Seed dedup + cursor from initial messages on mount
+  useEffect(() => {
+    initialMessages.forEach((m) => {
+      dedupRef.current.add(m.id);
+      trackHighestId(m.id);
+    });
+    // Mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Quota fetch ---------------------------------------------------------------
+  const refreshQuota = useCallback(async () => {
+    try {
+      const res = await fetch("/api/proxy/aven/quota", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => ({}));
+      const shaped = shapeQuota(data);
+      if (shaped) setQuota(shaped);
+    } catch {
+      // Silent — quota refresh is non-critical.
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshQuota();
+  }, [refreshQuota]);
+
+  // SSE connection ------------------------------------------------------------
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+  }, []);
+
+  const pollOnce = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/proxy/aven/history?since_id=${lastChatIdRef.current}`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (!data) return;
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray((data as { messages?: unknown }).messages)
+          ? (data as { messages: unknown[] }).messages
+          : [];
+      list.forEach((raw) => {
+        const msg = shapeMessage(raw);
+        if (msg) appendIfNew(msg);
+      });
+    } catch {
+      // Silent — polling errors are non-critical.
+    }
+  }, [appendIfNew]);
+
+  const startPolling = useCallback(() => {
+    stopPolling();
+    pollTimerRef.current = setInterval(
+      () => void pollOnce(),
+      POLLING_FALLBACK_INTERVAL_MS,
+    );
+  }, [pollOnce, stopPolling]);
+
+  const closeStream = useCallback(() => {
+    if (esRef.current) {
+      esRef.current.close();
+      esRef.current = null;
+    }
+  }, []);
+
+  const openStream = useCallback(() => {
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      // Server-side or unsupported — fall back to polling immediately.
+      startPolling();
+      return;
+    }
+    closeStream();
+
+    const params = new URLSearchParams({
+      last_chat_id: String(lastChatIdRef.current),
+    });
+    const es = new EventSource(`/api/proxy/events?${params.toString()}`);
+    esRef.current = es;
+
+    es.addEventListener("open", () => {
+      setStreamConnected(true);
+      sseErrorCountRef.current = 0;
+      stopPolling();
+    });
+
+    es.addEventListener("connected", (e) => {
+      try {
+        const data = JSON.parse((e as MessageEvent).data ?? "{}");
+        if (typeof data.last_chat_id === "number") {
+          lastChatIdRef.current = Math.max(
+            lastChatIdRef.current,
+            data.last_chat_id,
+          );
+        }
+      } catch {
+        // ignore malformed payload
+      }
+    });
+
+    es.addEventListener("chat.message", (e) => {
+      try {
+        const raw = JSON.parse((e as MessageEvent).data ?? "{}");
+        const msg = shapeMessage(raw);
+        if (msg) appendIfNew(msg);
+      } catch {
+        // ignore malformed payload
+      }
+    });
+
+    es.addEventListener("notification.new", (e) => {
+      // Notification handling lives in the bell — emit a global custom event
+      // so the NotificationCenter can pick it up without a context provider.
+      try {
+        const raw = JSON.parse((e as MessageEvent).data ?? "{}");
+        window.dispatchEvent(
+          new CustomEvent("pt-system:notification", { detail: raw }),
+        );
+      } catch {
+        // ignore
+      }
+    });
+
+    es.onerror = () => {
+      setStreamConnected(false);
+      sseErrorCountRef.current += 1;
+      if (sseErrorCountRef.current >= SSE_ERROR_THRESHOLD) {
+        // Give up on SSE for now and switch to polling. EventSource will be
+        // re-attempted by the page lifecycle on next mount.
+        closeStream();
+        startPolling();
+      }
+    };
+  }, [appendIfNew, closeStream, startPolling, stopPolling]);
+
+  useEffect(() => {
+    openStream();
+    return () => {
+      closeStream();
+      stopPolling();
+    };
+    // Mount only — openStream uses the latest refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Send ----------------------------------------------------------------------
+  const performSend = useCallback(
+    async (content: string, localId: string) => {
+      try {
+        const res = await fetch("/api/proxy/aven/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.localId === localId ? { ...m, status: "failed" as SendStatus } : m,
+            ),
+          );
+          const fallback =
+            res.status === 429
+              ? "Daily limit reached. Upgrade to VIP for unlimited Aven."
+              : typeof data?.message === "string"
+                ? data.message
+                : "Send failed. Please try again.";
+          setSendError(fallback);
+          return;
+        }
+
+        const result = shapeChatPost(data);
+
+        setMessages((prev) => {
+          const next = prev.map((m) => {
+            if (m.localId !== localId) return m;
+            if (result.userMessage) {
+              dedupRef.current.add(result.userMessage.id);
+              trackHighestId(result.userMessage.id);
+              return result.userMessage;
+            }
+            return { ...m, status: "sent" as SendStatus, localId: undefined };
+          });
+          if (
+            result.avenMessage &&
+            !dedupRef.current.has(result.avenMessage.id)
+          ) {
+            dedupRef.current.add(result.avenMessage.id);
+            trackHighestId(result.avenMessage.id);
+            next.push(result.avenMessage);
+          }
+          return next;
+        });
+
+        if (result.quota) setQuota(result.quota);
+      } catch {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.localId === localId ? { ...m, status: "failed" as SendStatus } : m,
+          ),
+        );
+        setSendError("Connection issue. Please try again.");
+      } finally {
+        setThinking(false);
+      }
+    },
+    [trackHighestId],
+  );
+
+  const send = useCallback(
+    async (textOverride?: string) => {
+      const content = (textOverride ?? input).trim();
+      if (!content) return;
+      if (
+        quota &&
+        !quota.isUnlimited &&
+        quota.remaining_today <= 0
+      ) {
+        setSendError(
+          "Daily limit reached. Upgrade to VIP for unlimited Aven.",
+        );
+        return;
+      }
+
+      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const localMsg: ChatMessage = {
+        id: localId,
+        localId,
+        role: "user",
+        content,
+        ts: new Date().toISOString(),
+        source: "web",
+        status: "sending",
+      };
+
+      setMessages((prev) => [...prev, localMsg]);
+      setInput("");
+      setThinking(true);
+      setSendError(null);
+
+      void performSend(content, localId);
+    },
+    [input, quota, performSend],
+  );
+
+  const retry = useCallback(
+    async (localId: string) => {
+      const failed = messages.find((m) => m.localId === localId);
+      if (!failed) return;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.localId === localId ? { ...m, status: "sending" as SendStatus } : m,
+        ),
+      );
+      setThinking(true);
+      setSendError(null);
+      void performSend(failed.content, localId);
+    },
+    [messages, performSend],
+  );
+
+  // Voice ---------------------------------------------------------------------
+  const releaseRecorder = useCallback(() => {
+    recorderRef.current = null;
+    if (recorderStreamRef.current) {
+      recorderStreamRef.current.getTracks().forEach((t) => t.stop());
+      recorderStreamRef.current = null;
+    }
+    audioChunksRef.current = [];
+  }, []);
+
+  const startVoice = useCallback(async () => {
+    if (
+      typeof window === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
+      setVoice({
+        recording: false,
+        transcribing: false,
+        supported: false,
+        error: "Voice input isn't supported in this browser.",
+      });
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      recorderStreamRef.current = stream;
+      recorderRef.current = recorder;
+      audioChunksRef.current = [];
+      cancelRecordingRef.current = false;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        const cancelled = cancelRecordingRef.current;
+        const chunks = audioChunksRef.current.slice();
+        const mime = recorder.mimeType || "audio/webm";
+
+        if (cancelled || chunks.length === 0) {
+          releaseRecorder();
+          setVoice((v) => ({ ...v, recording: false, transcribing: false }));
+          return;
+        }
+
+        const blob = new Blob(chunks, { type: mime });
+        const fd = new FormData();
+        const ext = mime.includes("mp4")
+          ? "mp4"
+          : mime.includes("ogg")
+            ? "ogg"
+            : "webm";
+        fd.append("audio", blob, `voice.${ext}`);
+
+        setVoice((v) => ({ ...v, recording: false, transcribing: true }));
+        releaseRecorder();
+
+        try {
+          const res = await fetch("/api/proxy/aven/voice", {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const msg =
+              typeof data?.message === "string"
+                ? data.message
+                : "Voice transcription failed.";
+            setVoice({
+              recording: false,
+              transcribing: false,
+              supported: true,
+              error: msg,
+            });
+            return;
+          }
+          const transcribed: string =
+            typeof data?.transcribed_text === "string"
+              ? data.transcribed_text
+              : typeof data?.text === "string"
+                ? data.text
+                : "";
+          if (transcribed.length > 0) {
+            setInput((prev) => (prev ? `${prev} ${transcribed}` : transcribed));
+          }
+          setVoice({
+            recording: false,
+            transcribing: false,
+            supported: true,
+            error: null,
+          });
+        } catch {
+          setVoice({
+            recording: false,
+            transcribing: false,
+            supported: true,
+            error: "Connection issue while transcribing voice.",
+          });
+        }
+      };
+
+      recorder.start();
+      setVoice({
+        recording: true,
+        transcribing: false,
+        supported: true,
+        error: null,
+      });
+    } catch (err) {
+      const denied =
+        err instanceof DOMException && err.name === "NotAllowedError";
+      setVoice({
+        recording: false,
+        transcribing: false,
+        supported: !denied,
+        error: denied
+          ? "Microphone access denied. Enable it in your browser settings to use voice."
+          : "Couldn't start recording. Please try again.",
+      });
+    }
+  }, [releaseRecorder]);
+
+  const stopVoice = useCallback(() => {
+    cancelRecordingRef.current = false;
+    recorderRef.current?.stop();
+  }, []);
+
+  const cancelVoice = useCallback(() => {
+    cancelRecordingRef.current = true;
+    recorderRef.current?.stop();
+  }, []);
+
+  return {
+    messages,
+    quota,
+    thinking,
+    sendError,
+    input,
+    setInput,
+    voice,
+    streamConnected,
+    send,
+    retry,
+    startVoice,
+    stopVoice,
+    cancelVoice,
+  };
+}

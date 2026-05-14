@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { getRawSnapshot } from "@/lib/dal";
+import {
+  getInitialAvenHistory,
+  getRawSnapshot,
+  requireUser,
+} from "@/lib/dal";
 import {
   buildMetricsView,
   type MetricsView,
@@ -11,7 +15,6 @@ import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
-import { mockMessages, mockUserView } from "@/lib/mock-dashboard";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -20,15 +23,23 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// ITERATION 4 — TradesGrid now polls /api/proxy/snapshot at 30s, with a
-// defensive shapeTrades() that respects privacy contracts:
-//   YourTrade  → USD PnL + ROI %  (no R-multiple)
-//   PaulsTrade → ROI % + R-multiple + optional reasoning  (no USD PnL)
-// Click any row → TradeDetailModal with full fields and (for Paul) the
-// reasoning notes when present.
+// ITERATION 5 — Aven chat now wires to the live backend:
+//   - Initial history via getInitialAvenHistory (SSR seed)
+//   - Send via /api/proxy/aven/chat (optimistic UI, retry on fail)
+//   - Voice via /api/proxy/aven/voice (MediaRecorder → Whisper)
+//   - Quota via /api/proxy/aven/quota
+//   - Real-time via EventSource on /api/proxy/events (SSE Edge passthrough),
+//     with auto-fallback to /api/proxy/aven/history?since_id polling after
+//     three consecutive SSE errors.
+// Source-indicators (📱 Telegram / 💻 Web) on every bubble close the
+// Telegram-Sync visual contract.
 
 export default async function DashboardPage() {
-  const raw = await getRawSnapshot();
+  const user = await requireUser();
+  const [raw, initialMessages] = await Promise.all([
+    getRawSnapshot(),
+    getInitialAvenHistory(50),
+  ]);
   const fetchedAt = Date.now();
   const initialMetrics: MetricsView | null = raw
     ? buildMetricsView(raw as RawSnapshotMetrics, fetchedAt)
@@ -43,9 +54,10 @@ export default async function DashboardPage() {
       <DailyBriefCard brief={initialBrief} />
 
       <AvenChat
-        initialMessages={mockMessages}
-        quotaUsed={mockUserView.avenQuotaUsed}
-        quotaLimit={mockUserView.avenQuotaLimit}
+        initialMessages={initialMessages}
+        displayName={user.display_name ?? null}
+        firstLoginCompleted={user.first_login_completed}
+        lastVisitAt={user.last_dashboard_visit_at ?? null}
       />
 
       <TradesGrid initial={initialTrades} />

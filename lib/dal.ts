@@ -4,6 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendFetch } from "./backend";
+import { shapeMessages, type ChatMessage } from "./aven";
 
 export type Tier = "standard" | "vip";
 export type SubscriptionStatus =
@@ -19,6 +20,7 @@ export type SubscriptionStatus =
 export interface CurrentUser {
   id: string;
   email: string;
+  display_name?: string | null;
   tier: Tier;
   telegram_username: string | null;
   subscription_status: SubscriptionStatus;
@@ -27,6 +29,13 @@ export interface CurrentUser {
   binance_api_key_added_at: string | null;
   aven_quota_used: number;
   aven_quota_limit: number | null;
+  /** True once the welcome flow has been dismissed. Defaults undefined when
+   *  the backend doesn't yet expose this field — UI treats undefined as
+   *  "no welcome shown" for safety. */
+  first_login_completed?: boolean;
+  /** ISO timestamp of the previous dashboard visit. Used to drive the
+   *  daily-greeting injection. */
+  last_dashboard_visit_at?: string | null;
 }
 
 export const getAccessToken = cache(async (): Promise<string | null> => {
@@ -114,5 +123,20 @@ export const getRawSnapshot = cache(
     );
     if (!res.ok) return null;
     return res.data;
+  },
+);
+
+/** Initial Aven chat history for fast first paint. Empty array if the
+ *  backend is unreachable or returns nothing. */
+export const getInitialAvenHistory = cache(
+  async (limit = 50): Promise<ChatMessage[]> => {
+    const token = await getAccessToken();
+    if (!token) return [];
+    const res = await backendFetch<unknown>(
+      `/api/aven/history?limit=${limit}`,
+      { method: "GET", token },
+    );
+    if (!res.ok) return [];
+    return shapeMessages(res.data);
   },
 );
