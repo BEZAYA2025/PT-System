@@ -1,16 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   IconBell,
   IconAlertTriangle,
+  IconChartCandle,
+  IconCheck,
   IconInfoCircle,
+  IconMessageCircle,
+  IconRefresh,
   IconTargetArrow,
   IconX,
-  IconCheck,
-  IconRefresh,
   IconAlertCircle,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
@@ -54,16 +63,129 @@ function KindIcon({ kind }: { kind: NotificationKind }) {
   return <IconInfoCircle size={16} stroke={1.75} aria-hidden />;
 }
 
+// ---------------------------------------------------------------------------
+// Tiny inline markdown: **bold**, *bold* (Telegram), _italic_, \n → <br>.
+// Notification bodies come straight from the bot so they contain Telegram-
+// style formatting tokens. Render them as React nodes rather than literal
+// asterisks.
+// ---------------------------------------------------------------------------
+
+const INLINE_TOKEN = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|_[^_\n]+_)/;
+
+function parseInlineMarkdown(line: string): ReactNode {
+  const parts: ReactNode[] = [];
+  let remaining = line;
+  let key = 0;
+  while (remaining.length > 0) {
+    const m = remaining.match(INLINE_TOKEN);
+    if (!m || m.index === undefined) {
+      parts.push(remaining);
+      break;
+    }
+    if (m.index > 0) parts.push(remaining.slice(0, m.index));
+    const token = m[1];
+    if (token.startsWith("**")) {
+      parts.push(
+        <strong key={`b${key++}`} className="font-semibold text-foreground">
+          {token.slice(2, -2)}
+        </strong>,
+      );
+    } else if (token.startsWith("*")) {
+      parts.push(
+        <strong key={`b${key++}`} className="font-semibold text-foreground">
+          {token.slice(1, -1)}
+        </strong>,
+      );
+    } else if (token.startsWith("_")) {
+      parts.push(
+        <em key={`i${key++}`} className="italic">
+          {token.slice(1, -1)}
+        </em>,
+      );
+    }
+    remaining = remaining.slice(m.index + token.length);
+  }
+  return <>{parts}</>;
+}
+
+function renderMarkdown(text: string): ReactNode {
+  if (!text) return null;
+  const lines = text.split(/\r?\n/);
+  return (
+    <>
+      {lines.map((line, i) => (
+        <Fragment key={i}>
+          {parseInlineMarkdown(line)}
+          {i < lines.length - 1 && <br />}
+        </Fragment>
+      ))}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Structured setup-payload detection. When backend includes the relevant
+// metadata fields, the detail modal swaps the raw text body for the
+// Enhanced Setup Card.
+// ---------------------------------------------------------------------------
+
+interface StructuredSetup {
+  symbol: string;
+  side: string;
+  score: number | null;
+  entry: number | null;
+  sl: number | null;
+  tp: number | null;
+  timeframe: string | null;
+  confluence: string | null;
+}
+
+function detectStructuredSetup(
+  item: NotificationItem,
+): StructuredSetup | null {
+  if (item.kind !== "setup") return null;
+  const m = item.metadata;
+  if (!m || typeof m !== "object") return null;
+  const symbol =
+    typeof m.symbol === "string" && m.symbol.length > 0 ? m.symbol : null;
+  const side =
+    typeof m.side === "string" && m.side.length > 0 ? m.side : null;
+  if (!symbol || !side) return null;
+  const num = (v: unknown): number | null =>
+    typeof v === "number" && Number.isFinite(v) ? v : null;
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.length > 0 ? v : null;
+  return {
+    symbol,
+    side,
+    score: num(m.score),
+    entry: num(m.entry) ?? num(m.entry_price),
+    sl: num(m.sl) ?? num(m.stop_loss),
+    tp: num(m.tp) ?? num(m.take_profit),
+    timeframe: str(m.timeframe),
+    confluence: str(m.confluence) ?? str(m.confluence_text),
+  };
+}
+
+function fmtPrice(n: number | null): string {
+  if (n === null) return "—";
+  if (n >= 1000)
+    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return `$${n.toFixed(2)}`;
+}
+
+// ---------------------------------------------------------------------------
+
 interface Props {
   /** SSR seed — populates the bell badge instantly. */
   initial: NotificationItem[];
-  /** SSR seed of unread_count from the backend. */
-  initialUnreadCount: number;
+  /** SSR seed of unread_count from the backend. Kept for API compatibility
+   *  but ignored — bell + dropdown both derive from `list` now. */
+  initialUnreadCount?: number;
 }
 
-export function NotificationCenter({ initial, initialUnreadCount }: Props) {
+export function NotificationCenter({ initial }: Props) {
   const [list, setList] = useState<NotificationItem[]>(initial);
-  const [unreadCount, setUnreadCount] = useState<number>(initialUnreadCount);
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState<NotificationItem | null>(null);
   const [loading, setLoading] = useState(false);
@@ -71,10 +193,15 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
   const [pulseToken, setPulseToken] = useState(0);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inFlight = useRef(false);
 
+  // Single source of truth: bell, dropdown header, and ARIA label all
+  // derive the unread count from the same `list`. Bell+dropdown can't drift.
+  const unreadCount = list.filter((n) => !n.read).length;
+
   // ---------------------------------------------------------------------------
-  // Fetch + dedup helpers
+  // Fetch
   // ---------------------------------------------------------------------------
 
   const fetchOnce = useCallback(async () => {
@@ -86,13 +213,14 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
         cache: "no-store",
       });
       if (!res.ok) {
+        // Keep any existing list. Only surface a banner when we genuinely
+        // have nothing to show.
         setError(`Notifications ${res.status}`);
         return;
       }
       const data = await res.json().catch(() => null);
       const shaped = shapeNotificationsResponse(data);
       setList(shaped.notifications);
-      setUnreadCount(shaped.unreadCount);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -102,7 +230,6 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
     }
   }, [list.length]);
 
-  // Refresh on tab visibility — catches missed events.
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === "visible") void fetchOnce();
@@ -111,7 +238,7 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, [fetchOnce]);
 
-  // Listen to SSE-driven notifications dispatched by the Aven chat hook.
+  // SSE-driven notifications (dispatched by the Aven chat hook).
   useEffect(() => {
     const handler = (ev: Event) => {
       const ce = ev as CustomEvent<unknown>;
@@ -121,58 +248,42 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
         if (prev.some((n) => n.id === shaped.id)) return prev;
         return [shaped, ...prev];
       });
-      setUnreadCount((c) => c + (shaped.read ? 0 : 1));
-      setPulseToken((t) => t + 1); // restart bell pulse
+      setPulseToken((t) => t + 1);
     };
     window.addEventListener("pt-system:notification", handler);
-    return () => window.removeEventListener("pt-system:notification", handler);
+    return () =>
+      window.removeEventListener("pt-system:notification", handler);
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Mark-read mutations (optimistic with rollback)
+  // Mark-read (optimistic with rollback)
   // ---------------------------------------------------------------------------
 
   const markRead = useCallback(async (id: string) => {
     let prevList: NotificationItem[] = [];
-    let prevCount = 0;
     setList((cur) => {
       prevList = cur;
-      const next = cur.map((n) =>
+      return cur.map((n) =>
         n.id === id && !n.read ? { ...n, read: true } : n,
       );
-      return next;
     });
-    setUnreadCount((c) => {
-      prevCount = c;
-      const target = prevList.find((n) => n.id === id);
-      return target && !target.read ? Math.max(0, c - 1) : c;
-    });
-
     try {
       const res = await fetch(`/api/proxy/notifications/${id}/read`, {
         method: "POST",
       });
       if (!res.ok) throw new Error(`Mark-read ${res.status}`);
     } catch {
-      // Roll back local state
       setList(prevList);
-      setUnreadCount(prevCount);
     }
   }, []);
 
   const markAllRead = useCallback(async () => {
     if (unreadCount === 0) return;
     let prevList: NotificationItem[] = [];
-    let prevCount = 0;
     setList((cur) => {
       prevList = cur;
       return cur.map((n) => ({ ...n, read: true }));
     });
-    setUnreadCount((c) => {
-      prevCount = c;
-      return 0;
-    });
-
     try {
       const res = await fetch("/api/proxy/notifications/read-all", {
         method: "POST",
@@ -180,23 +291,20 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
       if (!res.ok) throw new Error(`Mark-all ${res.status}`);
     } catch {
       setList(prevList);
-      setUnreadCount(prevCount);
     }
   }, [unreadCount]);
 
   // ---------------------------------------------------------------------------
-  // Click-outside / ESC for the panel
+  // Click-outside / ESC — accounts for the portal'd panel
   // ---------------------------------------------------------------------------
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
-      ) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (wrapperRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -215,6 +323,10 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
     setOpen(false);
   };
 
+  // Only show the error banner when the list is empty — partial failures
+  // shouldn't blame the user-visible UI when there's still data to read.
+  const showError = error !== null && list.length === 0;
+
   return (
     <>
       <div ref={wrapperRef} className="relative inline-flex">
@@ -222,7 +334,6 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
           type="button"
           onClick={() => {
             setOpen((v) => !v);
-            // Re-sync on open in case we opened with stale local state.
             if (!open) void fetchOnce();
           }}
           aria-label={
@@ -248,9 +359,10 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
           typeof document !== "undefined" &&
           createPortal(
             <NotificationPanel
+              panelRef={panelRef}
               list={list}
               loading={loading}
-              error={error}
+              showError={showError}
               hasUnread={unreadCount > 0}
               onClose={() => setOpen(false)}
               onMarkAllRead={() => void markAllRead()}
@@ -266,10 +378,23 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
           open={true}
           onClose={() => setDetail(null)}
           title={detail.title}
-          description={detail.detail}
           size="md"
         >
-          <NotificationDetailBody item={detail} />
+          <NotificationDetailBody
+            item={detail}
+            onMarkRead={() => {
+              if (!detail.read) void markRead(detail.id);
+              setDetail(null);
+            }}
+            onAvenExplain={() => {
+              window.dispatchEvent(
+                new CustomEvent("pt-system:aven-explain", {
+                  detail: { notification: detail },
+                }),
+              );
+              setDetail(null);
+            }}
+          />
         </Modal>
       )}
     </>
@@ -279,15 +404,10 @@ export function NotificationCenter({ initial, initialUnreadCount }: Props) {
 // ---------------------------------------------------------------------------
 
 function BellWithPulse({ pulseToken }: { pulseToken: number }) {
-  // Re-mount the icon when pulseToken changes so the animation restarts.
   return (
     <span
       key={pulseToken}
-      className={
-        pulseToken > 0
-          ? "inline-flex animate-[wiggle_0.6s_ease-in-out]"
-          : "inline-flex"
-      }
+      className="inline-flex"
       style={{
         animation: pulseToken > 0 ? "ptBellRing 0.8s ease-in-out" : undefined,
       }}
@@ -311,24 +431,27 @@ function BellWithPulse({ pulseToken }: { pulseToken: number }) {
 // ---------------------------------------------------------------------------
 
 function NotificationPanel({
+  panelRef,
   list,
   loading,
-  error,
+  showError,
   hasUnread,
   onClose,
   onMarkAllRead,
   onClick,
   onRetry,
 }: {
+  panelRef: React.RefObject<HTMLDivElement | null>;
   list: NotificationItem[];
   loading: boolean;
-  error: string | null;
+  showError: boolean;
   hasUnread: boolean;
   onClose: () => void;
   onMarkAllRead: () => void;
   onClick: (n: NotificationItem) => void;
   onRetry: () => void;
 }) {
+  const unread = list.filter((n) => !n.read).length;
   return (
     <>
       {/* Mobile backdrop */}
@@ -340,13 +463,14 @@ function NotificationPanel({
       />
 
       <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Notifications"
         className={[
           "fixed z-50 flex flex-col overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-2xl",
           "inset-x-3 bottom-3 max-h-[78vh]",
-          "sm:bottom-auto sm:left-auto sm:right-3 sm:top-16 sm:inset-x-auto sm:w-[380px] sm:max-h-[70vh]",
+          "sm:bottom-auto sm:left-auto sm:right-3 sm:top-16 sm:inset-x-auto sm:w-[400px] sm:max-h-[70vh]",
         ].join(" ")}
       >
         <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -359,7 +483,7 @@ function NotificationPanel({
                 ? "Loading…"
                 : list.length === 0
                   ? "Empty"
-                  : `${list.filter((n) => !n.read).length} unread · ${list.length} total`}
+                  : `${unread} unread · ${list.length} total`}
             </p>
           </div>
           <div className="flex items-center gap-1">
@@ -384,7 +508,7 @@ function NotificationPanel({
           </div>
         </header>
 
-        {error && (
+        {showError && (
           <div className="border-b border-amber-500/20 bg-amber-500/[0.06] px-4 py-2">
             <div className="flex items-center justify-between gap-2 text-xs">
               <p className="flex items-center gap-2 text-amber-200">
@@ -405,7 +529,7 @@ function NotificationPanel({
 
         {loading ? (
           <SkeletonList />
-        ) : list.length === 0 && !error ? (
+        ) : list.length === 0 && !showError ? (
           <div className="flex flex-1 items-center justify-center px-6 py-10">
             <div className="text-center">
               <span className="mx-auto mb-3 inline-flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground">
@@ -474,58 +598,70 @@ function NotificationRowInner({
 
   return (
     <button
-        type="button"
-        onClick={onClick}
+      type="button"
+      onClick={onClick}
+      className={[
+        "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors",
+        item.read
+          ? "bg-transparent hover:bg-surface"
+          : "bg-emerald/[0.03] hover:bg-emerald/[0.06]",
+      ].join(" ")}
+    >
+      <span
+        aria-hidden
         className={[
-          "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors",
-          item.read
-            ? "bg-transparent hover:bg-surface"
-            : "bg-emerald/[0.03] hover:bg-emerald/[0.06]",
+          "inline-flex size-8 shrink-0 items-center justify-center rounded-full",
+          tone.iconBg,
+          tone.iconText,
+          !item.read ? `ring-2 ${tone.ringWhenUnread}` : "",
         ].join(" ")}
       >
-        <span
-          aria-hidden
+        <KindIcon kind={item.kind} />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p
           className={[
-            "inline-flex size-8 shrink-0 items-center justify-center rounded-full",
-            tone.iconBg,
-            tone.iconText,
-            !item.read ? `ring-2 ${tone.ringWhenUnread}` : "",
+            "line-clamp-2 text-sm",
+            item.read
+              ? "text-muted-foreground"
+              : "font-medium text-foreground",
           ].join(" ")}
         >
-          <KindIcon kind={item.kind} />
-        </span>
-        <div className="flex-1 min-w-0">
-          <p
-            className={[
-              "text-sm",
-              item.read
-                ? "text-muted-foreground"
-                : "font-medium text-foreground",
-            ].join(" ")}
-          >
-            {item.title}
+          {item.title}
+        </p>
+        {item.detail && (
+          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+            {renderMarkdown(item.detail)}
           </p>
-          {item.detail && (
-            <p className="mt-0.5 truncate text-xs text-muted-foreground">
-              {item.detail}
-            </p>
-          )}
-          <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {tone.label} · {timeAgo(item.ts)}
-          </p>
-        </div>
-        {!item.read && (
-          <span
-            aria-hidden
-            className="mt-2 inline-flex size-1.5 shrink-0 rounded-full bg-emerald"
-          />
         )}
-      </button>
+        <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {tone.label} · {timeAgo(item.ts)}
+        </p>
+      </div>
+      {!item.read && (
+        <span
+          aria-hidden
+          className="mt-2 inline-flex size-1.5 shrink-0 rounded-full bg-emerald"
+        />
+      )}
+    </button>
   );
 }
 
-function NotificationDetailBody({ item }: { item: NotificationItem }) {
+// ---------------------------------------------------------------------------
+
+function NotificationDetailBody({
+  item,
+  onMarkRead,
+  onAvenExplain,
+}: {
+  item: NotificationItem;
+  onMarkRead: () => void;
+  onAvenExplain: () => void;
+}) {
   const tone = KIND_TONE[item.kind];
+  const structured = detectStructuredSetup(item);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
@@ -539,6 +675,14 @@ function NotificationDetailBody({ item }: { item: NotificationItem }) {
           {timeAgo(item.ts)}
         </span>
       </div>
+
+      {structured ? (
+        <EnhancedSetupCard data={structured} />
+      ) : item.detail ? (
+        <div className="rounded-lg border border-border bg-surface p-4 text-sm leading-relaxed text-foreground">
+          {renderMarkdown(item.detail)}
+        </div>
+      ) : null}
 
       {item.context && item.context.length > 0 && (
         <div className="rounded-lg border border-border bg-surface p-4">
@@ -558,17 +702,116 @@ function NotificationDetailBody({ item }: { item: NotificationItem }) {
         </div>
       )}
 
-      {item.kind === "setup" && (
-        <p className="rounded-lg border border-dashed border-border bg-surface/40 px-4 py-3 text-xs text-muted-foreground">
-          Chart preview + Aven context land in iteration 7 alongside deep-link
-          actions.
-        </p>
+      {/* Action row — Aven explain is wired to a window event so AvenChat
+       *  can pick it up; chart link is a placeholder until backend exposes
+       *  a chart URL or symbol-aware route. */}
+      <div className="flex flex-wrap gap-2">
+        {item.kind === "setup" && (
+          <button
+            type="button"
+            onClick={onAvenExplain}
+            className="inline-flex items-center gap-1.5 rounded-full bg-emerald px-3 py-1.5 text-xs font-medium text-background transition-colors hover:bg-emerald-hover"
+          >
+            <IconMessageCircle size={12} stroke={2} />
+            Aven explain
+          </button>
+        )}
+        {structured && (
+          <button
+            type="button"
+            disabled
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground"
+          >
+            <IconChartCandle size={12} stroke={1.75} />
+            Open chart
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onMarkRead}
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-foreground/30"
+        >
+          <IconCheck size={12} stroke={2} />
+          {item.read ? "Close" : "Mark read"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function EnhancedSetupCard({ data }: { data: StructuredSetup }) {
+  const sideTone =
+    data.side.toLowerCase() === "short"
+      ? "bg-red-500/[0.1] text-red-300"
+      : "bg-emerald/[0.1] text-emerald";
+  return (
+    <div className="space-y-4 rounded-lg border border-emerald/20 bg-emerald/[0.04] p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-sm font-semibold text-foreground">
+          {data.symbol}
+        </span>
+        <span
+          className={`inline-flex items-center rounded-md px-1.5 py-0.5 font-mono text-[10px] uppercase ${sideTone}`}
+        >
+          {data.side}
+        </span>
+        {data.timeframe && (
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            {data.timeframe}
+          </span>
+        )}
+        {data.score !== null && (
+          <span className="ml-auto font-mono text-[11px] text-emerald">
+            Score {data.score.toFixed(0)}/10
+          </span>
+        )}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <SetupField label="Entry" value={fmtPrice(data.entry)} />
+        <SetupField
+          label="Stop loss"
+          value={fmtPrice(data.sl)}
+          tone="text-red-300"
+        />
+        <SetupField
+          label="Take profit"
+          value={fmtPrice(data.tp)}
+          tone="text-emerald"
+        />
+      </div>
+
+      {data.confluence && (
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Confluence
+          </p>
+          <p className="mt-1 text-sm text-foreground">{data.confluence}</p>
+        </div>
       )}
-      {item.kind === "trade" && (
-        <p className="rounded-lg border border-dashed border-border bg-surface/40 px-4 py-3 text-xs text-muted-foreground">
-          Trade view + position-level chart land in iteration 7.
-        </p>
-      )}
+    </div>
+  );
+}
+
+function SetupField({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-background px-3 py-2">
+      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p
+        className={`mt-1 font-mono text-sm font-semibold ${tone ?? "text-foreground"}`}
+      >
+        {value}
+      </p>
     </div>
   );
 }
