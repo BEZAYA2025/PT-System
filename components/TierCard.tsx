@@ -83,10 +83,10 @@ export function TierCard({
   return (
     <div
       className={[
-        "relative flex flex-col rounded-2xl border bg-surface/40 p-6 sm:p-8",
+        "relative flex flex-col rounded-2xl border p-6 sm:p-8 transition-colors",
         recommended
-          ? "border-emerald/40 shadow-[0_0_0_1px_rgba(16,185,129,0.15),0_0_60px_-20px_rgba(16,185,129,0.45)]"
-          : "border-border",
+          ? "border-emerald/50 bg-gradient-to-b from-emerald/[0.06] to-surface shadow-[0_0_0_1px_rgba(16,185,129,0.2),0_0_80px_-20px_rgba(16,185,129,0.55)]"
+          : "border-border/80 bg-surface hover:border-border",
       ].join(" ")}
     >
       {recommended && (

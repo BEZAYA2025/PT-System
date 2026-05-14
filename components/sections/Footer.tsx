@@ -21,8 +21,26 @@ export function Footer() {
 
           <nav
             aria-label="Footer"
-            className="flex items-center gap-6 text-sm text-muted-foreground sm:justify-end"
+            className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-muted-foreground sm:justify-end"
           >
+            <Link
+              href="/pricing"
+              className="transition-colors hover:text-foreground"
+            >
+              Pricing
+            </Link>
+            <Link
+              href="/signin"
+              className="transition-colors hover:text-foreground"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/dashboard"
+              className="transition-colors hover:text-foreground"
+            >
+              Dashboard
+            </Link>
             <Link
               href="/privacy"
               className="transition-colors hover:text-foreground"

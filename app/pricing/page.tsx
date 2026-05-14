@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { TierCard } from "@/components/TierCard";
+import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
 
 export const metadata: Metadata = {
@@ -31,20 +31,25 @@ const VIP_FEATURES = [
 export default function PricingPage() {
   return (
     <>
-      <main id="main" className="flex-1 px-6 py-20 sm:py-28">
-        <div className="mx-auto w-full max-w-5xl">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← Back
-          </Link>
+      <SiteHeader />
+      <main id="main" className="relative flex-1 overflow-hidden px-6 py-20 sm:py-28">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 -z-10"
+        >
+          <div className="absolute left-1/2 top-[-10%] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-emerald/[0.05] blur-[140px]" />
+        </div>
 
-          <div className="mt-10 max-w-2xl sm:mt-12">
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-5xl">
+        <div className="mx-auto w-full max-w-5xl">
+          <div className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald/30 bg-emerald/[0.06] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.1em] text-emerald">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-emerald" />
+              Now live
+            </span>
+            <h1 className="mt-6 text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-6xl">
               Choose your tier
             </h1>
-            <p className="mt-4 text-base text-muted-foreground sm:text-lg">
+            <p className="mt-5 text-base text-muted-foreground sm:text-lg sm:leading-[1.7]">
               Trade alongside Paul. Both tiers ship with Aven, the live trades
               feed, and the Vault Knowledge Base. VIP unlocks setup-alerts,
               unlimited Aven, and the methodology archive.

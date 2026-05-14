@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { SignInForm } from "@/components/SignInForm";
+import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
 
 export const metadata: Metadata = {
@@ -13,16 +14,10 @@ export const metadata: Metadata = {
 export default function SignInPage() {
   return (
     <>
-      <main id="main" className="flex-1 px-6 py-20 sm:py-28">
+      <SiteHeader />
+      <main id="main" className="flex-1 px-6 py-16 sm:py-24">
         <div className="mx-auto w-full max-w-md">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            ← Back
-          </Link>
-
-          <div className="mt-10 sm:mt-12">
+          <div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
               Sign in to PT System
             </h1>
