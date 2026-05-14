@@ -71,12 +71,37 @@ export function useAvenChat({
     }
   }, []);
 
+  /**
+   * Append an inbound message (SSE / poll). Dedup by id AND by content+role
+   * match — if a pending local optimistic row matches, replace it in place
+   * rather than adding a duplicate alongside the server-confirmed version.
+   */
   const appendIfNew = useCallback(
     (msg: ChatMessage) => {
       if (dedupRef.current.has(msg.id)) return;
       dedupRef.current.add(msg.id);
       trackHighestId(msg.id);
-      setMessages((prev) => [...prev, msg]);
+      setMessages((prev) => {
+        // Look for a pending local row with matching role+content. Most
+        // commonly user echoes back from the server, but Aven replies that
+        // arrive via SSE can also collide with the POST-response append.
+        const pendingIdx = prev.findIndex(
+          (m) =>
+            (m.localId !== undefined || m.status === "sending") &&
+            m.role === msg.role &&
+            m.content === msg.content,
+        );
+        if (pendingIdx !== -1) {
+          const next = prev.slice();
+          next[pendingIdx] = {
+            ...msg,
+            localId: undefined,
+            status: "sent",
+          };
+          return next;
+        }
+        return [...prev, msg];
+      });
     },
     [trackHighestId],
   );
@@ -87,6 +112,39 @@ export function useAvenChat({
       dedupRef.current.add(m.id);
       trackHighestId(m.id);
     });
+    // Mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Daily-greeting trigger — fires on mount. Backend returns the greeting
+  // payload when last_dashboard_visit_at is >=8h ago (or null) and persists
+  // it server-side. We append it locally too so the bubble appears
+  // immediately rather than after the next /history refresh.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/proxy/aven/greeting", {
+          cache: "no-store",
+        });
+        if (cancelled || !res.ok) return;
+        const data = await res.json().catch(() => null);
+        const greetingRaw = data && typeof data === "object"
+          ? (data as { greeting?: unknown }).greeting
+          : null;
+        if (!greetingRaw) return;
+        const msg = shapeMessage(greetingRaw);
+        if (msg) {
+          // Tag as greeting in case the backend didn't set the meta flag.
+          appendIfNew({ ...msg, isGreeting: true });
+        }
+      } catch {
+        // Silent — greeting is non-critical.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
     // Mount only
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -191,12 +249,22 @@ export function useAvenChat({
     es.addEventListener("chat.message", (e) => {
       try {
         const raw = JSON.parse((e as MessageEvent).data ?? "{}");
+        // Diagnostic for telegram-sync verification (D3) — visible in
+        // browser console so a tester can see exactly what arrives.
+        // eslint-disable-next-line no-console
+        console.log("[sse:chat.message]", raw);
         const msg = shapeMessage(raw);
         if (msg) appendIfNew(msg);
       } catch {
         // ignore malformed payload
       }
     });
+
+    // Fallback for events the backend may emit under a different name.
+    es.onmessage = (e) => {
+      // eslint-disable-next-line no-console
+      console.log("[sse:default]", e.data);
+    };
 
     es.addEventListener("notification.new", (e) => {
       // Notification handling lives in the bell — emit a global custom event
@@ -299,23 +367,41 @@ export function useAvenChat({
         const result = shapeChatPost(data);
 
         setMessages((prev) => {
-          const next = prev.map((m) => {
-            if (m.localId !== localId) return m;
-            // Replace the optimistic local row with the server-confirmed
-            // user message id, but keep the local content/timestamp.
-            if (result.userMessageId) {
-              dedupRef.current.add(result.userMessageId);
-              trackHighestId(result.userMessageId);
+          // If SSE already delivered the user message with the real id
+          // (and `appendIfNew` replaced the local row in place), the local
+          // row no longer exists in `prev` — that's already correct.
+          // Otherwise: convert the optimistic local row to its real id.
+          let next: ChatMessage[];
+          if (
+            result.userMessageId &&
+            dedupRef.current.has(result.userMessageId)
+          ) {
+            // SSE already won the race → drop any stale local row carrying
+            // the same localId to be safe.
+            next = prev.filter((m) => m.localId !== localId);
+          } else {
+            next = prev.map((m) => {
+              if (m.localId !== localId) return m;
+              if (result.userMessageId) {
+                dedupRef.current.add(result.userMessageId);
+                trackHighestId(result.userMessageId);
+                return {
+                  ...m,
+                  id: result.userMessageId,
+                  content: result.userContentEcho ?? m.content,
+                  status: "sent" as SendStatus,
+                  localId: undefined,
+                };
+              }
               return {
                 ...m,
-                id: result.userMessageId,
-                content: result.userContentEcho ?? m.content,
                 status: "sent" as SendStatus,
                 localId: undefined,
               };
-            }
-            return { ...m, status: "sent" as SendStatus, localId: undefined };
-          });
+            });
+          }
+
+          // Append Aven reply unless SSE already brought it in.
           if (
             result.avenMessageId &&
             result.reply &&
@@ -323,13 +409,16 @@ export function useAvenChat({
           ) {
             dedupRef.current.add(result.avenMessageId);
             trackHighestId(result.avenMessageId);
-            next.push({
-              id: result.avenMessageId,
-              role: "aven",
-              content: result.reply,
-              ts: new Date().toISOString(),
-              source: "web",
-            });
+            next = [
+              ...next,
+              {
+                id: result.avenMessageId,
+                role: "aven",
+                content: result.reply,
+                ts: new Date().toISOString(),
+                source: "web",
+              },
+            ];
           }
           return next;
         });

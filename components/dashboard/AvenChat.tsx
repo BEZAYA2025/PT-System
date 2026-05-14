@@ -38,6 +38,28 @@ function formatTime(iso: string): string {
   }
 }
 
+/**
+ * Chronological ASC by timestamp (oldest at top, newest at bottom). The
+ * backend doesn't guarantee /api/aven/history ordering, and SSE-pushed
+ * Telegram messages can arrive out of order relative to optimistic local
+ * sends. Sorting at render-time keeps the bubble flow sane without
+ * mutating hook state.
+ */
+function sortChronological(messages: ChatMessage[]): ChatMessage[] {
+  return [...messages].sort((a, b) => {
+    const at = new Date(a.ts).getTime();
+    const bt = new Date(b.ts).getTime();
+    if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) {
+      return at - bt;
+    }
+    // Tie-breaker by numeric id when timestamps are equal/missing.
+    const ai = Number(a.id);
+    const bi = Number(b.id);
+    if (Number.isFinite(ai) && Number.isFinite(bi)) return ai - bi;
+    return 0;
+  });
+}
+
 export function AvenChat({
   initialMessages,
   initialHasOlder,
@@ -112,7 +134,7 @@ export function AvenChat({
         )}
 
         <AnimatePresence initial={false} mode="popLayout">
-          {chat.messages.map((m) => (
+          {sortChronological(chat.messages).map((m) => (
             <motion.div
               key={m.localId ?? m.id}
               layout="position"
