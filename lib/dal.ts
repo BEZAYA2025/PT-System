@@ -138,6 +138,21 @@ export const getRawSnapshot = cache(
   },
 );
 
+/** Initial Paul's-trades feed for SSR seed. The endpoint already strips
+ *  USD PnL server-side (privacy contract enforced backend-side). */
+export const getInitialPaulTrades = cache(
+  async (): Promise<unknown | null> => {
+    const token = await getAccessToken();
+    if (!token) return null;
+    const res = await backendFetch<unknown>("/api/cockpit/paul-trades", {
+      method: "GET",
+      token,
+    });
+    if (!res.ok) return null;
+    return res.data;
+  },
+);
+
 /** Initial Aven chat history for fast first paint. Returns the shaped
  *  messages plus the cursor info so the client knows whether to show the
  *  "Load older" pill. Empty list / hasMore=false on backend failure. */

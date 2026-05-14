@@ -35,8 +35,18 @@ export interface YourTrade extends CommonTrade {
 
 export interface PaulsTrade extends CommonTrade {
   owner: "paul";
-  pnlR: number;
+  /** R-multiple may be absent on the new /api/cockpit/paul-trades feed;
+   *  UI hides the column when null. */
+  pnlR: number | null;
   reasoning: string | null;
+  /** Confluence score from the new endpoint (0..1). Surface in detail view. */
+  score?: number | null;
+  /** Leverage from the new endpoint — shown as size pill when present. */
+  leverage?: number | null;
+  /** Paul's sequential trade number — informational, future detail use. */
+  tradeNumber?: number | null;
+  /** True when backend has a written analysis available for deep dive. */
+  hasAnalysis?: boolean;
 }
 
 export type AnyTrade = YourTrade | PaulsTrade;
@@ -178,9 +188,122 @@ function shapePaulOne(raw: unknown, fallbackId: string): PaulsTrade | null {
   const base = shapeCommon(raw, fallbackId);
   if (!base) return null;
   const t = raw as Record<string, unknown>;
-  const pnlR = num(readField(t, ["r_multiple", "r", "r_value"])) ?? 0;
+  const pnlR = num(readField(t, ["r_multiple", "r", "r_value"]));
   const reasoning = str(readField(t, ["reasoning", "notes", "thesis"]));
   return { ...base, owner: "paul", pnlR, reasoning };
+}
+
+function durationFromSeconds(sec: number | null): string {
+  if (sec === null || sec <= 0) return "—";
+  const days = Math.floor(sec / 86400);
+  const hrs = Math.floor((sec - days * 86400) / 3600);
+  const mins = Math.floor((sec - days * 86400 - hrs * 3600) / 60);
+  if (days > 0) return `${days}d ${hrs}h`;
+  if (hrs > 0) return `${hrs}h ${mins}m`;
+  return `${mins}m`;
+}
+
+/**
+ * Shape a single entry from the dedicated /api/cockpit/paul-trades feed.
+ * Response items: { id, trade_number, symbol, side, leverage, entry, exit,
+ *   sl, tp, roi_pct, score, status, opened_at, duration_seconds, has_analysis }
+ * No USD field present — privacy stripped server-side.
+ */
+function shapePaulEndpointOne(
+  raw: unknown,
+  fallbackId: string,
+): PaulsTrade | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+
+  const symbol = str(t.symbol);
+  if (!symbol) return null;
+
+  const entry = num(t.entry);
+  if (entry === null) return null;
+
+  const status: TradeStatus =
+    str(t.status)?.toLowerCase() === "closed" ? "closed" : "open";
+  const exit = num(t.exit);
+  const sl = num(t.sl);
+  const tp = num(t.tp);
+  const openedAt = str(t.opened_at) ?? "";
+  const durationSec = num(t.duration_seconds);
+
+  // Endpoint doesn't include closed_at — derive from opened_at + duration.
+  const closedAt =
+    status === "closed" && openedAt && durationSec !== null
+      ? (() => {
+          try {
+            const startMs = new Date(openedAt).getTime();
+            if (!Number.isFinite(startMs)) return null;
+            return new Date(startMs + durationSec * 1000).toISOString();
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  const durationLabel =
+    durationSec !== null && durationSec > 0
+      ? durationFromSeconds(durationSec)
+      : durationFromOpened(openedAt, closedAt);
+
+  const idRaw = t.id ?? t.trade_id;
+  const id =
+    typeof idRaw === "number"
+      ? String(idRaw)
+      : typeof idRaw === "string"
+        ? idRaw
+        : fallbackId;
+
+  return {
+    id,
+    owner: "paul",
+    symbol,
+    side: lowerSide(t.side),
+    status,
+    entry,
+    mark: null, // endpoint doesn't expose live mark price
+    exit: status === "closed" ? exit : null,
+    pnlPct: num(t.roi_pct) ?? 0,
+    pnlR: null,
+    slPrice: sl,
+    tpPrice: tp,
+    slDistancePct: null, // no mark → can't compute
+    tpDistancePct: null,
+    openedAt,
+    closedAt,
+    durationLabel,
+    reasoning: null,
+    score: num(t.score),
+    leverage: num(t.leverage),
+    tradeNumber: num(t.trade_number),
+    hasAnalysis: t.has_analysis === true,
+  };
+}
+
+/** Shape the dedicated /api/cockpit/paul-trades response. */
+export function shapePaulTrades(raw: unknown): {
+  active: PaulsTrade[];
+  recent: PaulsTrade[];
+} {
+  if (!raw || typeof raw !== "object") {
+    return { active: [], recent: [] };
+  }
+  const t = raw as Record<string, unknown>;
+  const open = Array.isArray(t.open) ? t.open : [];
+  const closed = Array.isArray(t.closed) ? t.closed : [];
+
+  const active = open
+    .map((x, i) => shapePaulEndpointOne(x, `paul-open-${i}`))
+    .filter((x): x is PaulsTrade => x !== null);
+  const recent = closed
+    .map((x, i) => shapePaulEndpointOne(x, `paul-closed-${i}`))
+    .filter((x): x is PaulsTrade => x !== null)
+    .slice(0, 5);
+
+  return { active, recent };
 }
 
 const OWN_ACTIVE_PATHS: string[][] = [
@@ -208,6 +331,43 @@ const PAUL_RECENT_PATHS: string[][] = [
   ["trades", "paul", "recent"],
 ];
 
+/** Read member-owned trades from a /api/cockpit/snapshot payload. */
+export function shapeOwnTrades(snapshotRaw: unknown): {
+  active: YourTrade[];
+  recent: YourTrade[];
+} {
+  const active = pickArrayPath(snapshotRaw, OWN_ACTIVE_PATHS)
+    .map((t, i) => shapeYourOne(t, `your-active-${i}`))
+    .filter((t): t is YourTrade => t !== null);
+  const recent = pickArrayPath(snapshotRaw, OWN_RECENT_PATHS)
+    .map((t, i) => shapeYourOne(t, `your-recent-${i}`))
+    .filter((t): t is YourTrade => t !== null)
+    .slice(0, 5);
+  return { active, recent };
+}
+
+/**
+ * Combine snapshot (own) + dedicated paul-trades endpoint into a single
+ * TradesView. Either raw may be null/missing — caller will see empty
+ * sections, not a crash.
+ */
+export function buildTradesView(
+  snapshotRaw: unknown,
+  paulRaw: unknown,
+  fetchedAt: number,
+): TradesView {
+  return {
+    your: shapeOwnTrades(snapshotRaw),
+    pauls: shapePaulTrades(paulRaw),
+    fetchedAt,
+  };
+}
+
+/**
+ * Legacy shapeTrades — kept so callers reading the snapshot for Paul's
+ * trades (pre-dedicated-endpoint) compile. New code should call
+ * buildTradesView.
+ */
 export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
   const ownActive = pickArrayPath(raw, OWN_ACTIVE_PATHS)
     .map((t, i) => shapeYourOne(t, `your-active-${i}`))
@@ -225,9 +385,6 @@ export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
     .filter((t): t is PaulsTrade => t !== null)
     .slice(0, 5);
 
-  // Snapshot legacy path: if public_trades is a flat array and all entries are
-  // "closed", treat them as recent. Backend should expose active/recent split
-  // explicitly going forward.
   return {
     your: { active: ownActive, recent: ownRecent },
     pauls: { active: paulActive, recent: paulRecent },

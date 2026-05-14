@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import {
+  IconArrowLeft,
   IconSettings,
   IconMenu2,
   IconX,
@@ -25,6 +27,11 @@ export function DashboardHeader({
   unreadCount,
 }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname() ?? "/dashboard";
+  // Sub-pages under /dashboard get a back-to-dashboard affordance both in
+  // the desktop cluster and the mobile header.
+  const isSubPage =
+    pathname.startsWith("/dashboard/") && pathname !== "/dashboard";
 
   const handleSignOut = async () => {
     try {
@@ -56,6 +63,16 @@ export function DashboardHeader({
 
         {/* Desktop right cluster */}
         <div className="hidden items-center gap-2 sm:flex">
+          {isSubPage && (
+            <Link
+              href="/dashboard"
+              aria-label="Back to dashboard"
+              className="inline-flex h-10 items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            >
+              <IconArrowLeft size={14} stroke={1.75} />
+              Dashboard
+            </Link>
+          )}
           <span className="hidden text-sm text-muted-foreground md:inline">
             {displayName}
           </span>
@@ -82,6 +99,15 @@ export function DashboardHeader({
 
         {/* Mobile right cluster — bell stays accessible */}
         <div className="flex items-center gap-2 sm:hidden">
+          {isSubPage && (
+            <Link
+              href="/dashboard"
+              aria-label="Back to dashboard"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            >
+              <IconArrowLeft size={18} stroke={1.75} />
+            </Link>
+          )}
           <NotificationCenter
             initial={notifications}
             initialUnreadCount={unreadCount}

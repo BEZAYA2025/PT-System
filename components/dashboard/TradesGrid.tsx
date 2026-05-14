@@ -12,7 +12,11 @@ import {
   IconPlugConnected,
 } from "@tabler/icons-react";
 import { TradeDetailModal } from "./TradeDetailModal";
-import { shapeTrades, type AnyTrade, type TradesView } from "@/lib/trades";
+import {
+  buildTradesView,
+  type AnyTrade,
+  type TradesView,
+} from "@/lib/trades";
 
 const POLL_INTERVAL_MS = 30_000;
 const STALE_THRESHOLD_MS = 2 * 60_000;
@@ -60,13 +64,21 @@ export function TradesGrid({ initial }: Props) {
     inFlight.current = true;
     setRefreshing(true);
     try {
-      const res = await fetch("/api/proxy/snapshot", { cache: "no-store" });
-      if (!res.ok) {
-        setError(`Snapshot ${res.status}`);
+      // Own trades still live on the snapshot. Paul's trades moved to a
+      // dedicated USD-stripped endpoint. Fire both in parallel.
+      const [snapRes, paulRes] = await Promise.all([
+        fetch("/api/proxy/snapshot", { cache: "no-store" }),
+        fetch("/api/proxy/cockpit/paul-trades", { cache: "no-store" }),
+      ]);
+      if (!snapRes.ok && !paulRes.ok) {
+        setError(
+          `Snapshot ${snapRes.status} · Paul ${paulRes.status}`,
+        );
         return;
       }
-      const raw = await res.json();
-      setView(shapeTrades(raw, Date.now()));
+      const snapRaw = snapRes.ok ? await snapRes.json().catch(() => null) : null;
+      const paulRaw = paulRes.ok ? await paulRes.json().catch(() => null) : null;
+      setView(buildTradesView(snapRaw, paulRaw, Date.now()));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -455,7 +467,7 @@ function PaulsTradeRow({
         </div>
       </div>
       <div className={`hidden text-right font-mono text-sm ${tone} sm:block`}>
-        {fmtSignedR(trade.pnlR)}
+        {trade.pnlR !== null ? fmtSignedR(trade.pnlR) : ""}
       </div>
     </button>
   );

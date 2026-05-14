@@ -91,6 +91,21 @@ export async function proxyToBackend(
     data = null;
   }
 
+  if (!upstream.ok) {
+    // Surface upstream non-ok in Vercel deploy logs with a small body
+    // preview so production-test failures are diagnosable without curl.
+    let preview: string | null = null;
+    try {
+      preview = JSON.stringify(data).slice(0, 240);
+    } catch {
+      preview = null;
+    }
+    console.error(`[proxy] ${req.method} ${vpsPath} upstream non-ok`, {
+      status: upstream.status,
+      preview,
+    });
+  }
+
   const res = NextResponse.json(data ?? { ok: upstream.ok }, {
     status: upstream.status,
   });

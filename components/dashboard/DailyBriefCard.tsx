@@ -14,7 +14,7 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
     return (
       <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
         <div className="flex items-start gap-3">
-          <AvenAvatar size={36} />
+          <AvenAvatar size={36} online={false} />
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-foreground">
               Today&apos;s Brief
@@ -32,7 +32,7 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
     <>
       <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
         <div className="flex items-start gap-3">
-          <AvenAvatar size={36} />
+          <AvenAvatar size={36} online={false} />
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
               <h2 className="text-lg font-semibold tracking-tight text-foreground">
