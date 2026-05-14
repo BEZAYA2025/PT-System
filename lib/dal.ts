@@ -5,6 +5,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendFetch } from "./backend";
 import { shapeMessages, type ChatMessage } from "./aven";
+import {
+  shapeNotificationsResponse,
+  type NotificationsResponse,
+} from "./notifications";
 
 export type Tier = "standard" | "vip";
 export type SubscriptionStatus =
@@ -138,5 +142,25 @@ export const getInitialAvenHistory = cache(
     );
     if (!res.ok) return [];
     return shapeMessages(res.data);
+  },
+);
+
+/** Initial notifications for the bell — gives an instant unread count on
+ *  first paint instead of a flicker from 0. Returns an empty bag if the
+ *  backend is unreachable. */
+export const getInitialNotifications = cache(
+  async (limit = 50): Promise<NotificationsResponse> => {
+    const token = await getAccessToken();
+    if (!token) {
+      return { notifications: [], unreadCount: 0, totalCount: 0 };
+    }
+    const res = await backendFetch<unknown>(
+      `/api/notifications?limit=${limit}`,
+      { method: "GET", token },
+    );
+    if (!res.ok) {
+      return { notifications: [], unreadCount: 0, totalCount: 0 };
+    }
+    return shapeNotificationsResponse(res.data);
   },
 );

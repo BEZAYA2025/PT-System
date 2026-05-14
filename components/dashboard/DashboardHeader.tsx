@@ -9,15 +9,21 @@ import {
   IconLogout,
 } from "@tabler/icons-react";
 import { NotificationCenter } from "./NotificationCenter";
-import type { NotificationItem } from "@/lib/mock-dashboard";
+import type { NotificationItem } from "@/lib/notifications";
 
 interface Props {
   displayName: string;
   email: string;
   notifications: NotificationItem[];
+  unreadCount: number;
 }
 
-export function DashboardHeader({ displayName, email, notifications }: Props) {
+export function DashboardHeader({
+  displayName,
+  email,
+  notifications,
+  unreadCount,
+}: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -53,7 +59,10 @@ export function DashboardHeader({ displayName, email, notifications }: Props) {
           <span className="hidden text-sm text-muted-foreground md:inline">
             {displayName}
           </span>
-          <NotificationCenter initial={notifications} />
+          <NotificationCenter
+            initial={notifications}
+            initialUnreadCount={unreadCount}
+          />
           <Link
             href="/dashboard/settings"
             aria-label="Settings"
@@ -73,7 +82,10 @@ export function DashboardHeader({ displayName, email, notifications }: Props) {
 
         {/* Mobile right cluster — bell stays accessible */}
         <div className="flex items-center gap-2 sm:hidden">
-          <NotificationCenter initial={notifications} />
+          <NotificationCenter
+            initial={notifications}
+            initialUnreadCount={unreadCount}
+          />
           <button
             type="button"
             aria-label="Open menu"
