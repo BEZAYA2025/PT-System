@@ -400,14 +400,22 @@ function YourTradeRow({
         )}
       </div>
 
-      <div className={`text-right font-mono text-sm font-semibold ${tone}`}>
-        <div className="flex items-center justify-end gap-1">
+      <div className={`text-right ${tone}`}>
+        <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+          ROI
+        </div>
+        <div className="flex items-center justify-end gap-1 font-mono text-sm font-semibold">
           <PnlIcon positive={positive} />
           {fmtSignedPct(trade.pnlPct)}
         </div>
       </div>
-      <div className={`hidden text-right font-mono text-sm ${tone} sm:block`}>
-        {fmtSignedUsd(trade.pnlUsd)}
+      <div className={`hidden text-right sm:block ${tone}`}>
+        <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+          USD
+        </div>
+        <div className="font-mono text-sm">
+          {fmtSignedUsd(trade.pnlUsd)}
+        </div>
       </div>
     </button>
   );
@@ -460,15 +468,25 @@ function PaulsTradeRow({
         )}
       </div>
 
-      <div className={`text-right font-mono text-sm font-semibold ${tone}`}>
-        <div className="flex items-center justify-end gap-1">
+      <div className={`text-right ${tone}`}>
+        <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+          ROI
+        </div>
+        <div className="flex items-center justify-end gap-1 font-mono text-sm font-semibold">
           <PnlIcon positive={positive} />
           {fmtSignedPct(trade.pnlPct)}
         </div>
       </div>
-      <div className={`hidden text-right font-mono text-sm ${tone} sm:block`}>
-        {trade.pnlR !== null ? fmtSignedR(trade.pnlR) : ""}
-      </div>
+      {trade.pnlR !== null && (
+        <div className={`hidden text-right sm:block ${tone}`}>
+          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
+            R
+          </div>
+          <div className="font-mono text-sm">
+            {fmtSignedR(trade.pnlR)}
+          </div>
+        </div>
+      )}
     </button>
   );
 }
