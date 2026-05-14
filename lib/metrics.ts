@@ -1,61 +1,89 @@
-// Backend-shape adapter for the TopStrip live metrics.
-// Reads several plausible paths from /api/cockpit/snapshot — keep this in
-// sync once the backend payload is finalized.
+// Market Pulse adapter — backend paths confirmed by VPS.
+// Mixes liquidation_map (flatter, member-facing) with market_pulse
+// (envelope-wrapped {fresh, error, value: {...}}). The dig() walker
+// resolves both layouts via dotted paths.
 
-import type { MetricCard, Trend } from "./mock-dashboard";
+export type Trend = "bullish" | "bearish" | "neutral";
 
-export const METRIC_KEYS = ["btc", "fng", "oi", "funding", "lsr"] as const;
-export type MetricKey = (typeof METRIC_KEYS)[number];
-
-export interface MetricMeta {
-  shortLabel: string;
-  fullLabel: string;
-  explanation: string;
-}
-
-export const METRIC_META: Record<MetricKey, MetricMeta> = {
-  btc: {
-    shortLabel: "BTC",
-    fullLabel: "Bitcoin price",
-    explanation:
-      "Bitcoin spot price + 24h change. The market's primary anchor — sets the tone for everything else.",
-  },
-  fng: {
-    shortLabel: "Fear & Greed",
-    fullLabel: "Crypto Fear & Greed Index",
-    explanation:
-      "0–100 score from the alternative.me index. <25 = extreme fear, >75 = extreme greed. Contrarian signal at extremes.",
-  },
-  oi: {
-    shortLabel: "Open Interest",
-    fullLabel: "Aggregated Open Interest",
-    explanation:
-      "Total $ value of open futures contracts across exchanges. Rising OI + rising price = real buying. Rising OI + flat price = positioning building.",
-  },
-  funding: {
-    shortLabel: "Funding",
-    fullLabel: "Perpetual funding rate",
-    explanation:
-      "8h average funding paid between longs and shorts. Positive = longs pay shorts (bullish positioning crowded). Negative = shorts pay longs.",
-  },
-  lsr: {
-    shortLabel: "L/S Ratio",
-    fullLabel: "Long / Short ratio",
-    explanation:
-      "Ratio of long positions to short positions across major exchanges. 1.0 = neutral. >1.2 = long-heavy crowd. <0.8 = short-heavy.",
-  },
-};
-
-// Loose-typed snapshot record. The adapter walks several plausible paths
-// per metric so a backend rename doesn't blank a card.
 export type RawSnapshotMetrics = Record<string, unknown>;
 
-export interface MetricsView {
-  cards: MetricCard[];
+// ---------------------------------------------------------------------------
+// View shapes — each metric has its own subtype so the MarketPulse card
+// can render layout-specific copy (e.g. "47% L · 53% S") without leaking
+// optionality into a generic MetricCard.
+// ---------------------------------------------------------------------------
+
+export interface FearGreedView {
+  value: number | null;
+  label: string | null;
+  trend: Trend;
+}
+
+export interface FundingView {
+  rate: number | null;
+  /** Source label e.g. "Binance" — falls back gracefully when missing. */
+  source: string | null;
+  trend: Trend;
+}
+
+export interface OpenInterestView {
+  usd: number | null;
+  btc: number | null;
+  deltaPct: number | null;
+  trend: Trend;
+}
+
+export interface LsRatioView {
+  value: number | null;
+  longPct: number | null;
+  shortPct: number | null;
+  trend: Trend;
+}
+
+export interface BtcDominanceView {
+  pct: number | null;
+  marketCapUsd: number | null;
+  trend: Trend;
+}
+
+export interface MarketPulseView {
+  fearGreed: FearGreedView;
+  funding: FundingView;
+  openInterest: OpenInterestView;
+  lsRatio: LsRatioView;
+  btcDominance: BtcDominanceView;
   generatedAt: string | null;
-  /** Wall-clock ms when the client received this payload. */
   fetchedAt: number;
 }
+
+export interface BtcPriceView {
+  price: number | null;
+  changePct: number | null;
+  fetchedAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// Per-card tooltip metadata (consumed by MetricTooltip components)
+// ---------------------------------------------------------------------------
+
+export const PULSE_TOOLTIPS = {
+  fearGreed:
+    "0–100 score from the alternative.me index. <25 = extreme fear, >75 = extreme greed. Contrarian signal at extremes.",
+  funding:
+    "8h average funding paid between longs and shorts. Positive = longs pay shorts (bullish positioning crowded). Negative = shorts pay longs.",
+  openInterest:
+    "Total $ value of open futures contracts across exchanges. Rising OI + rising price = real buying. Rising OI + flat price = positioning building.",
+  lsRatio:
+    "Ratio of long positions to short positions across major exchanges. 1.0 = neutral. >1.2 = long-heavy crowd. <0.8 = short-heavy.",
+  btcDominance:
+    "BTC market cap as a share of total crypto market cap. Rising dominance often signals risk-off rotation out of altcoins.",
+  btcPrice:
+    "Bitcoin spot price. The market's primary anchor — sets the tone for everything else.",
+} as const;
+
+// ---------------------------------------------------------------------------
+// Path-walker helpers
+// ---------------------------------------------------------------------------
 
 const num = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -63,8 +91,6 @@ const num = (v: unknown): number | null =>
 const str = (v: unknown): string | null =>
   typeof v === "string" && v.length > 0 ? v : null;
 
-/** Walk a dotted-path against the raw snapshot. Returns the value at the
- *  leaf or undefined when any segment is missing. */
 function dig(raw: unknown, path: string): unknown {
   if (raw === null || raw === undefined) return undefined;
   let cur: unknown = raw;
@@ -76,7 +102,6 @@ function dig(raw: unknown, path: string): unknown {
   return cur;
 }
 
-/** Try a list of paths until one yields a finite number. */
 function pickNumber(raw: unknown, paths: string[]): number | null {
   for (const p of paths) {
     const v = num(dig(raw, p));
@@ -93,44 +118,89 @@ function pickString(raw: unknown, paths: string[]): string | null {
   return null;
 }
 
-// Backend paths confirmed by VPS — combine liquidation_map (flatter) with
-// market_pulse (envelope-wrapped). For market_pulse-derived metrics the
-// envelope is {fresh, error, value: {...}} so paths step through .value
-// before the actual field.
+// ---------------------------------------------------------------------------
+// Pickers (confirmed paths primary, defensive fallbacks secondary)
+// ---------------------------------------------------------------------------
 
 function pickBtcPrice(raw: unknown): number | null {
   return pickNumber(raw, ["btc.price"]);
 }
 function pickBtcChange(raw: unknown): number | null {
-  // Backend currently returns null here (poller stores only point-in-time).
-  // Picker returns null → UI hides the delta until backend computes.
   return pickNumber(raw, ["btc.change_pct"]);
 }
+
 function pickFng(raw: unknown): number | null {
   return pickNumber(raw, ["market_pulse.fear_greed.value.value"]);
 }
 function pickFngLabel(raw: unknown): string | null {
   return pickString(raw, ["market_pulse.fear_greed.value.classification"]);
 }
-function pickOi(raw: unknown): number | null {
-  return pickNumber(raw, ["liquidation_map.oi_aggregated.now_usd"]);
-}
-function pickOiDelta(raw: unknown): number | null {
-  return pickNumber(raw, ["liquidation_map.oi_aggregated.delta_24h_pct"]);
-}
-function pickFunding(raw: unknown): number | null {
-  // Top-level btc.funding_rate is simpler; market_pulse envelope is the
-  // documented fallback.
+
+function pickFundingRate(raw: unknown): number | null {
   return pickNumber(raw, [
     "btc.funding_rate",
     "market_pulse.btc_funding.value.last_funding_rate",
   ]);
 }
+function pickFundingSource(raw: unknown): string | null {
+  return pickString(raw, [
+    "btc.funding_source",
+    "btc.funding_exchange",
+    "market_pulse.btc_funding.value.source",
+    "market_pulse.btc_funding.value.exchange",
+  ]);
+}
+
+function pickOiUsd(raw: unknown): number | null {
+  return pickNumber(raw, ["liquidation_map.oi_aggregated.now_usd"]);
+}
+function pickOiBtc(raw: unknown): number | null {
+  return pickNumber(raw, [
+    "liquidation_map.oi_aggregated.now_btc",
+    "liquidation_map.oi_aggregated.now_base",
+  ]);
+}
+function pickOiDelta(raw: unknown): number | null {
+  return pickNumber(raw, ["liquidation_map.oi_aggregated.delta_24h_pct"]);
+}
+
 function pickLsr(raw: unknown): number | null {
   return pickNumber(raw, ["liquidation_map.ls_ratio.now"]);
 }
-function pickLsrDelta(raw: unknown): number | null {
-  return pickNumber(raw, ["liquidation_map.ls_ratio.delta_pct"]);
+function pickLsLongPct(raw: unknown): number | null {
+  return pickNumber(raw, [
+    "liquidation_map.ls_ratio.long_share_pct",
+    "liquidation_map.ls_ratio.long_pct",
+    "liquidation_map.ls_ratio.long_share",
+    "liquidation_map.ls_ratio.long_account_pct",
+  ]);
+}
+function pickLsShortPct(raw: unknown): number | null {
+  return pickNumber(raw, [
+    "liquidation_map.ls_ratio.short_share_pct",
+    "liquidation_map.ls_ratio.short_pct",
+    "liquidation_map.ls_ratio.short_share",
+    "liquidation_map.ls_ratio.short_account_pct",
+  ]);
+}
+
+function pickBtcDominance(raw: unknown): number | null {
+  return pickNumber(raw, [
+    "liquidation_map.btc_dominance.current_dominance_pct",
+    "liquidation_map.btc_dominance.now_pct",
+    "liquidation_map.btc_dominance.value",
+    "market_pulse.btc_dominance.value.value",
+    "btc_dominance.value",
+  ]);
+}
+function pickMarketCap(raw: unknown): number | null {
+  return pickNumber(raw, [
+    "liquidation_map.btc_dominance.total_market_cap_usd",
+    "liquidation_map.btc_dominance.market_cap_usd",
+    "liquidation_map.total_market_cap_usd",
+    "market_pulse.market_cap.value.value",
+    "market_pulse.btc_dominance.value.market_cap_usd",
+  ]);
 }
 
 function pickGeneratedAt(raw: unknown): string | null {
@@ -142,35 +212,24 @@ function pickGeneratedAt(raw: unknown): string | null {
   ]);
 }
 
-const PLACEHOLDER = "—";
+// ---------------------------------------------------------------------------
+// Trend helpers
+// ---------------------------------------------------------------------------
 
-function fmtPrice(n: number | null): string {
-  if (n === null) return PLACEHOLDER;
-  if (n >= 1000) return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
-  return `$${n.toFixed(2)}`;
+function trendFromFng(n: number | null): Trend {
+  if (n === null) return "neutral";
+  if (n >= 60) return "bullish";
+  if (n <= 40) return "bearish";
+  return "neutral";
 }
 
-function fmtCompactUsd(n: number | null): string {
-  if (n === null) return PLACEHOLDER;
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return `$${n.toLocaleString()}`;
-}
-
-function fmtPct(n: number | null, digits = 2, withSign = true): string {
-  if (n === null) return PLACEHOLDER;
-  const sign = withSign && n > 0 ? "+" : "";
-  return `${sign}${n.toFixed(digits)}%`;
-}
-
-function fmtFundingPct(n: number | null): string {
-  if (n === null) return PLACEHOLDER;
-  // Funding usually comes as decimal (0.0001 = 0.01%) or already-pct.
-  // Heuristic: if absolute value <0.01 treat as decimal.
+function trendFromFunding(n: number | null): Trend {
+  if (n === null) return "neutral";
+  // Funding may arrive as decimal (0.0001) or already-pct.
   const pct = Math.abs(n) < 0.01 ? n * 100 : n;
-  const sign = pct > 0 ? "+" : "";
-  return `${sign}${pct.toFixed(4)}%`;
+  if (pct > 0.01) return "bullish";
+  if (pct < -0.01) return "bearish";
+  return "neutral";
 }
 
 function trendFromChange(n: number | null): Trend {
@@ -180,105 +239,67 @@ function trendFromChange(n: number | null): Trend {
   return "neutral";
 }
 
-function trendFromFng(n: number | null): Trend {
-  if (n === null) return "neutral";
-  if (n >= 60) return "bullish";
-  if (n <= 40) return "bearish";
-  return "neutral";
-}
-
-function fngLabel(n: number | null, override: string | null): string {
-  if (override) return override;
-  if (n === null) return "—";
-  if (n <= 24) return "Extreme fear";
-  if (n <= 44) return "Fear";
-  if (n <= 55) return "Neutral";
-  if (n <= 74) return "Greed";
-  return "Extreme greed";
-}
-
-function fundingTrend(n: number | null): Trend {
-  if (n === null) return "neutral";
-  const pct = Math.abs(n) < 0.01 ? n * 100 : n;
-  if (pct > 0.01) return "bullish";
-  if (pct < -0.01) return "bearish";
-  return "neutral";
-}
-
-function lsrTrend(n: number | null): Trend {
+function trendFromLsr(n: number | null): Trend {
   if (n === null) return "neutral";
   if (n >= 1.2) return "bullish";
   if (n <= 0.85) return "bearish";
   return "neutral";
 }
 
-function lsrCaption(n: number | null): string {
-  if (n === null) return PLACEHOLDER;
-  if (n >= 1.2) return "Long-heavy crowd";
-  if (n <= 0.85) return "Short-heavy crowd";
-  return "Slight long bias";
-}
+// ---------------------------------------------------------------------------
+// Builders
+// ---------------------------------------------------------------------------
 
-export function shapeMetrics(raw: RawSnapshotMetrics | null): MetricCard[] {
-  const btcPrice = pickBtcPrice(raw);
-  const btcChange = pickBtcChange(raw);
-  const fng = pickFng(raw);
-  const fngLabelOverride = pickFngLabel(raw);
-  const oi = pickOi(raw);
-  const oiDelta = pickOiDelta(raw);
-  const funding = pickFunding(raw);
-  const lsr = pickLsr(raw);
-  const lsrDelta = pickLsrDelta(raw);
-
-  return [
-    {
-      key: "btc",
-      label: METRIC_META.btc.shortLabel,
-      value: fmtPrice(btcPrice),
-      delta: btcChange !== null ? fmtPct(btcChange) : undefined,
-      trend: trendFromChange(btcChange),
-      caption: "24h",
-    },
-    {
-      key: "fng",
-      label: METRIC_META.fng.shortLabel,
-      value: fng !== null ? String(fng) : PLACEHOLDER,
-      trend: trendFromFng(fng),
-      caption: fngLabel(fng, fngLabelOverride),
-    },
-    {
-      key: "oi",
-      label: METRIC_META.oi.shortLabel,
-      value: fmtCompactUsd(oi),
-      delta: oiDelta !== null ? fmtPct(oiDelta) : undefined,
-      trend: trendFromChange(oiDelta),
-      caption: "Aggregated 24h",
-    },
-    {
-      key: "funding",
-      label: METRIC_META.funding.shortLabel,
-      value: fmtFundingPct(funding),
-      trend: fundingTrend(funding),
-      caption: "8h avg",
-    },
-    {
-      key: "lsr",
-      label: METRIC_META.lsr.shortLabel,
-      value: lsr !== null ? lsr.toFixed(2) : PLACEHOLDER,
-      delta: lsrDelta !== null ? fmtPct(lsrDelta) : undefined,
-      trend: lsrTrend(lsr),
-      caption: lsrCaption(lsr),
-    },
-  ];
-}
-
-export function buildMetricsView(
+export function buildMarketPulseView(
   raw: RawSnapshotMetrics | null,
   fetchedAt: number,
-): MetricsView {
+): MarketPulseView {
+  const fngValue = pickFng(raw);
+  const fundingRate = pickFundingRate(raw);
+  const oiUsd = pickOiUsd(raw);
+  const lsr = pickLsr(raw);
+  const dominance = pickBtcDominance(raw);
+
   return {
-    cards: shapeMetrics(raw),
+    fearGreed: {
+      value: fngValue,
+      label: pickFngLabel(raw),
+      trend: trendFromFng(fngValue),
+    },
+    funding: {
+      rate: fundingRate,
+      source: pickFundingSource(raw),
+      trend: trendFromFunding(fundingRate),
+    },
+    openInterest: {
+      usd: oiUsd,
+      btc: pickOiBtc(raw),
+      deltaPct: pickOiDelta(raw),
+      trend: trendFromChange(pickOiDelta(raw)),
+    },
+    lsRatio: {
+      value: lsr,
+      longPct: pickLsLongPct(raw),
+      shortPct: pickLsShortPct(raw),
+      trend: trendFromLsr(lsr),
+    },
+    btcDominance: {
+      pct: dominance,
+      marketCapUsd: pickMarketCap(raw),
+      trend: "neutral",
+    },
     generatedAt: pickGeneratedAt(raw),
+    fetchedAt,
+  };
+}
+
+export function buildBtcPriceView(
+  raw: RawSnapshotMetrics | null,
+  fetchedAt: number,
+): BtcPriceView {
+  return {
+    price: pickBtcPrice(raw),
+    changePct: pickBtcChange(raw),
     fetchedAt,
   };
 }

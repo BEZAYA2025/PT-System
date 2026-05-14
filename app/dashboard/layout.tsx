@@ -1,4 +1,9 @@
-import { getInitialNotifications, requireUser } from "@/lib/dal";
+import {
+  getInitialNotifications,
+  getRawSnapshot,
+  requireUser,
+} from "@/lib/dal";
+import { buildBtcPriceView } from "@/lib/metrics";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { mockUserView } from "@/lib/mock-dashboard";
 
@@ -9,12 +14,15 @@ export default async function DashboardLayout({
 }) {
   // Auth-gate: redirects to /signin when no access_token cookie.
   const user = await requireUser();
-  const initialNotifications = await getInitialNotifications(50);
+  const [initialNotifications, snapshot] = await Promise.all([
+    getInitialNotifications(50),
+    getRawSnapshot(),
+  ]);
 
-  // ITERATION 6 — display_name still falls back to email until DAL exposes
-  // it post onboarding-refactor merge. Notifications are now live (was mock
-  // in iter 3); the bell + panel + mark-read all hit /api/proxy/notifications.
   const displayName = user.display_name ?? mockUserView.displayName;
+  const initialBtcPrice = snapshot
+    ? buildBtcPriceView(snapshot, Date.now())
+    : null;
 
   return (
     <div className="min-h-svh bg-background">
@@ -23,6 +31,7 @@ export default async function DashboardLayout({
         email={user.email}
         notifications={initialNotifications.notifications}
         unreadCount={initialNotifications.unreadCount}
+        initialBtcPrice={initialBtcPrice}
       />
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {children}
