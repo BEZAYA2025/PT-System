@@ -240,31 +240,59 @@ export function useAvenChat({
         const res = await fetch("/api/proxy/aven/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          // Forward-compat per VPS spec: send `text` (canonical) AND `content`
+          // (legacy) AND message_type so partial backend roll-outs both work.
+          body: JSON.stringify({
+            text: content,
+            content,
+            message_type: "user_text",
+          }),
         });
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
-          // Surface the failing payload in the browser console so a
-          // production tester can diagnose without backend access.
           // eslint-disable-next-line no-console
           console.error("[aven/chat] send failed", { status: res.status, data });
+
+          if (res.status === 401) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.localId === localId
+                  ? { ...m, status: "failed" as SendStatus }
+                  : m,
+              ),
+            );
+            setSendError("Sign in expired. Redirecting…");
+            setTimeout(() => {
+              window.location.href = "/signin";
+            }, 800);
+            return;
+          }
+
           setMessages((prev) =>
             prev.map((m) =>
               m.localId === localId ? { ...m, status: "failed" as SendStatus } : m,
             ),
           );
+
           const backendMsg =
             (typeof data?.message === "string" && data.message) ||
             (typeof data?.error === "string" && data.error) ||
             null;
-          const fallback =
-            res.status === 429
-              ? "Daily limit reached. Upgrade to VIP for unlimited Aven."
-              : backendMsg
+
+          const byStatus: Record<number, string> = {
+            400: "Message required.",
+            413: "Message too long (max 4,000 chars).",
+            429: "Daily limit reached. Upgrade to VIP for unlimited Aven.",
+            502: "Aven is having trouble. Try again in a moment.",
+          };
+
+          setSendError(
+            byStatus[res.status] ??
+              (backendMsg
                 ? `${backendMsg} (HTTP ${res.status})`
-                : `Send failed — HTTP ${res.status}. Please try again or copy this status to support.`;
-          setSendError(fallback);
+                : `Send failed — HTTP ${res.status}. Please try again.`),
+          );
           return;
         }
 

@@ -70,9 +70,11 @@ export function TradeDetailModal({
             {fmtSignedPct(trade.pnlPct)}
           </span>
           {isPaul ? (
-            <span className={`font-mono text-sm ${tone}`}>
-              {fmtSignedR(trade.pnlR)}
-            </span>
+            trade.pnlR !== null ? (
+              <span className={`font-mono text-sm ${tone}`}>
+                {fmtSignedR(trade.pnlR)}
+              </span>
+            ) : null
           ) : (
             <span className={`font-mono text-sm ${tone}`}>
               {fmtSignedUsd(trade.pnlUsd)}

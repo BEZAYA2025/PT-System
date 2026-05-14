@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   getInitialAvenHistory,
+  getInitialPaulTrades,
   getRawSnapshot,
   requireUser,
 } from "@/lib/dal";
@@ -10,7 +11,7 @@ import {
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
 import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
-import { shapeTrades } from "@/lib/trades";
+import { buildTradesView } from "@/lib/trades";
 import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
@@ -36,8 +37,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [raw, history] = await Promise.all([
+  const [raw, paulRaw, history] = await Promise.all([
     getRawSnapshot(),
+    getInitialPaulTrades(),
     getInitialAvenHistory(50),
   ]);
   const fetchedAt = Date.now();
@@ -45,7 +47,7 @@ export default async function DashboardPage() {
     ? buildMetricsView(raw as RawSnapshotMetrics, fetchedAt)
     : null;
   const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
-  const initialTrades = raw ? shapeTrades(raw, fetchedAt) : null;
+  const initialTrades = buildTradesView(raw, paulRaw, fetchedAt);
 
   const showTour = user.first_login_completed === false;
 
