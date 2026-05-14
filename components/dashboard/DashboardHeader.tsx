@@ -11,13 +11,16 @@ import {
   IconLogout,
 } from "@tabler/icons-react";
 import { NotificationCenter } from "./NotificationCenter";
+import { BtcPricePill } from "./BtcPricePill";
 import type { NotificationItem } from "@/lib/notifications";
+import type { BtcPriceView } from "@/lib/metrics";
 
 interface Props {
   displayName: string;
   email: string;
   notifications: NotificationItem[];
   unreadCount: number;
+  initialBtcPrice: BtcPriceView | null;
 }
 
 export function DashboardHeader({
@@ -25,6 +28,7 @@ export function DashboardHeader({
   email,
   notifications,
   unreadCount,
+  initialBtcPrice,
 }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname() ?? "/dashboard";
@@ -44,22 +48,29 @@ export function DashboardHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        {/* Brand + live */}
-        <Link href="/" data-tour="brand" className="flex items-center gap-3">
-          <span className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
-            PT System
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
-            <span aria-hidden className="relative flex size-1.5">
-              <span
-                className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-                style={{ animationDuration: "2s" }}
-              />
-              <span className="relative inline-flex size-1.5 rounded-full bg-emerald" />
+        {/* Brand + live + BTC price */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            data-tour="brand"
+            className="flex items-center gap-3"
+          >
+            <span className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
+              PT System
             </span>
-            Live
-          </span>
-        </Link>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
+              <span aria-hidden className="relative flex size-1.5">
+                <span
+                  className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+                  style={{ animationDuration: "2s" }}
+                />
+                <span className="relative inline-flex size-1.5 rounded-full bg-emerald" />
+              </span>
+              Live
+            </span>
+          </Link>
+          <BtcPricePill initial={initialBtcPrice} />
+        </div>
 
         {/* Desktop right cluster */}
         <div className="hidden items-center gap-2 sm:flex">

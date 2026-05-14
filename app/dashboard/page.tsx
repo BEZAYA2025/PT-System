@@ -6,13 +6,13 @@ import {
   requireUser,
 } from "@/lib/dal";
 import {
-  buildMetricsView,
-  type MetricsView,
+  buildMarketPulseView,
+  type MarketPulseView,
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
 import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
 import { buildTradesView } from "@/lib/trades";
-import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
+import { MarketPulse } from "@/components/dashboard/MarketPulse";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
@@ -43,8 +43,8 @@ export default async function DashboardPage() {
     getInitialAvenHistory(50),
   ]);
   const fetchedAt = Date.now();
-  const initialMetrics: MetricsView | null = raw
-    ? buildMetricsView(raw as RawSnapshotMetrics, fetchedAt)
+  const initialMetrics: MarketPulseView | null = raw
+    ? buildMarketPulseView(raw as RawSnapshotMetrics, fetchedAt)
     : null;
   const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
   const initialTrades = buildTradesView(raw, paulRaw, fetchedAt);
@@ -54,7 +54,7 @@ export default async function DashboardPage() {
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
       <MotionSection tour="market" delay={0.04}>
-        <TopStripMetrics initial={initialMetrics} />
+        <MarketPulse initial={initialMetrics} />
       </MotionSection>
 
       <MotionSection tour="brief" delay={0.1}>

@@ -38,6 +38,28 @@ function formatTime(iso: string): string {
   }
 }
 
+/**
+ * Chronological ASC by timestamp (oldest at top, newest at bottom). The
+ * backend doesn't guarantee /api/aven/history ordering, and SSE-pushed
+ * Telegram messages can arrive out of order relative to optimistic local
+ * sends. Sorting at render-time keeps the bubble flow sane without
+ * mutating hook state.
+ */
+function sortChronological(messages: ChatMessage[]): ChatMessage[] {
+  return [...messages].sort((a, b) => {
+    const at = new Date(a.ts).getTime();
+    const bt = new Date(b.ts).getTime();
+    if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) {
+      return at - bt;
+    }
+    // Tie-breaker by numeric id when timestamps are equal/missing.
+    const ai = Number(a.id);
+    const bi = Number(b.id);
+    if (Number.isFinite(ai) && Number.isFinite(bi)) return ai - bi;
+    return 0;
+  });
+}
+
 export function AvenChat({
   initialMessages,
   initialHasOlder,
@@ -93,7 +115,7 @@ export function AvenChat({
 
       <div
         ref={scrollRef}
-        className="flex max-h-[480px] flex-col gap-4 overflow-y-auto px-5 py-5"
+        className="flex max-h-[480px] flex-col gap-4 overflow-y-auto px-6 py-5 sm:px-8"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -112,7 +134,7 @@ export function AvenChat({
         )}
 
         <AnimatePresence initial={false} mode="popLayout">
-          {chat.messages.map((m) => (
+          {sortChronological(chat.messages).map((m) => (
             <motion.div
               key={m.localId ?? m.id}
               layout="position"
@@ -161,7 +183,7 @@ function ChatHeader({
   messageCount: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
+    <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
       <div className="flex items-center gap-3">
         <AvenAvatar size={36} online={streamConnected} />
         <div>
@@ -387,7 +409,7 @@ function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="space-y-2 border-t border-border bg-surface-elevated px-3 py-3 sm:px-5"
+      className="space-y-2 border-t border-border bg-surface-elevated px-4 py-3 sm:px-8"
     >
       {limitReached && (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200">

@@ -69,7 +69,7 @@ export function ExchangeSettingsCard({
           Exchange API
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Read-only key — Binance, Bybit, or OKX. Locked to our server via IP
+          Read-only key — Binance, Bybit, OKX, or any major exchange. Locked to our server via IP
           restriction.
         </p>
 

@@ -164,7 +164,7 @@ export function ConnectExchangeModal({
               IP restrictions, paste{" "}
               <span className="font-mono text-foreground">145.79.11.110</span>{" "}
               — that locks the key to our server only. Works with Binance,
-              Bybit, OKX.
+              Bybit, OKX, or any major exchange.
             </p>
           </div>
 
