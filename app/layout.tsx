@@ -26,8 +26,12 @@ export default function RootLayout({
     <html
       lang="en"
       className={`dark ${inter.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      style={{ colorScheme: "dark", backgroundColor: "#0a0a0a" }}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body
+        className="min-h-full flex flex-col bg-background text-foreground"
+        style={{ backgroundColor: "#0a0a0a", color: "#f5f5f5" }}
+      >
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-foreground focus:px-4 focus:py-2 focus:text-background"
