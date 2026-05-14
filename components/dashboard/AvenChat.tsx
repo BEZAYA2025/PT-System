@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBrandTelegram,
+  IconChevronUp,
   IconDeviceLaptop,
+  IconMessageCircle,
   IconMicrophone,
   IconPlayerStopFilled,
   IconRefresh,
@@ -40,12 +43,19 @@ export function AvenChat({ initialMessages, initialQuota = null }: Props) {
   const chat = useAvenChat({ initialMessages, initialQuota });
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const lastBottomIdRef = useRef<string | null>(null);
+  const reduce = useReducedMotion();
 
-  // Auto-scroll on new messages or thinking indicator changes.
+  // Auto-scroll only when the *last* message changes (a new bottom row),
+  // not when older history is prepended via loadOlder.
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const last = chat.messages[chat.messages.length - 1];
+    const lastKey = last ? (last.localId ?? last.id) : null;
+    if (lastKey !== lastBottomIdRef.current) {
+      const el = scrollRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      lastBottomIdRef.current = lastKey;
+    }
   }, [chat.messages, chat.thinking]);
 
   const limitReached =
@@ -77,13 +87,39 @@ export function AvenChat({ initialMessages, initialQuota = null }: Props) {
         ref={scrollRef}
         className="flex max-h-[480px] flex-col gap-4 overflow-y-auto px-5 py-5"
       >
-        {chat.messages.map((m) => (
-          <ChatBubble
-            key={m.localId ?? m.id}
-            message={m}
-            onRetry={() => m.localId && void chat.retry(m.localId)}
-          />
-        ))}
+        {chat.hasOlder && chat.messages.length > 0 && (
+          <button
+            type="button"
+            onClick={() => void chat.loadOlder()}
+            disabled={chat.loadingOlder}
+            className="mx-auto inline-flex items-center gap-1.5 self-center rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground disabled:opacity-60"
+          >
+            <IconChevronUp size={12} stroke={2} />
+            {chat.loadingOlder ? "Loading…" : "Load older messages"}
+          </button>
+        )}
+
+        {chat.messages.length === 0 && (
+          <ChatEmptyState />
+        )}
+
+        <AnimatePresence initial={false} mode="popLayout">
+          {chat.messages.map((m) => (
+            <motion.div
+              key={m.localId ?? m.id}
+              layout="position"
+              initial={reduce ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <ChatBubble
+                message={m}
+                onRetry={() => m.localId && void chat.retry(m.localId)}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
         {chat.thinking && <ThinkingIndicator />}
       </div>
@@ -284,6 +320,27 @@ function Dot({ delay }: { delay: string }) {
       className="inline-block size-1.5 animate-bounce rounded-full bg-emerald/70"
       style={{ animationDelay: delay, animationDuration: "1.2s" }}
     />
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function ChatEmptyState() {
+  return (
+    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+      <span className="inline-flex size-14 items-center justify-center rounded-full border border-emerald/30 bg-emerald/[0.06] text-emerald">
+        <IconMessageCircle size={28} stroke={1.5} aria-hidden />
+      </span>
+      <div>
+        <p className="text-sm font-medium text-foreground">
+          Start a conversation with Aven
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Ask about a setup, a trade you&apos;re watching, or just say hi.
+          Aven sees the live market data and Paul&apos;s methodology.
+        </p>
+      </div>
+    </div>
   );
 }
 

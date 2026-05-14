@@ -8,6 +8,8 @@ import {
   IconAlertCircle,
   IconClockHour4,
   IconRefresh,
+  IconChartCandle,
+  IconPlugConnected,
 } from "@tabler/icons-react";
 import { TradeDetailModal } from "./TradeDetailModal";
 import { shapeTrades, type AnyTrade, type TradesView } from "@/lib/trades";
@@ -199,7 +201,10 @@ function YourTradesSection({
 
       <RecentBlock title="Recent — last 5 closed">
         {recent.length === 0 ? (
-          <EmptyRow message="No trades yet — your positions will appear here." />
+          <EmptyRow
+            icon="plug"
+            message="No trades yet — connect your exchange in Settings to start tracking."
+          />
         ) : (
           recent.map((t) => (
             <YourTradeRow key={t.id} trade={t} onClick={() => onSelect(t)} />
@@ -295,11 +300,21 @@ function RecentBlock({
   );
 }
 
-function EmptyRow({ message }: { message: string }) {
+function EmptyRow({
+  message,
+  icon = "chart",
+}: {
+  message: string;
+  icon?: "chart" | "plug";
+}) {
+  const Icon = icon === "plug" ? IconPlugConnected : IconChartCandle;
   return (
-    <p className="rounded-lg border border-dashed border-border bg-background px-4 py-5 text-center text-sm text-muted-foreground">
-      {message}
-    </p>
+    <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center">
+      <span className="inline-flex size-9 items-center justify-center rounded-full bg-surface text-muted-foreground">
+        <Icon size={18} stroke={1.5} aria-hidden />
+      </span>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
   );
 }
 

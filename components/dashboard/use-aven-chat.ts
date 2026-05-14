@@ -41,6 +41,8 @@ export function useAvenChat({
     error: null,
   });
   const [streamConnected, setStreamConnected] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState<boolean>(initialMessages.length >= 50);
 
   // Refs ----------------------------------------------------------------------
   const dedupRef = useRef<Set<string>>(new Set());
@@ -476,6 +478,47 @@ export function useAvenChat({
     recorderRef.current?.stop();
   }, []);
 
+  // Lazy-load older messages ----------------------------------------------
+  const loadOlder = useCallback(async () => {
+    if (loadingOlder || !hasOlder) return;
+    // Lowest server-assigned id (skip optimistic local rows)
+    const ids = messages
+      .filter((m) => !m.localId)
+      .map((m) => Number(m.id))
+      .filter((n) => Number.isFinite(n));
+    if (ids.length === 0) return;
+    const oldest = Math.min(...ids);
+    setLoadingOlder(true);
+    try {
+      const res = await fetch(
+        `/api/proxy/aven/history?before_id=${oldest}&limit=50`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray((data as { messages?: unknown })?.messages)
+          ? (data as { messages: unknown[] }).messages
+          : [];
+      const shaped = list
+        .map(shapeMessage)
+        .filter((m): m is ChatMessage => m !== null)
+        .filter((m) => !dedupRef.current.has(m.id));
+      shaped.forEach((m) => dedupRef.current.add(m.id));
+      if (shaped.length === 0) {
+        setHasOlder(false);
+        return;
+      }
+      // Backend returns ASC; ensure prepend ordering matches existing sort.
+      const sorted = shaped.slice().sort((a, b) => Number(a.id) - Number(b.id));
+      setMessages((prev) => [...sorted, ...prev]);
+      if (shaped.length < 50) setHasOlder(false);
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [hasOlder, loadingOlder, messages]);
+
   return {
     messages,
     quota,
@@ -485,8 +528,11 @@ export function useAvenChat({
     setInput,
     voice,
     streamConnected,
+    loadingOlder,
+    hasOlder,
     send,
     retry,
+    loadOlder,
     startVoice,
     stopVoice,
     cancelVoice,

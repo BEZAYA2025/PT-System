@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBell,
   IconAlertTriangle,
@@ -419,9 +420,23 @@ function NotificationPanel({
           </div>
         ) : (
           <ul role="list" className="flex-1 divide-y divide-border overflow-y-auto">
-            {list.map((n) => (
-              <NotificationRow key={n.id} item={n} onClick={() => onClick(n)} />
-            ))}
+            <AnimatePresence initial={false} mode="popLayout">
+              {list.map((n) => (
+                <motion.li
+                  key={n.id}
+                  layout="position"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <NotificationRowInner
+                    item={n}
+                    onClick={() => onClick(n)}
+                  />
+                </motion.li>
+              ))}
+            </AnimatePresence>
           </ul>
         )}
       </div>
@@ -448,7 +463,7 @@ function SkeletonList() {
 
 // ---------------------------------------------------------------------------
 
-function NotificationRow({
+function NotificationRowInner({
   item,
   onClick,
 }: {
@@ -458,8 +473,7 @@ function NotificationRow({
   const tone = KIND_TONE[item.kind];
 
   return (
-    <li>
-      <button
+    <button
         type="button"
         onClick={onClick}
         className={[
@@ -507,7 +521,6 @@ function NotificationRow({
           />
         )}
       </button>
-    </li>
   );
 }
 

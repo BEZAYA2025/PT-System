@@ -16,6 +16,7 @@ import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
+import { MotionSection } from "@/components/dashboard/MotionSection";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -50,21 +51,21 @@ export default async function DashboardPage() {
 
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
-      <div data-tour="market">
+      <MotionSection tour="market" delay={0.04}>
         <TopStripMetrics initial={initialMetrics} />
-      </div>
+      </MotionSection>
 
-      <div data-tour="brief">
+      <MotionSection tour="brief" delay={0.1}>
         <DailyBriefCard brief={initialBrief} />
-      </div>
+      </MotionSection>
 
-      <div data-tour="aven">
+      <MotionSection tour="aven" delay={0.16}>
         <AvenChat initialMessages={initialMessages} />
-      </div>
+      </MotionSection>
 
-      <div data-tour="trades">
+      <MotionSection tour="trades" delay={0.22}>
         <TradesGrid initial={initialTrades} />
-      </div>
+      </MotionSection>
 
       {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
     </main>
