@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -12,7 +13,6 @@ import {
   labelClasses,
   submitErrorClasses,
 } from "@/lib/ui";
-import { TelegramLinkCard } from "./TelegramLinkCard";
 
 const onboardSchema = z
   .object({
@@ -21,16 +21,11 @@ const onboardSchema = z
       .min(12, { error: "At least 12 characters." })
       .max(200),
     password_confirm: z.string(),
-    binance_api_key: z
+    display_name: z
       .string()
-      .min(10, { error: "API key looks too short." })
-      .max(200)
-      .trim(),
-    binance_api_secret: z
-      .string()
-      .min(10, { error: "API secret looks too short." })
-      .max(200)
-      .trim(),
+      .max(80, { error: "Keep it under 80 characters." })
+      .optional()
+      .or(z.literal("")),
   })
   .refine((d) => d.password === d.password_confirm, {
     path: ["password_confirm"],
@@ -38,11 +33,6 @@ const onboardSchema = z
   });
 
 type OnboardInput = z.infer<typeof onboardSchema>;
-
-interface CompleteResponse {
-  telegram_link_url?: string;
-  telegram_link_token?: string;
-}
 
 export function OnboardForm({
   token,
@@ -53,8 +43,8 @@ export function OnboardForm({
   email: string;
   tier: string;
 }) {
+  const router = useRouter();
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [completed, setCompleted] = useState<CompleteResponse | null>(null);
 
   const {
     register,
@@ -65,22 +55,21 @@ export function OnboardForm({
     defaultValues: {
       password: "",
       password_confirm: "",
-      binance_api_key: "",
-      binance_api_secret: "",
+      display_name: "",
     },
   });
 
   const onSubmit = async (values: OnboardInput) => {
     setSubmitError(null);
     try {
+      const trimmedName = (values.display_name ?? "").trim();
       const res = await fetch("/api/proxy/auth/complete-signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token,
           password: values.password,
-          binance_api_key: values.binance_api_key,
-          binance_api_secret: values.binance_api_secret,
+          display_name: trimmedName.length > 0 ? trimmedName : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -89,34 +78,22 @@ export function OnboardForm({
         setSubmitError(
           typeof data?.message === "string"
             ? data.message
-            : "Could not complete signup. Please try again.",
+            : typeof data?.error === "string"
+              ? data.error
+              : "Could not complete signup. Please try again.",
         );
         return;
       }
 
-      setCompleted({
-        telegram_link_url:
-          typeof data?.telegram_link_url === "string"
-            ? data.telegram_link_url
-            : undefined,
-        telegram_link_token:
-          typeof data?.telegram_link_token === "string"
-            ? data.telegram_link_token
-            : undefined,
-      });
+      // Access-token cookie was captured by the proxy. Send the user into
+      // the dashboard — Telegram + Binance linking now happen from the
+      // Setup-Progress card.
+      router.replace("/dashboard");
+      router.refresh();
     } catch {
       setSubmitError("Connection issue. Please try again.");
     }
   };
-
-  if (completed) {
-    return (
-      <TelegramLinkCard
-        telegramLinkUrl={completed.telegram_link_url}
-        tier={tier}
-      />
-    );
-  }
 
   return (
     <form
@@ -172,54 +149,26 @@ export function OnboardForm({
         )}
       </div>
 
-      <div className="rounded-lg border border-emerald/20 bg-emerald/[0.04] p-4 text-sm text-foreground">
-        <p className="font-medium">Binance API key — read-only</p>
-        <p className="mt-1 text-muted-foreground">
-          Create the key with{" "}
-          <span className="font-mono text-foreground">
-            IP restriction → 145.79.11.110
-          </span>{" "}
-          and{" "}
-          <span className="font-mono text-foreground">read-only</span>{" "}
-          permissions. Required for security — no withdrawal access is ever
-          requested.
-        </p>
-      </div>
-
       <div>
-        <label htmlFor="binance_api_key" className={labelClasses}>
-          Binance API key
+        <label htmlFor="display_name" className={labelClasses}>
+          Display name{" "}
+          <span className="font-normal text-muted-foreground">(optional)</span>
         </label>
         <input
-          id="binance_api_key"
+          id="display_name"
           type="text"
-          autoComplete="off"
-          aria-invalid={errors.binance_api_key ? "true" : undefined}
-          className={`${inputClasses} mt-2 font-mono text-sm`}
-          {...register("binance_api_key")}
+          autoComplete="nickname"
+          placeholder="What should Aven call you?"
+          aria-invalid={errors.display_name ? "true" : undefined}
+          className={`${inputClasses} mt-2`}
+          {...register("display_name")}
         />
-        {errors.binance_api_key && (
+        <p className={helperClasses}>
+          Used in briefings and chat. You can change it later.
+        </p>
+        {errors.display_name && (
           <p role="alert" className={errorClasses}>
-            {errors.binance_api_key.message}
-          </p>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="binance_api_secret" className={labelClasses}>
-          Binance API secret
-        </label>
-        <input
-          id="binance_api_secret"
-          type="password"
-          autoComplete="off"
-          aria-invalid={errors.binance_api_secret ? "true" : undefined}
-          className={`${inputClasses} mt-2 font-mono text-sm`}
-          {...register("binance_api_secret")}
-        />
-        {errors.binance_api_secret && (
-          <p role="alert" className={errorClasses}>
-            {errors.binance_api_secret.message}
+            {errors.display_name.message}
           </p>
         )}
       </div>
@@ -235,8 +184,13 @@ export function OnboardForm({
         disabled={isSubmitting}
         className={`${buttonPrimaryClasses} w-full`}
       >
-        {isSubmitting ? "Setting up your account…" : "Complete setup"}
+        {isSubmitting ? "Activating your account…" : "Activate account"}
       </button>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Almost done — Telegram and your exchange take just a few clicks from
+        the dashboard after this.
+      </p>
     </form>
   );
 }
