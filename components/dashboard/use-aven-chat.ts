@@ -245,17 +245,25 @@ export function useAvenChat({
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
+          // Surface the failing payload in the browser console so a
+          // production tester can diagnose without backend access.
+          // eslint-disable-next-line no-console
+          console.error("[aven/chat] send failed", { status: res.status, data });
           setMessages((prev) =>
             prev.map((m) =>
               m.localId === localId ? { ...m, status: "failed" as SendStatus } : m,
             ),
           );
+          const backendMsg =
+            (typeof data?.message === "string" && data.message) ||
+            (typeof data?.error === "string" && data.error) ||
+            null;
           const fallback =
             res.status === 429
               ? "Daily limit reached. Upgrade to VIP for unlimited Aven."
-              : typeof data?.message === "string"
-                ? data.message
-                : "Send failed. Please try again.";
+              : backendMsg
+                ? `${backendMsg} (HTTP ${res.status})`
+                : `Send failed — HTTP ${res.status}. Please try again or copy this status to support.`;
           setSendError(fallback);
           return;
         }
