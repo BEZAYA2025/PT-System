@@ -46,28 +46,9 @@ export const METRIC_META: Record<MetricKey, MetricMeta> = {
   },
 };
 
-// What we hope the backend hands us. All fields optional — the adapter
-// degrades gracefully when something is missing and surfaces "—" in the UI.
-export interface RawSnapshotMetrics {
-  generated_at?: string;
-  // Several plausible shapes — read whichever is present.
-  btc_price?: number;
-  btc_change_24h_pct?: number;
-  btc?: { price?: number; change_24h_pct?: number };
-  fear_greed_value?: number;
-  fear_greed_label?: string;
-  fear_greed?: { value?: number; label?: string };
-  oi_aggregated_usd?: number;
-  oi_delta_24h_pct?: number;
-  open_interest?: {
-    aggregated_usd?: number;
-    delta_24h_pct?: number;
-  };
-  funding_rate?: number;
-  funding?: { rate?: number };
-  long_short_ratio?: number;
-  lsr?: number;
-}
+// Loose-typed snapshot record. The adapter walks several plausible paths
+// per metric so a backend rename doesn't blank a card.
+export type RawSnapshotMetrics = Record<string, unknown>;
 
 export interface MetricsView {
   cards: MetricCard[];
@@ -82,29 +63,186 @@ const num = (v: unknown): number | null =>
 const str = (v: unknown): string | null =>
   typeof v === "string" && v.length > 0 ? v : null;
 
-function pickBtcPrice(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.btc_price) ?? num(raw?.btc?.price);
+/** Walk a dotted-path against the raw snapshot. Returns the value at the
+ *  leaf or undefined when any segment is missing. */
+function dig(raw: unknown, path: string): unknown {
+  if (raw === null || raw === undefined) return undefined;
+  let cur: unknown = raw;
+  for (const seg of path.split(".")) {
+    if (cur === null || typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[seg];
+    if (cur === undefined) return undefined;
+  }
+  return cur;
 }
-function pickBtcChange(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.btc_change_24h_pct) ?? num(raw?.btc?.change_24h_pct);
+
+/** Try a list of paths until one yields a finite number. */
+function pickNumber(raw: unknown, paths: string[]): number | null {
+  for (const p of paths) {
+    const v = num(dig(raw, p));
+    if (v !== null) return v;
+  }
+  return null;
 }
-function pickFng(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.fear_greed_value) ?? num(raw?.fear_greed?.value);
+
+function pickString(raw: unknown, paths: string[]): string | null {
+  for (const p of paths) {
+    const v = str(dig(raw, p));
+    if (v !== null) return v;
+  }
+  return null;
 }
-function pickFngLabel(raw: RawSnapshotMetrics | null): string | null {
-  return str(raw?.fear_greed_label) ?? str(raw?.fear_greed?.label);
+
+// Common envelopes the snapshot might be wrapped in. Each picker tries the
+// metric path BOTH at the root AND under these nested parents.
+const ENVELOPES = ["", "data.", "snapshot.", "coinglass.", "metrics.", "market."];
+
+function pathsAcrossEnvelopes(suffixes: string[]): string[] {
+  const out: string[] = [];
+  for (const env of ENVELOPES) {
+    for (const s of suffixes) out.push(`${env}${s}`);
+  }
+  return out;
 }
-function pickOi(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.oi_aggregated_usd) ?? num(raw?.open_interest?.aggregated_usd);
+
+function pickBtcPrice(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "btc_price",
+      "btc.price",
+      "btc.last_price",
+      "btc.price_usd",
+      "btc_price_usd",
+      "price.btc",
+      "prices.btc",
+    ]),
+  );
 }
-function pickOiDelta(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.oi_delta_24h_pct) ?? num(raw?.open_interest?.delta_24h_pct);
+function pickBtcChange(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "btc_change_24h_pct",
+      "btc.change_24h_pct",
+      "btc.change_24h",
+      "btc.delta_24h_pct",
+      "btc.delta_24h",
+      "btc.pct_change_24h",
+      "btc_24h_change",
+    ]),
+  );
 }
-function pickFunding(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.funding_rate) ?? num(raw?.funding?.rate);
+function pickFng(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "fear_greed_value",
+      "fear_greed.value",
+      "fear_greed",
+      "fng.value",
+      "fng",
+      "fng_value",
+      "sentiment.fear_greed",
+    ]),
+  );
 }
-function pickLsr(raw: RawSnapshotMetrics | null): number | null {
-  return num(raw?.long_short_ratio) ?? num(raw?.lsr);
+function pickFngLabel(raw: unknown): string | null {
+  return pickString(
+    raw,
+    pathsAcrossEnvelopes([
+      "fear_greed_label",
+      "fear_greed.label",
+      "fng.label",
+      "fng_label",
+    ]),
+  );
+}
+function pickOi(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "oi_aggregated_usd",
+      "open_interest.aggregated_usd",
+      "open_interest.aggregated",
+      "open_interest.usd",
+      "open_interest_usd",
+      "oi.aggregated_usd",
+      "oi.aggregated",
+      "oi.usd",
+      "oi_usd",
+      "futures_oi",
+    ]),
+  );
+}
+function pickOiDelta(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "oi_delta_24h_pct",
+      "open_interest.delta_24h_pct",
+      "open_interest.delta_24h",
+      "open_interest.change_24h_pct",
+      "open_interest.change_24h",
+      "oi.delta_24h_pct",
+      "oi.delta_24h",
+      "oi.change_24h_pct",
+      "oi.change_24h",
+      "oi_change_24h_pct",
+      "oi_24h_change",
+    ]),
+  );
+}
+function pickFunding(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "funding_rate",
+      "funding.rate",
+      "funding.rate_8h",
+      "funding.avg",
+      "funding.average",
+      "funding_avg",
+      "funding_rate_avg",
+      "perp_funding",
+      "perp_funding_rate",
+      "btc_funding",
+      "btc_funding_rate",
+      "funding.btc",
+      "funding.btc_rate",
+    ]),
+  );
+}
+function pickLsr(raw: unknown): number | null {
+  return pickNumber(
+    raw,
+    pathsAcrossEnvelopes([
+      "long_short_ratio",
+      "lsr",
+      "ls_ratio",
+      "long_short_ratio.value",
+      "lsr.value",
+      "ls_ratio.value",
+      "long_short_ratio.global",
+      "long_short_ratio.btc",
+      "global_long_short_ratio",
+      "ls_ratio.global",
+      "position_ratio.long_short",
+    ]),
+  );
+}
+
+function pickGeneratedAt(raw: unknown): string | null {
+  return pickString(
+    raw,
+    pathsAcrossEnvelopes([
+      "generated_at",
+      "updated_at",
+      "fetched_at",
+      "timestamp",
+      "as_of",
+    ]),
+  );
 }
 
 const PLACEHOLDER = "—";
@@ -241,7 +379,7 @@ export function buildMetricsView(
 ): MetricsView {
   return {
     cards: shapeMetrics(raw),
-    generatedAt: str(raw?.generated_at) ?? null,
+    generatedAt: pickGeneratedAt(raw),
     fetchedAt,
   };
 }
