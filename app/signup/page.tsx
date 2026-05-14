@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { WaitlistForm } from "@/components/WaitlistForm";
 import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
+import { getCurrentUser } from "@/lib/dal";
 
 export const metadata: Metadata = {
   title: "Join the Waitlist",
@@ -10,7 +12,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/signup" },
 };
 
-export default function SignupPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SignupPage() {
+  const user = await getCurrentUser();
+  if (user) redirect("/dashboard");
+
   return (
     <>
       <SiteHeader />

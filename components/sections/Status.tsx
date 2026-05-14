@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Reveal } from "@/components/Reveal";
 
-export function Status() {
+export function Status({ isAuthed = false }: { isAuthed?: boolean }) {
   return (
     <section id="status" className="scroll-mt-16 px-6 py-24 sm:py-32 lg:py-40">
       <div className="mx-auto max-w-3xl">
@@ -25,20 +25,22 @@ export function Status() {
               <span className="text-foreground">Aven Unlimited</span> (VIP) —
               will be announced at launch.
             </p>
-            <p>Join the waitlist to be among the first.</p>
+            {!isAuthed && <p>Join the waitlist to be among the first.</p>}
           </div>
         </Reveal>
 
-        <Reveal delay={0.2}>
-          <div className="mt-10">
-            <Link
-              href="/signup"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-emerald px-8 text-sm font-medium text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
-            >
-              Join the waitlist
-            </Link>
-          </div>
-        </Reveal>
+        {!isAuthed && (
+          <Reveal delay={0.2}>
+            <div className="mt-10">
+              <Link
+                href="/signup"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-emerald px-8 text-sm font-medium text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
+              >
+                Join the waitlist
+              </Link>
+            </div>
+          </Reveal>
+        )}
       </div>
     </section>
   );

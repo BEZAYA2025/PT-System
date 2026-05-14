@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { SignInForm } from "@/components/SignInForm";
 import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
+import { getCurrentUser } from "@/lib/dal";
 
 export const metadata: Metadata = {
   title: "Sign In · PT System",
@@ -11,7 +13,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "/signin" },
 };
 
-export default function SignInPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SignInPage() {
+  const user = await getCurrentUser();
+  if (user) redirect("/dashboard");
+
   return (
     <>
       <SiteHeader />
