@@ -3,8 +3,7 @@ import { requireUser } from "@/lib/dal";
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
 import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCard";
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
-import { SignOutButton } from "@/components/dashboard/SignOutButton";
-import { buttonSecondaryClasses, cardClasses } from "@/lib/ui";
+import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
 
 export const metadata: Metadata = {
   title: "Settings · PT System",
@@ -39,32 +38,10 @@ export default async function SettingsPage() {
           addedAt={user.binance_api_key_added_at}
         />
 
-        <section className={cardClasses}>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Account
-          </h2>
-          <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                Email
-              </dt>
-              <dd className="mt-1 font-mono text-foreground">{user.email}</dd>
-            </div>
-            <div>
-              <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-                Display name
-              </dt>
-              <dd className="mt-1 text-foreground">
-                {user.display_name || (
-                  <span className="text-muted-foreground">Not set</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-          <div className="mt-6">
-            <SignOutButton className={buttonSecondaryClasses} />
-          </div>
-        </section>
+        <AccountSettingsCard
+          email={user.email}
+          displayName={user.display_name}
+        />
       </div>
     </main>
   );
