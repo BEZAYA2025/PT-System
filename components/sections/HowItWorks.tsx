@@ -32,7 +32,7 @@ function Chips({
       {items.map((label) => (
         <span
           key={label}
-          className="inline-flex items-center rounded-md border border-border bg-background/40 px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
+          className="inline-flex items-center rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground"
         >
           {label}
         </span>

@@ -1,6 +1,11 @@
 import Link from "next/link";
+import { getCurrentUser } from "@/lib/dal";
+import { SignOutButton } from "@/components/dashboard/SignOutButton";
 
-export function Footer() {
+export async function Footer() {
+  const user = await getCurrentUser();
+  const isAuthed = user !== null;
+
   return (
     <footer className="border-t border-border px-6 py-12">
       <div className="mx-auto flex max-w-6xl flex-col gap-8 sm:gap-10">
@@ -10,7 +15,7 @@ export function Footer() {
           </p>
 
           <div className="flex items-center justify-start sm:justify-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/40 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
               <span
                 aria-hidden="true"
                 className="size-1.5 rounded-full bg-emerald"
@@ -29,18 +34,27 @@ export function Footer() {
             >
               Pricing
             </Link>
-            <Link
-              href="/signin"
-              className="transition-colors hover:text-foreground"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/dashboard"
-              className="transition-colors hover:text-foreground"
-            >
-              Dashboard
-            </Link>
+            {isAuthed ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  className="transition-colors hover:text-foreground"
+                >
+                  Dashboard
+                </Link>
+                <SignOutButton
+                  label="Sign out"
+                  className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                />
+              </>
+            ) : (
+              <Link
+                href="/signin"
+                className="transition-colors hover:text-foreground"
+              >
+                Sign in
+              </Link>
+            )}
             <Link
               href="/privacy"
               className="transition-colors hover:text-foreground"

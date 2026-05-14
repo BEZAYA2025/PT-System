@@ -7,18 +7,24 @@ import { WaveRidingMethod } from "@/components/sections/WaveRidingMethod";
 import { Status } from "@/components/sections/Status";
 import { Founder } from "@/components/sections/Founder";
 import { Footer } from "@/components/sections/Footer";
+import { getCurrentUser } from "@/lib/dal";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const user = await getCurrentUser();
+  const isAuthed = user !== null;
+
   return (
     <>
       <SiteHeader />
       <main id="main" className="flex-1">
-        <Hero />
+        <Hero isAuthed={isAuthed} />
         <WhatIs />
         <MeetAven />
         <HowItWorks />
         <WaveRidingMethod />
-        <Status />
+        <Status isAuthed={isAuthed} />
         <Founder />
       </main>
       <Footer />

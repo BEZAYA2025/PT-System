@@ -252,7 +252,7 @@ export function WaitlistForm() {
           {marketOptions.map((o) => (
             <label
               key={o.value}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface/30 px-4 py-3 text-[15px] text-foreground transition-colors hover:border-foreground/30 has-[input:checked]:border-emerald/60 has-[input:checked]:bg-emerald/[0.06]"
+              className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-[15px] text-foreground transition-colors hover:border-foreground/30 has-[input:checked]:border-emerald/60 has-[input:checked]:bg-emerald/[0.06]"
             >
               <input
                 type="checkbox"

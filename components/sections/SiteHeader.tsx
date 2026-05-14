@@ -7,7 +7,7 @@ export async function SiteHeader() {
   const isAuthed = user !== null;
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6 sm:h-16">
         <Link
           href="/"
@@ -18,43 +18,35 @@ export async function SiteHeader() {
 
         <nav
           aria-label="Primary"
-          className="flex items-center gap-1 sm:gap-2"
+          className="flex items-center gap-1 sm:gap-3"
         >
           <Link
             href="/pricing"
-            className="hidden rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:inline-flex"
+            className="rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             Pricing
           </Link>
 
           {isAuthed ? (
             <>
+              <SignOutButton
+                label="Sign out"
+                className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+              />
               <Link
                 href="/dashboard"
                 className="inline-flex h-9 items-center justify-center rounded-full bg-emerald px-4 text-sm font-medium text-background transition-colors hover:bg-emerald-hover sm:h-10 sm:px-5"
               >
                 Open Dashboard
               </Link>
-              <SignOutButton
-                label="Sign out"
-                className="hidden rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60 sm:inline-flex sm:items-center sm:gap-2"
-              />
             </>
           ) : (
-            <>
-              <Link
-                href="/signin"
-                className="rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Sign in
-              </Link>
-              <Link
-                href="/pricing"
-                className="inline-flex h-9 items-center justify-center rounded-full bg-emerald px-4 text-sm font-medium text-background transition-colors hover:bg-emerald-hover sm:h-10 sm:px-5"
-              >
-                Subscribe
-              </Link>
-            </>
+            <Link
+              href="/signin"
+              className="rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              Sign in
+            </Link>
           )}
         </nav>
       </div>

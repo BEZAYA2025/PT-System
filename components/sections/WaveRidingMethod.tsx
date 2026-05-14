@@ -59,7 +59,7 @@ export function WaveRidingMethod() {
           {tools.map((tool, idx) => (
             <Reveal key={tool.number} delay={0.18 + idx * 0.08}>
               <article className="flex h-full flex-col gap-5 rounded-2xl border border-border bg-surface p-6 transition-colors duration-300 hover:border-emerald/20 sm:p-7">
-                <div className="overflow-hidden rounded-lg border border-border/80 bg-background/30 p-3">
+                <div className="overflow-hidden rounded-lg border border-border bg-background p-3">
                   {tool.visual}
                 </div>
                 <div className="flex flex-col gap-2">

@@ -37,7 +37,7 @@ export function TradesTable({
 }) {
   if (trades.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-border bg-surface/20 px-4 py-6 text-sm text-muted-foreground">
+      <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
         {emptyMessage}
       </p>
     );
@@ -46,7 +46,7 @@ export function TradesTable({
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
       <table className="min-w-full divide-y divide-border text-sm">
-        <thead className="bg-surface/40 text-xs uppercase tracking-wider text-muted-foreground">
+        <thead className="bg-surface text-xs uppercase tracking-wider text-muted-foreground">
           <tr>
             <th scope="col" className="px-4 py-3 text-left">Symbol</th>
             <th scope="col" className="px-4 py-3 text-left">Side</th>

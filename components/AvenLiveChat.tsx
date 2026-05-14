@@ -315,7 +315,7 @@ export function AvenLiveChat() {
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-emerald/20 bg-surface/60 p-6 shadow-[0_0_80px_-20px_rgba(16,185,129,0.25)] sm:p-8 lg:p-10"
+      className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-emerald/20 bg-surface p-6 shadow-[0_0_80px_-20px_rgba(16,185,129,0.25)] sm:p-8 lg:p-10"
     >
       <style>{`
         @keyframes aven-caret {

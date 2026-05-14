@@ -102,7 +102,7 @@ export function OnboardForm({
       className="space-y-6"
       aria-describedby={submitError ? "onboard-error" : undefined}
     >
-      <div className="rounded-lg border border-border bg-surface/40 px-4 py-3 text-sm">
+      <div className="rounded-lg border border-border bg-surface px-4 py-3 text-sm">
         <p className="text-muted-foreground">Setting up</p>
         <p className="font-medium text-foreground">{email}</p>
         <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.1em] text-emerald">

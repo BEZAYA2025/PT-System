@@ -27,7 +27,7 @@ export function DashboardSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r border-border bg-surface/30 px-5 py-8 lg:flex lg:flex-col">
+      <aside className="sticky top-0 hidden h-svh w-60 shrink-0 border-r border-border bg-surface px-5 py-8 lg:flex lg:flex-col">
         <Link
           href="/"
           className="text-lg font-semibold tracking-tight text-foreground"
@@ -47,8 +47,8 @@ export function DashboardSidebar() {
                 className={[
                   "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   active
-                    ? "bg-surface text-foreground"
-                    : "text-muted-foreground hover:bg-surface/60 hover:text-foreground",
+                    ? "bg-surface-elevated text-foreground"
+                    : "text-muted-foreground hover:bg-surface-elevated hover:text-foreground",
                 ].join(" ")}
               >
                 <Icon aria-hidden className="size-4" />
@@ -66,7 +66,7 @@ export function DashboardSidebar() {
       {/* Mobile bottom-nav */}
       <nav
         aria-label="Cockpit"
-        className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-stretch border-t border-border bg-background/95 backdrop-blur lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-16 items-stretch border-t border-border bg-background lg:hidden"
       >
         {NAV.map((item) => {
           const Icon = item.icon;
