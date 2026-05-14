@@ -98,150 +98,230 @@ export const mockMessages: ChatMessage[] = [
   },
 ];
 
-export type TradeSide = "long" | "short";
-export type TradeStatus = "open" | "closed";
+import type { YourTrade, PaulsTrade, TradesView } from "./trades";
 
-export interface MockTrade {
-  id: string;
-  symbol: string;
-  side: TradeSide;
-  status: TradeStatus;
-  entry: number;
-  mark?: number;
-  exit?: number;
-  pnlPct: number;
-  pnlR: number;
-  durationLabel: string;
-  size?: string;
-  liquidationDistancePct?: number;
-}
+// Re-export for legacy import sites; canonical source lives in lib/trades.ts.
+export type { YourTrade, PaulsTrade } from "./trades";
 
-export const mockYourTrades: { active: MockTrade[]; recent: MockTrade[] } = {
+const now = Date.now();
+const ago = (mins: number) => new Date(now - mins * 60_000).toISOString();
+const days = (d: number) => new Date(now - d * 24 * 60 * 60_000).toISOString();
+
+export const mockYourTrades: { active: YourTrade[]; recent: YourTrade[] } = {
   active: [
     {
       id: "y1",
+      owner: "self",
       symbol: "SOLUSDT",
       side: "long",
       status: "open",
       entry: 198.4,
       mark: 211.7,
+      exit: null,
+      pnlUsd: 1248.5,
       pnlPct: 6.7,
-      pnlR: 2.4,
-      durationLabel: "11h open",
-      size: "1.2x",
-      liquidationDistancePct: 28,
+      slPrice: 195.0,
+      tpPrice: 218.4,
+      slDistancePct: 7.9,
+      tpDistancePct: 3.16,
+      openedAt: ago(11 * 60),
+      closedAt: null,
+      durationLabel: "11h 0m",
     },
     {
       id: "y2",
+      owner: "self",
       symbol: "ETHUSDT",
       side: "long",
       status: "open",
       entry: 3742,
       mark: 3781,
+      exit: null,
+      pnlUsd: 312.0,
       pnlPct: 1.04,
-      pnlR: 0.6,
-      durationLabel: "4h open",
-      size: "0.8x",
-      liquidationDistancePct: 41,
+      slPrice: 3690,
+      tpPrice: 3920,
+      slDistancePct: 2.41,
+      tpDistancePct: 3.68,
+      openedAt: ago(4 * 60),
+      closedAt: null,
+      durationLabel: "4h 0m",
     },
   ],
   recent: [
     {
       id: "y3",
+      owner: "self",
       symbol: "AVAXUSDT",
       side: "long",
       status: "closed",
       entry: 38.4,
+      mark: null,
       exit: 41.2,
+      pnlUsd: 567.2,
       pnlPct: 7.3,
-      pnlR: 2.9,
+      slPrice: 37.6,
+      tpPrice: 41.2,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: days(2),
+      closedAt: days(1),
       durationLabel: "1d 6h",
     },
     {
       id: "y4",
+      owner: "self",
       symbol: "BTCUSDT",
       side: "long",
       status: "closed",
       entry: 69_840,
+      mark: null,
       exit: 71_280,
+      pnlUsd: 1148.0,
       pnlPct: 2.06,
-      pnlR: 1.2,
-      durationLabel: "8h",
+      slPrice: 69_200,
+      tpPrice: 71_280,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: days(1),
+      closedAt: ago(60 * 14),
+      durationLabel: "8h 0m",
     },
     {
       id: "y5",
+      owner: "self",
       symbol: "TIAUSDT",
       side: "short",
       status: "closed",
       entry: 7.42,
+      mark: null,
       exit: 7.55,
+      pnlUsd: -142.1,
       pnlPct: -1.75,
-      pnlR: -0.8,
-      durationLabel: "3h",
+      slPrice: 7.62,
+      tpPrice: 7.18,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: ago(60 * 6),
+      closedAt: ago(60 * 3),
+      durationLabel: "3h 0m",
     },
   ],
 };
 
-export const mockPaulsTrades: { active: MockTrade[]; recent: MockTrade[] } = {
+export const mockPaulsTrades: { active: PaulsTrade[]; recent: PaulsTrade[] } = {
   active: [
     {
       id: "p1",
+      owner: "paul",
       symbol: "BTCUSDT",
       side: "long",
       status: "open",
       entry: 70_120,
       mark: 71_420,
+      exit: null,
       pnlPct: 1.85,
       pnlR: 1.5,
-      durationLabel: "9h open",
+      slPrice: 69_400,
+      tpPrice: 74_000,
+      slDistancePct: 2.83,
+      tpDistancePct: 3.61,
+      openedAt: ago(9 * 60),
+      closedAt: null,
+      durationLabel: "9h 0m",
+      reasoning:
+        "4H reclaim of the 70k pivot after the overnight sweep. Funding still neutral, no aggressive crowding. Risk to 69.4k, structural invalidation under 68.8k.",
     },
     {
       id: "p2",
+      owner: "paul",
       symbol: "SOLUSDT",
       side: "long",
       status: "open",
       entry: 196.8,
       mark: 211.7,
+      exit: null,
       pnlPct: 7.57,
       pnlR: 3.2,
-      durationLabel: "12h open",
+      slPrice: 193.0,
+      tpPrice: 218.4,
+      slDistancePct: 8.83,
+      tpDistancePct: 3.16,
+      openedAt: ago(12 * 60),
+      closedAt: null,
+      durationLabel: "12h 0m",
+      reasoning: null,
     },
   ],
   recent: [
     {
       id: "p3",
+      owner: "paul",
       symbol: "AVAXUSDT",
       side: "long",
       status: "closed",
       entry: 38.1,
+      mark: null,
       exit: 41.2,
       pnlPct: 8.13,
       pnlR: 3.4,
+      slPrice: 37.4,
+      tpPrice: 41.2,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: days(2),
+      closedAt: days(1),
       durationLabel: "1d 4h",
+      reasoning: null,
     },
     {
       id: "p4",
+      owner: "paul",
       symbol: "ETHUSDT",
       side: "short",
       status: "closed",
       entry: 3_820,
+      mark: null,
       exit: 3_742,
       pnlPct: 2.04,
       pnlR: 1.1,
-      durationLabel: "6h",
+      slPrice: 3_870,
+      tpPrice: 3_740,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: ago(60 * 10),
+      closedAt: ago(60 * 4),
+      durationLabel: "6h 0m",
+      reasoning:
+        "Daily relative-weakness fade vs BTC. Closed at structural HTF support.",
     },
     {
       id: "p5",
+      owner: "paul",
       symbol: "ARBUSDT",
       side: "long",
       status: "closed",
       entry: 0.92,
+      mark: null,
       exit: 0.99,
       pnlPct: 7.61,
       pnlR: 2.6,
+      slPrice: 0.895,
+      tpPrice: 0.99,
+      slDistancePct: null,
+      tpDistancePct: null,
+      openedAt: days(3),
+      closedAt: days(2),
       durationLabel: "1d 9h",
+      reasoning: null,
     },
   ],
+};
+
+export const mockTradesView: TradesView = {
+  your: mockYourTrades,
+  pauls: mockPaulsTrades,
+  fetchedAt: now,
 };
 
 export type NotificationKind = "setup" | "trade" | "system";
