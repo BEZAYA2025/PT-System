@@ -58,12 +58,42 @@ export const getAccessToken = cache(async (): Promise<string | null> => {
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const token = await getAccessToken();
   if (!token) return null;
-  const res = await backendFetch<{ user: CurrentUser }>("/api/auth/me", {
-    method: "GET",
-    token,
-  });
-  if (!res.ok) return null;
-  return res.data?.user ?? null;
+  const res = await backendFetch<{ user: CurrentUser & Record<string, unknown> }>(
+    "/api/auth/me",
+    { method: "GET", token },
+  );
+  if (!res.ok || !res.data?.user) return null;
+
+  const user = res.data.user;
+
+  // Defensive: backend route version may expose period_end under different
+  // names. Alias whatever's present so the SubscriptionCard always has a
+  // value to format.
+  if (!user.subscription_period_end) {
+    const raw = user as Record<string, unknown>;
+    const candidates = [
+      raw.period_end,
+      raw.current_period_end,
+      raw.next_billing_at,
+      raw.billing_period_end,
+      raw.next_billing_date,
+    ];
+    for (const v of candidates) {
+      if (typeof v === "string" && v.length > 0) {
+        user.subscription_period_end = v;
+        break;
+      }
+      if (typeof v === "number" && Number.isFinite(v)) {
+        // Unix seconds OR ms → normalised to ISO so SubscriptionCard
+        // formatDate works uniformly.
+        const ms = v > 1e12 ? v : v * 1000;
+        user.subscription_period_end = new Date(ms).toISOString();
+        break;
+      }
+    }
+  }
+
+  return user;
 });
 
 export async function requireUser(): Promise<CurrentUser> {

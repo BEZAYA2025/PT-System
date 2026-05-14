@@ -168,19 +168,18 @@ function pickLsr(raw: unknown): number | null {
   return pickNumber(raw, ["liquidation_map.ls_ratio.now"]);
 }
 function pickLsLongPct(raw: unknown): number | null {
+  // Path confirmed by VPS round-4: liquidation_map.ls_ratio.long_pct_now
   return pickNumber(raw, [
+    "liquidation_map.ls_ratio.long_pct_now",
     "liquidation_map.ls_ratio.long_share_pct",
     "liquidation_map.ls_ratio.long_pct",
-    "liquidation_map.ls_ratio.long_share",
-    "liquidation_map.ls_ratio.long_account_pct",
   ]);
 }
 function pickLsShortPct(raw: unknown): number | null {
   return pickNumber(raw, [
+    "liquidation_map.ls_ratio.short_pct_now",
     "liquidation_map.ls_ratio.short_share_pct",
     "liquidation_map.ls_ratio.short_pct",
-    "liquidation_map.ls_ratio.short_share",
-    "liquidation_map.ls_ratio.short_account_pct",
   ]);
 }
 

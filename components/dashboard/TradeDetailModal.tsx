@@ -1,6 +1,6 @@
 "use client";
 
-import { IconBulb, IconChartCandle } from "@tabler/icons-react";
+import { IconBulb } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { timeAgo } from "@/lib/format";
 import type { AnyTrade } from "@/lib/trades";
@@ -156,11 +156,6 @@ export function TradeDetailModal({
           </div>
         )}
 
-        {/* Chart placeholder */}
-        <div className="flex items-center gap-3 rounded-lg border border-dashed border-border bg-surface/40 px-4 py-5 text-sm text-muted-foreground">
-          <IconChartCandle size={18} stroke={1.5} aria-hidden />
-          <span>Mini-chart lands in iteration 7 alongside real-time data.</span>
-        </div>
       </div>
     </Modal>
   );
