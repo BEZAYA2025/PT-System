@@ -4,7 +4,11 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { backendFetch } from "./backend";
-import { shapeMessages, type ChatMessage } from "./aven";
+import {
+  shapeHistoryResponse,
+  type ChatMessage,
+  type HistoryResponse,
+} from "./aven";
 import {
   shapeNotificationsResponse,
   type NotificationsResponse,
@@ -130,20 +134,28 @@ export const getRawSnapshot = cache(
   },
 );
 
-/** Initial Aven chat history for fast first paint. Empty array if the
- *  backend is unreachable or returns nothing. */
+/** Initial Aven chat history for fast first paint. Returns the shaped
+ *  messages plus the cursor info so the client knows whether to show the
+ *  "Load older" pill. Empty list / hasMore=false on backend failure. */
 export const getInitialAvenHistory = cache(
-  async (limit = 50): Promise<ChatMessage[]> => {
+  async (limit = 50): Promise<HistoryResponse> => {
     const token = await getAccessToken();
-    if (!token) return [];
+    if (!token) {
+      return { messages: [], hasMore: false, nextBeforeId: null, nextSinceId: null };
+    }
     const res = await backendFetch<unknown>(
       `/api/aven/history?limit=${limit}`,
       { method: "GET", token },
     );
-    if (!res.ok) return [];
-    return shapeMessages(res.data);
+    if (!res.ok) {
+      return { messages: [], hasMore: false, nextBeforeId: null, nextSinceId: null };
+    }
+    return shapeHistoryResponse(res.data);
   },
 );
+
+// Re-export ChatMessage to keep existing import sites compiling.
+export type { ChatMessage };
 
 /** Initial notifications for the bell — gives an instant unread count on
  *  first paint instead of a flicker from 0. Returns an empty bag if the

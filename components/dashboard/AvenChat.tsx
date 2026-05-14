@@ -20,6 +20,9 @@ import type { ChatMessage, QuotaState } from "@/lib/aven";
 
 interface Props {
   initialMessages: ChatMessage[];
+  /** SSR-known cursor info — drives the initial visibility of the
+   *  "Load older messages" pill. */
+  initialHasOlder?: boolean;
   /** Optional SSR-fetched quota; client refreshes after mount + each send. */
   initialQuota?: QuotaState | null;
 }
@@ -35,12 +38,20 @@ function formatTime(iso: string): string {
   }
 }
 
-export function AvenChat({ initialMessages, initialQuota = null }: Props) {
+export function AvenChat({
+  initialMessages,
+  initialHasOlder,
+  initialQuota = null,
+}: Props) {
   // Iter 7: synthetic greeting + WelcomeCard removed. The daily greeting is
   // now a real Aven message inserted server-side (flagged via
   // meta.greeting=true) and the first-login welcome moved to the global
   // SpotlightTour.
-  const chat = useAvenChat({ initialMessages, initialQuota });
+  const chat = useAvenChat({
+    initialMessages,
+    initialQuota,
+    initialHasOlder,
+  });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastBottomIdRef = useRef<string | null>(null);
@@ -58,10 +69,7 @@ export function AvenChat({ initialMessages, initialQuota = null }: Props) {
     }
   }, [chat.messages, chat.thinking]);
 
-  const limitReached =
-    chat.quota !== null &&
-    !chat.quota.isUnlimited &&
-    chat.quota.remaining_today <= 0;
+  const limitReached = chat.quota !== null && !chat.quota.allowed;
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -191,10 +199,9 @@ function ChatHeader({
 }
 
 function QuotaPill({ quota }: { quota: QuotaState }) {
-  const used = quota.total_today - quota.remaining_today;
-  const pct = quota.total_today
-    ? Math.min(100, Math.round((used / quota.total_today) * 100))
-    : 0;
+  // Skip the pill when the backend gave us nothing meaningful to render.
+  if (quota.limit === null || quota.limit === 0) return null;
+  const pct = Math.min(100, Math.round((quota.used / quota.limit) * 100));
   return (
     <div className="hidden items-center gap-2 sm:flex">
       <div className="h-1 w-20 overflow-hidden rounded-full bg-surface-elevated">
@@ -204,7 +211,7 @@ function QuotaPill({ quota }: { quota: QuotaState }) {
         />
       </div>
       <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        {used}/{quota.total_today} today
+        {quota.used}/{quota.limit} today
       </p>
     </div>
   );

@@ -1,4 +1,5 @@
 // Aven chat types — shared between server fetchers and the client hook.
+// Adapter shapes confirmed against the live VPS-Phase-A.1 backend (May 2026).
 
 export type ChatRole = "user" | "aven" | "system";
 export type ChatSource = "web" | "telegram";
@@ -18,11 +19,16 @@ export interface ChatMessage {
   isGreeting?: boolean;
 }
 
+/**
+ * Quota response from GET /api/aven/quota:
+ *   { used, limit, remaining, allowed, unlimited }
+ *   limit === null when VIP-unlimited.
+ */
 export interface QuotaState {
-  remaining_today: number;
-  total_today: number;
-  tier: "standard" | "vip";
-  /** Frontend-derived: limit === null when tier is VIP (unlimited). */
+  used: number;
+  limit: number | null;
+  remaining: number;
+  allowed: boolean;
   isUnlimited: boolean;
 }
 
@@ -31,6 +37,13 @@ const num = (v: unknown): number | null =>
 
 const str = (v: unknown): string | null =>
   typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
+
+const numericId = (v: unknown): string | null =>
+  typeof v === "number" && Number.isFinite(v)
+    ? String(v)
+    : typeof v === "string" && v.trim().length > 0
+      ? v.trim()
+      : null;
 
 function normaliseRole(v: unknown): ChatRole {
   const s = typeof v === "string" ? v.toLowerCase() : "";
@@ -47,16 +60,16 @@ function normaliseSource(v: unknown): ChatSource {
 export function shapeMessage(raw: unknown): ChatMessage | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
-  const idRaw = t.id ?? t.message_id ?? t.msg_id;
-  const id =
-    typeof idRaw === "number"
-      ? String(idRaw)
-      : typeof idRaw === "string"
-        ? idRaw
-        : null;
+  const id = numericId(t.id ?? t.message_id ?? t.msg_id);
   if (!id) return null;
   const content = str(t.content) ?? str(t.text) ?? str(t.message) ?? "";
-  const ts = str(t.ts) ?? str(t.created_at) ?? str(t.timestamp) ?? new Date().toISOString();
+  const ts =
+    str(t.created_at) ??
+    str(t.ts) ??
+    str(t.timestamp) ??
+    new Date().toISOString();
+  // Backend SSE emits `channel` ("web" | "telegram"); REST emits `source`.
+  const source = normaliseSource(t.source ?? t.channel);
   const meta =
     t.meta && typeof t.meta === "object"
       ? (t.meta as Record<string, unknown>)
@@ -72,93 +85,125 @@ export function shapeMessage(raw: unknown): ChatMessage | null {
     role: normaliseRole(t.role),
     content,
     ts,
-    source: normaliseSource(t.source),
+    source,
     isGreeting: isGreeting || undefined,
   };
 }
 
-export function shapeMessages(raw: unknown): ChatMessage[] {
-  let arr: unknown[];
+/**
+ * Backend GET /api/aven/history response:
+ *   { messages, has_more, next_before_id?, next_since_id? }
+ * Falls back to a bare array for resilience.
+ */
+export interface HistoryResponse {
+  messages: ChatMessage[];
+  hasMore: boolean;
+  nextBeforeId: number | null;
+  nextSinceId: number | null;
+}
+
+export function shapeHistoryResponse(raw: unknown): HistoryResponse {
+  let arr: unknown[] = [];
+  let hasMore = false;
+  let nextBeforeId: number | null = null;
+  let nextSinceId: number | null = null;
+
   if (Array.isArray(raw)) {
     arr = raw;
-  } else if (raw && typeof raw === "object" && Array.isArray((raw as { messages?: unknown }).messages)) {
-    arr = (raw as { messages: unknown[] }).messages;
-  } else {
-    arr = [];
+    hasMore = arr.length >= 50;
+  } else if (raw && typeof raw === "object") {
+    const t = raw as Record<string, unknown>;
+    if (Array.isArray(t.messages)) arr = t.messages;
+    if (typeof t.has_more === "boolean") hasMore = t.has_more;
+    nextBeforeId = num(t.next_before_id);
+    nextSinceId = num(t.next_since_id);
   }
-  return arr
+
+  const messages = arr
     .map(shapeMessage)
     .filter((m): m is ChatMessage => m !== null);
+
+  return { messages, hasMore, nextBeforeId, nextSinceId };
+}
+
+/** Convenience: legacy callers that only want the array. */
+export function shapeMessages(raw: unknown): ChatMessage[] {
+  return shapeHistoryResponse(raw).messages;
 }
 
 export function shapeQuota(raw: unknown): QuotaState | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
-  const remaining = num(t.remaining_today) ?? num(t.remaining) ?? 0;
-  const total = num(t.total_today) ?? num(t.total) ?? 0;
-  const tier =
-    str(t.tier)?.toLowerCase() === "vip" ? "vip" : "standard";
-  return {
-    remaining_today: remaining,
-    total_today: total,
-    tier,
-    isUnlimited: tier === "vip" || total === 0,
-  };
+  const used = num(t.used) ?? num(t.total_used) ?? 0;
+  // limit is intentionally allowed to be `null` from the backend → unlimited.
+  const limit =
+    t.limit === null
+      ? null
+      : (num(t.limit) ?? num(t.total_today) ?? null);
+  const explicitRemaining = num(t.remaining) ?? num(t.remaining_today);
+  const remaining =
+    explicitRemaining ?? (limit !== null ? Math.max(0, limit - used) : 0);
+  const isUnlimited =
+    t.unlimited === true || limit === null;
+  const allowed =
+    typeof t.allowed === "boolean"
+      ? t.allowed
+      : isUnlimited || remaining > 0;
+  return { used, limit, remaining, allowed, isUnlimited };
 }
 
 /**
- * Shape returned by POST /api/aven/chat. Defensive across two plausible
- * server layouts:
- *   { user_message: {...}, aven_message: {...}, quota: {...} }
- *   { message_id: 123, response: "...", response_id: 124, quota: {...} }
+ * Backend POST /api/aven/chat response:
+ *   { message_id, user_message_id, reply, quota }
+ * Tolerates legacy keys (response, response_id, aven_message_id, user_message,
+ * aven_message) so partial backend roll-outs don't break the UI.
  */
 export interface ChatPostResult {
-  userMessage: ChatMessage | null;
-  avenMessage: ChatMessage | null;
+  userMessageId: string | null;
+  avenMessageId: string | null;
+  reply: string | null;
+  /** Optional content echo for the user message; backend rarely returns it
+   *  but the hook can fall back to its locally-sent text either way. */
+  userContentEcho: string | null;
   quota: QuotaState | null;
 }
 
 export function shapeChatPost(raw: unknown): ChatPostResult {
   if (!raw || typeof raw !== "object") {
-    return { userMessage: null, avenMessage: null, quota: null };
+    return {
+      userMessageId: null,
+      avenMessageId: null,
+      reply: null,
+      userContentEcho: null,
+      quota: null,
+    };
   }
   const t = raw as Record<string, unknown>;
 
-  // Layout A: explicit objects
-  const userMsg = shapeMessage(t.user_message);
-  const avenMsg = shapeMessage(t.aven_message);
-  if (userMsg || avenMsg) {
+  // Legacy nested shape (kept for transition):
+  if (
+    t.user_message &&
+    typeof t.user_message === "object" &&
+    t.aven_message &&
+    typeof t.aven_message === "object"
+  ) {
+    const u = shapeMessage(t.user_message);
+    const a = shapeMessage(t.aven_message);
     return {
-      userMessage: userMsg,
-      avenMessage: avenMsg,
+      userMessageId: u?.id ?? null,
+      avenMessageId: a?.id ?? null,
+      reply: a?.content ?? null,
+      userContentEcho: u?.content ?? null,
       quota: shapeQuota(t.quota),
     };
   }
 
-  // Layout B: flat shape with message_id + response
-  const userId = t.message_id;
-  const avenId = t.response_id ?? t.aven_id;
-  const flatUser =
-    userId !== undefined
-      ? shapeMessage({
-          id: userId,
-          role: "user",
-          content: t.user_content ?? "",
-          source: "web",
-        })
-      : null;
-  const flatAven =
-    avenId !== undefined
-      ? shapeMessage({
-          id: avenId,
-          role: "aven",
-          content: t.response ?? "",
-          source: "web",
-        })
-      : null;
+  // Flat shape (current backend):
   return {
-    userMessage: flatUser,
-    avenMessage: flatAven,
+    userMessageId: numericId(t.user_message_id),
+    avenMessageId: numericId(t.message_id ?? t.aven_message_id ?? t.response_id),
+    reply: str(t.reply) ?? str(t.response),
+    userContentEcho: str(t.user_content),
     quota: shapeQuota(t.quota),
   };
 }

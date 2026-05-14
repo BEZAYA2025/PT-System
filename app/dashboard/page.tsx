@@ -36,7 +36,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [raw, initialMessages] = await Promise.all([
+  const [raw, history] = await Promise.all([
     getRawSnapshot(),
     getInitialAvenHistory(50),
   ]);
@@ -60,7 +60,10 @@ export default async function DashboardPage() {
       </MotionSection>
 
       <MotionSection tour="aven" delay={0.16}>
-        <AvenChat initialMessages={initialMessages} />
+        <AvenChat
+          initialMessages={history.messages}
+          initialHasOlder={history.hasMore}
+        />
       </MotionSection>
 
       <MotionSection tour="trades" delay={0.22}>

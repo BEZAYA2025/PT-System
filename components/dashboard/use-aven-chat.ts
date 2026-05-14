@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   shapeChatPost,
+  shapeHistoryResponse,
   shapeMessage,
   shapeQuota,
   type ChatMessage,
@@ -16,6 +17,9 @@ const SSE_ERROR_THRESHOLD = 3;
 interface UseAvenChatOptions {
   initialMessages: ChatMessage[];
   initialQuota?: QuotaState | null;
+  /** SSR-known cursor — set when the initial /api/aven/history response had
+   *  has_more=true. */
+  initialHasOlder?: boolean;
 }
 
 interface VoiceState {
@@ -28,6 +32,7 @@ interface VoiceState {
 export function useAvenChat({
   initialMessages,
   initialQuota = null,
+  initialHasOlder,
 }: UseAvenChatOptions) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [quota, setQuota] = useState<QuotaState | null>(initialQuota);
@@ -42,7 +47,9 @@ export function useAvenChat({
   });
   const [streamConnected, setStreamConnected] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  const [hasOlder, setHasOlder] = useState<boolean>(initialMessages.length >= 50);
+  const [hasOlder, setHasOlder] = useState<boolean>(
+    initialHasOlder ?? initialMessages.length >= 50,
+  );
 
   // Refs ----------------------------------------------------------------------
   const dedupRef = useRef<Set<string>>(new Set());
@@ -258,20 +265,35 @@ export function useAvenChat({
         setMessages((prev) => {
           const next = prev.map((m) => {
             if (m.localId !== localId) return m;
-            if (result.userMessage) {
-              dedupRef.current.add(result.userMessage.id);
-              trackHighestId(result.userMessage.id);
-              return result.userMessage;
+            // Replace the optimistic local row with the server-confirmed
+            // user message id, but keep the local content/timestamp.
+            if (result.userMessageId) {
+              dedupRef.current.add(result.userMessageId);
+              trackHighestId(result.userMessageId);
+              return {
+                ...m,
+                id: result.userMessageId,
+                content: result.userContentEcho ?? m.content,
+                status: "sent" as SendStatus,
+                localId: undefined,
+              };
             }
             return { ...m, status: "sent" as SendStatus, localId: undefined };
           });
           if (
-            result.avenMessage &&
-            !dedupRef.current.has(result.avenMessage.id)
+            result.avenMessageId &&
+            result.reply &&
+            !dedupRef.current.has(result.avenMessageId)
           ) {
-            dedupRef.current.add(result.avenMessage.id);
-            trackHighestId(result.avenMessage.id);
-            next.push(result.avenMessage);
+            dedupRef.current.add(result.avenMessageId);
+            trackHighestId(result.avenMessageId);
+            next.push({
+              id: result.avenMessageId,
+              role: "aven",
+              content: result.reply,
+              ts: new Date().toISOString(),
+              source: "web",
+            });
           }
           return next;
         });
@@ -295,11 +317,7 @@ export function useAvenChat({
     async (textOverride?: string) => {
       const content = (textOverride ?? input).trim();
       if (!content) return;
-      if (
-        quota &&
-        !quota.isUnlimited &&
-        quota.remaining_today <= 0
-      ) {
+      if (quota && !quota.allowed) {
         setSendError(
           "Daily limit reached. Upgrade to VIP for unlimited Aven.",
         );
@@ -496,24 +514,17 @@ export function useAvenChat({
       );
       if (!res.ok) return;
       const data = await res.json().catch(() => null);
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray((data as { messages?: unknown })?.messages)
-          ? (data as { messages: unknown[] }).messages
-          : [];
-      const shaped = list
-        .map(shapeMessage)
-        .filter((m): m is ChatMessage => m !== null)
-        .filter((m) => !dedupRef.current.has(m.id));
-      shaped.forEach((m) => dedupRef.current.add(m.id));
-      if (shaped.length === 0) {
+      const { messages: shaped, hasMore } = shapeHistoryResponse(data);
+      const fresh = shaped.filter((m) => !dedupRef.current.has(m.id));
+      fresh.forEach((m) => dedupRef.current.add(m.id));
+      if (fresh.length === 0) {
         setHasOlder(false);
         return;
       }
       // Backend returns ASC; ensure prepend ordering matches existing sort.
-      const sorted = shaped.slice().sort((a, b) => Number(a.id) - Number(b.id));
+      const sorted = fresh.slice().sort((a, b) => Number(a.id) - Number(b.id));
       setMessages((prev) => [...sorted, ...prev]);
-      if (shaped.length < 50) setHasOlder(false);
+      setHasOlder(hasMore);
     } finally {
       setLoadingOlder(false);
     }
