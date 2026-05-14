@@ -15,6 +15,7 @@ import { TopStripMetrics } from "@/components/dashboard/TopStripMetrics";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
+import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -23,16 +24,14 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// ITERATION 5 — Aven chat now wires to the live backend:
-//   - Initial history via getInitialAvenHistory (SSR seed)
-//   - Send via /api/proxy/aven/chat (optimistic UI, retry on fail)
-//   - Voice via /api/proxy/aven/voice (MediaRecorder → Whisper)
-//   - Quota via /api/proxy/aven/quota
-//   - Real-time via EventSource on /api/proxy/events (SSE Edge passthrough),
-//     with auto-fallback to /api/proxy/aven/history?since_id polling after
-//     three consecutive SSE errors.
-// Source-indicators (📱 Telegram / 💻 Web) on every bubble close the
-// Telegram-Sync visual contract.
+// ITERATION 7 — Coached spotlight tour for first-time members and proper
+// daily-greeting integration.
+//   - SpotlightTour mounts only when user.first_login_completed === false.
+//     The 6-step flow targets sections via data-tour selectors (resilient to
+//     component refactors) and POSTs first-login-complete on Done/Skip.
+//   - The synthetic greeting injection from iter 5 is gone. The greeting is
+//     now a real Aven message stamped meta.greeting=true on the backend; the
+//     bubble surfaces a subtle "Daily greeting" badge.
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -47,20 +46,27 @@ export default async function DashboardPage() {
   const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
   const initialTrades = raw ? shapeTrades(raw, fetchedAt) : null;
 
+  const showTour = user.first_login_completed === false;
+
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
-      <TopStripMetrics initial={initialMetrics} />
+      <div data-tour="market">
+        <TopStripMetrics initial={initialMetrics} />
+      </div>
 
-      <DailyBriefCard brief={initialBrief} />
+      <div data-tour="brief">
+        <DailyBriefCard brief={initialBrief} />
+      </div>
 
-      <AvenChat
-        initialMessages={initialMessages}
-        displayName={user.display_name ?? null}
-        firstLoginCompleted={user.first_login_completed}
-        lastVisitAt={user.last_dashboard_visit_at ?? null}
-      />
+      <div data-tour="aven">
+        <AvenChat initialMessages={initialMessages} />
+      </div>
 
-      <TradesGrid initial={initialTrades} />
+      <div data-tour="trades">
+        <TradesGrid initial={initialTrades} />
+      </div>
+
+      {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
     </main>
   );
 }

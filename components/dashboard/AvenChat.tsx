@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import {
   IconBrandTelegram,
   IconDeviceLaptop,
@@ -8,6 +8,7 @@ import {
   IconPlayerStopFilled,
   IconRefresh,
   IconSend2,
+  IconSparkles,
   IconX,
 } from "@tabler/icons-react";
 import { AvenAvatar } from "./AvenAvatar";
@@ -16,16 +17,9 @@ import type { ChatMessage, QuotaState } from "@/lib/aven";
 
 interface Props {
   initialMessages: ChatMessage[];
-  displayName: string | null;
-  /** When false, show the first-login welcome card with quick-replies. */
-  firstLoginCompleted: boolean | undefined;
-  /** ISO timestamp of the previous dashboard visit; drives the daily greeting. */
-  lastVisitAt: string | null | undefined;
   /** Optional SSR-fetched quota; client refreshes after mount + each send. */
   initialQuota?: QuotaState | null;
 }
-
-const GREETING_THRESHOLD_MS = 8 * 60 * 60 * 1000;
 
 function formatTime(iso: string): string {
   try {
@@ -38,57 +32,12 @@ function formatTime(iso: string): string {
   }
 }
 
-function pickGreeting(displayName: string | null): string {
-  const hour = new Date().getHours();
-  const name = displayName?.trim() || "baba";
-  if (hour < 12)
-    return `Morning, ${name} — glad you're back. Anything in the markets you want me to read into?`;
-  if (hour < 18)
-    return `Hey ${name} — markets have been moving. Want a quick take?`;
-  return `Welcome back, ${name}. Settling in for the evening — what's on your mind?`;
-}
-
-function shouldShowGreeting(lastVisitAt: string | null | undefined): boolean {
-  if (!lastVisitAt) return false;
-  try {
-    return Date.now() - new Date(lastVisitAt).getTime() > GREETING_THRESHOLD_MS;
-  } catch {
-    return false;
-  }
-}
-
-export function AvenChat({
-  initialMessages,
-  displayName,
-  firstLoginCompleted,
-  lastVisitAt,
-  initialQuota = null,
-}: Props) {
-  const showWelcome = firstLoginCompleted === false;
-  const showGreeting = !showWelcome && shouldShowGreeting(lastVisitAt);
-
-  // Synthetic greeting message injected at the top once on mount, only when
-  // not in the welcome flow. Stays in history alongside real backend messages.
-  const seededMessages = useMemo<ChatMessage[]>(() => {
-    if (!showGreeting) return initialMessages;
-    return [
-      {
-        id: `greeting-${Date.now()}`,
-        role: "aven",
-        content: pickGreeting(displayName),
-        ts: new Date().toISOString(),
-        source: "web",
-      },
-      ...initialMessages,
-    ];
-    // Compute once on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const chat = useAvenChat({
-    initialMessages: seededMessages,
-    initialQuota,
-  });
+export function AvenChat({ initialMessages, initialQuota = null }: Props) {
+  // Iter 7: synthetic greeting + WelcomeCard removed. The daily greeting is
+  // now a real Aven message inserted server-side (flagged via
+  // meta.greeting=true) and the first-login welcome moved to the global
+  // SpotlightTour.
+  const chat = useAvenChat({ initialMessages, initialQuota });
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -128,18 +77,6 @@ export function AvenChat({
         ref={scrollRef}
         className="flex max-h-[480px] flex-col gap-4 overflow-y-auto px-5 py-5"
       >
-        {showWelcome && (
-          <WelcomeCard
-            displayName={displayName}
-            onAccept={() => {
-              void chat.send("Yes, show me around");
-            }}
-            onDismiss={() => {
-              void chat.send("I'll explore myself");
-            }}
-          />
-        )}
-
         {chat.messages.map((m) => (
           <ChatBubble
             key={m.localId ?? m.id}
@@ -267,8 +204,15 @@ function ChatBubble({
           tone,
           failed ? "ring-1 ring-red-400/40" : "",
           sending ? "opacity-70" : "",
+          message.isGreeting ? "ring-1 ring-emerald/30" : "",
         ].join(" ")}
       >
+        {message.isGreeting && (
+          <p className="mb-1 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-emerald">
+            <IconSparkles size={10} stroke={2} aria-hidden />
+            Daily greeting
+          </p>
+        )}
         <p className="whitespace-pre-line">{message.content}</p>
       </div>
 
@@ -340,47 +284,6 @@ function Dot({ delay }: { delay: string }) {
       className="inline-block size-1.5 animate-bounce rounded-full bg-emerald/70"
       style={{ animationDelay: delay, animationDuration: "1.2s" }}
     />
-  );
-}
-
-// ---------------------------------------------------------------------------
-
-function WelcomeCard({
-  displayName,
-  onAccept,
-  onDismiss,
-}: {
-  displayName: string | null;
-  onAccept: () => void;
-  onDismiss: () => void;
-}) {
-  const name = displayName?.trim() || "baba";
-  return (
-    <div className="flex items-start gap-3">
-      <AvenAvatar size={36} />
-      <div className="max-w-[85%] space-y-3 rounded-2xl rounded-tl-sm border border-emerald/30 bg-emerald/[0.05] p-4">
-        <p className="text-[15px] leading-relaxed text-foreground">
-          Hi {name}, welcome to PT System. I&apos;m Aven, your trading
-          mentor. Want a quick tour, or jump straight in?
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onAccept}
-            className="inline-flex items-center justify-center rounded-full bg-emerald px-4 py-1.5 text-xs font-medium text-background transition-colors hover:bg-emerald-hover"
-          >
-            Yes, show me around
-          </button>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="inline-flex items-center justify-center rounded-full border border-border bg-background px-4 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-foreground/30"
-          >
-            I&apos;ll explore myself
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
 

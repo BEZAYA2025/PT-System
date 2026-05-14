@@ -13,6 +13,9 @@ export interface ChatMessage {
   /** Set only on optimistic local rows still awaiting server confirmation. */
   localId?: string;
   status?: SendStatus;
+  /** True when the backend flags the message as the daily greeting (via
+   *  meta.greeting=true OR a top-level greeting field). */
+  isGreeting?: boolean;
 }
 
 export interface QuotaState {
@@ -54,12 +57,23 @@ export function shapeMessage(raw: unknown): ChatMessage | null {
   if (!id) return null;
   const content = str(t.content) ?? str(t.text) ?? str(t.message) ?? "";
   const ts = str(t.ts) ?? str(t.created_at) ?? str(t.timestamp) ?? new Date().toISOString();
+  const meta =
+    t.meta && typeof t.meta === "object"
+      ? (t.meta as Record<string, unknown>)
+      : t.metadata && typeof t.metadata === "object"
+        ? (t.metadata as Record<string, unknown>)
+        : null;
+  const isGreeting =
+    meta?.greeting === true ||
+    t.greeting === true ||
+    t.is_greeting === true;
   return {
     id,
     role: normaliseRole(t.role),
     content,
     ts,
     source: normaliseSource(t.source),
+    isGreeting: isGreeting || undefined,
   };
 }
 

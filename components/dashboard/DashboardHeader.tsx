@@ -38,7 +38,7 @@ export function DashboardHeader({
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
         {/* Brand + live */}
-        <Link href="/" className="flex items-center gap-3">
+        <Link href="/" data-tour="brand" className="flex items-center gap-3">
           <span className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
             PT System
           </span>
