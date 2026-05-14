@@ -17,16 +17,78 @@ function formatStatus(s: SubscriptionStatus): string {
     .join(" ");
 }
 
-function formatDate(iso: string | null): string {
-  if (!iso) return "—";
+function statusTone(s: SubscriptionStatus): {
+  border: string;
+  bg: string;
+  text: string;
+  dot: string;
+} {
+  if (s === "active" || s === "trialing") {
+    return {
+      border: "border-emerald/30",
+      bg: "bg-emerald/[0.06]",
+      text: "text-emerald",
+      dot: "bg-emerald",
+    };
+  }
+  if (s === "past_due" || s === "incomplete" || s === "unpaid") {
+    return {
+      border: "border-amber-500/30",
+      bg: "bg-amber-500/[0.06]",
+      text: "text-amber-300",
+      dot: "bg-amber-300",
+    };
+  }
+  if (s === "canceled" || s === "incomplete_expired") {
+    return {
+      border: "border-red-500/30",
+      bg: "bg-red-500/[0.06]",
+      text: "text-red-300",
+      dot: "bg-red-300",
+    };
+  }
+  return {
+    border: "border-border",
+    bg: "bg-surface",
+    text: "text-muted-foreground",
+    dot: "bg-muted-foreground",
+  };
+}
+
+function formatDate(input: string | number | null): string {
+  if (input === null || input === "" || input === 0) return "—";
   try {
-    return new Date(iso).toLocaleDateString(undefined, {
+    const d =
+      typeof input === "number"
+        ? new Date(input > 1e12 ? input : input * 1000)
+        : new Date(input);
+    if (Number.isNaN(d.getTime())) return String(input);
+    return d.toLocaleDateString(undefined, {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
   } catch {
-    return iso;
+    return String(input);
+  }
+}
+
+function relativeDays(input: string | number | null): string | null {
+  if (input === null || input === "" || input === 0) return null;
+  try {
+    const d =
+      typeof input === "number"
+        ? new Date(input > 1e12 ? input : input * 1000)
+        : new Date(input);
+    if (Number.isNaN(d.getTime())) return null;
+    const days = Math.round((d.getTime() - Date.now()) / 86_400_000);
+    if (days < -1) return `${Math.abs(days)} days ago`;
+    if (days === -1) return "yesterday";
+    if (days === 0) return "today";
+    if (days === 1) return "tomorrow";
+    return `in ${days} days`;
+  } catch {
+    return null;
   }
 }
 
@@ -78,27 +140,37 @@ export function SubscriptionCard({
     }
   };
 
+  const tone = statusTone(status);
+  const dateRel = relativeDays(periodEnd);
+
   return (
-    <section className={cardClasses}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Subscription
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage payment method, change tier, or cancel.
-          </p>
-        </div>
-        <TierBadge tier={tier} />
+    <section className={`${cardClasses} relative`}>
+      {/* Status badge — top-right corner per Paul's spec */}
+      {status && (
+        <span
+          className={`absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tone.border} ${tone.bg} ${tone.text}`}
+        >
+          <span aria-hidden className={`size-1.5 rounded-full ${tone.dot}`} />
+          {formatStatus(status)}
+        </span>
+      )}
+
+      <div className="pr-28">
+        <h2 className="text-lg font-semibold tracking-tight text-foreground">
+          Subscription
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage payment method, change tier, or cancel.
+        </p>
       </div>
 
       <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs uppercase tracking-wider text-muted-foreground">
-            Status
+            Tier
           </dt>
-          <dd className="mt-1 font-mono text-foreground">
-            {formatStatus(status)}
+          <dd className="mt-1">
+            <TierBadge tier={tier} />
           </dd>
         </div>
         <div>
@@ -107,6 +179,11 @@ export function SubscriptionCard({
           </dt>
           <dd className="mt-1 font-mono text-foreground">
             {formatDate(periodEnd)}
+            {dateRel && (
+              <span className="ml-2 font-sans text-xs text-muted-foreground">
+                · {dateRel}
+              </span>
+            )}
           </dd>
         </div>
       </dl>
