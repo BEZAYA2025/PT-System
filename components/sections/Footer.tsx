@@ -15,7 +15,7 @@ export async function Footer() {
           </p>
 
           <div className="flex items-center justify-start sm:justify-center">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/40 px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
+            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground">
               <span
                 aria-hidden="true"
                 className="size-1.5 rounded-full bg-emerald"

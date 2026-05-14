@@ -96,7 +96,7 @@ export default async function DashboardPage() {
               )}
             </article>
           ) : (
-            <p className="rounded-lg border border-dashed border-border bg-surface/20 px-4 py-6 text-sm text-muted-foreground">
+            <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
               No briefing yet today — Aven posts shortly after market open.
             </p>
           )}
@@ -127,7 +127,7 @@ export default async function DashboardPage() {
               ))}
             </ul>
           ) : (
-            <p className="rounded-lg border border-dashed border-border bg-surface/20 px-4 py-6 text-sm text-muted-foreground">
+            <p className="rounded-lg border border-dashed border-border bg-surface px-4 py-6 text-sm text-muted-foreground">
               No alerts in the last 24 hours.
             </p>
           )}

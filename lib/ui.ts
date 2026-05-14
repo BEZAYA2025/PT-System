@@ -20,13 +20,13 @@ export const buttonGhostClasses =
   "inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald";
 
 export const cardClasses =
-  "rounded-2xl border border-border bg-surface/40 p-6 sm:p-8";
+  "rounded-2xl border border-border bg-surface p-6 sm:p-8";
 
 export const cardElevatedClasses =
   "rounded-2xl border border-border bg-surface-elevated p-6 sm:p-8";
 
 export const badgeClasses =
-  "inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground";
+  "inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 font-mono text-[11px] uppercase tracking-[0.1em] text-muted-foreground";
 
 export const badgeEmeraldClasses =
   "inline-flex items-center gap-2 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1 font-mono text-[11px] uppercase tracking-[0.1em] text-emerald";
