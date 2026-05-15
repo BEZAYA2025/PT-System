@@ -134,7 +134,12 @@ export function TradesGrid({ initial }: Props) {
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-2">
+        {/* Round-21b: explicit `[&>*]:min-w-0` so the carousel inside
+            either section can never force the grid item wider than its
+            allocated column — without this, a multi-trade carousel's
+            content width pushed the column out past the page bounds on
+            narrow viewports. */}
+        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
           <MyTradesSection
             active={view?.your.active ?? []}
             recent={view?.your.recent ?? []}

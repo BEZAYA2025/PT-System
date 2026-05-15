@@ -109,7 +109,7 @@ function OpenTradesPanel({
   onSelect: (t: AnyTrade) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       <div className="flex items-baseline gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
           Open trades
@@ -287,9 +287,17 @@ function OpenTradesCarousel({
     }
   };
 
+  // Round-21b mobile width-fix: `min-w-0` on the outer wrappers so a
+  // grid/flex parent can't be forced wider by the carousel's content.
+  // Dropped the `-mx-1 px-1` trick that pushed the scroll-area 4px past
+  // each section edge — on a 390px viewport that 8px overhang made the
+  // chat below feel mis-aligned. Cards size with
+  // `basis-full grow-0 shrink-0` instead of `w-full` so the flex basis
+  // is resolved against the scroller's measured width (not via
+  // circular `width: 100%` of an auto-sized flex container).
   return (
-    <div className="relative space-y-2">
-      <div className="relative">
+    <div className="relative min-w-0 space-y-2">
+      <div className="relative min-w-0">
         {/* Left arrow — desktop only, hidden when at start. */}
         <CarouselArrow
           direction="left"
@@ -304,13 +312,13 @@ function OpenTradesCarousel({
           tabIndex={0}
           role="region"
           aria-label="Open trades carousel"
-          className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 scroll-smooth [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald"
+          className="flex w-full min-w-0 snap-x snap-mandatory gap-3 overflow-x-auto pb-1 scroll-smooth [&::-webkit-scrollbar]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald"
           style={{ scrollbarWidth: "none" }}
         >
           {trades.map((t) => (
             <div
               key={t.id}
-              className="w-full shrink-0 snap-start sm:w-[300px]"
+              className="snap-start basis-full grow-0 shrink-0 sm:basis-[300px]"
             >
               <OpenTradeCard
                 trade={t}
@@ -726,7 +734,7 @@ export function MyTradesSection({
   const showColdStart = empty && meta !== undefined;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+    <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
       <header className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold tracking-tight text-foreground">
           Your trades
@@ -768,7 +776,7 @@ export function PaulsTradesSection({
     winRate !== null ? `Win-Rate ${winRate.toFixed(0)}%` : null;
 
   return (
-    <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+    <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-baseline gap-3">
           <h2 className="text-base font-semibold tracking-tight text-foreground">
