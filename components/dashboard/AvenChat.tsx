@@ -238,9 +238,12 @@ function AvenLiveBar({
       {/* Top row — avatar vertically centered against the 2-line
           AI MENTOR / Aven block. The right-side status dot moved to the
           Live row (consolidated with the live-pulse) so the top row stays
-          identity-only. */}
+          identity-only.
+          Round-14b: avatar dropped to 28px (size-7) to sit more
+          quietly next to the name; the breathing pulse is the visual
+          weight, not the glyph. */}
       <div className="flex items-center gap-3 sm:gap-4">
-        <AvenAvatar size={32} online={streamConnected} breath />
+        <AvenAvatar size={28} online={streamConnected} breath />
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
             AI Mentor
@@ -253,8 +256,14 @@ function AvenLiveBar({
 
       {/* Live observation — centered horizontally in the bar. Pulsing
           dot replaces the ▸ chevron AND the old right-side status dot
-          (single visual heartbeat for the bar). */}
-      <div className="mt-3 flex justify-center sm:mt-4">
+          (single visual heartbeat for the bar).
+          Round-14b: previous attempt left LiveObservation as a flex
+          block (default 100%-width) — `justify-center` on the parent
+          had nothing to centre against. Wrap in a centered container
+          AND give the row `inline-flex` so it sizes to content; the
+          truncate child gets `min-w-0` so long observations clip
+          inside the bar's max-width cap rather than blowing the layout. */}
+      <div className="mt-3 flex w-full justify-center sm:mt-4">
         <LiveObservation
           text={obs}
           reduce={!!reduce}
@@ -267,21 +276,26 @@ function AvenLiveBar({
 }
 
 // ---------------------------------------------------------------------------
-// Live observations — frontend mock for Phase-1. Cover the categories
-// Paul listed: market state, setup hints, funding flips, liquidity
-// events, status updates. The array order also drives the rotation
-// order; shuffle on the backend later if it gets repetitive.
+// Live observations — frontend mock for Phase-1.
+//
+// Round-14b: dropped the previous mock list, which name-dropped
+// specific prices ("$80,308", "$79,827") and concrete setups
+// ("BTCUSDT LONG · 4H · score 8/10"). A member reading those during
+// the wait for the real SSE feed might mistake them for live signals,
+// so the strings now stay deliberately vague — no prices, no symbols,
+// no setup claims. Replace this array end-to-end once the VPS ships
+// /api/aven/observations and the wizard switches to live data.
 // ---------------------------------------------------------------------------
 
 const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
-  "Watching BTC 1H bull-cross at $80,308…",
-  "BTC at $81,200 · 4H VMC w7 forming",
-  "Setup detected: BTCUSDT LONG · 4H · score 8/10",
-  "Funding flipped negative on ETH-perp — bear shift watch",
-  "Liquidity sweep at $79,827 · sweep-reversion pattern",
-  "Analysing 4H structure across majors…",
-  "ETH 1H momentum building above $3,420",
-  "OI rising on perp longs — late-comers chasing",
+  "Analyzing 4H market structure…",
+  "Monitoring liquidity layers",
+  "Watching key levels",
+  "Tracking funding rate flow",
+  "Observing volume patterns",
+  "Setup detection running",
+  "Market scan in progress",
+  "Live market intelligence active",
 ];
 
 function LiveObservation({
@@ -302,13 +316,16 @@ function LiveObservation({
       key={text}
       aria-live="off"
       className={[
-        // Round-14a: `overflow-hidden` was clipping the StatusDot's
-        // animate-ping on the left edge (the pulse extends ~5px past
-        // the dot, but only the right side was visible because the
-        // text-truncate parent clipped left of x=0). Drop the wrapper
-        // overflow — the `truncate` utility on the text span has its
-        // own overflow-hidden, so the ellipsis still works.
-        "flex max-w-full items-center gap-2.5 text-[13px] leading-snug",
+        // Round-14a: dropped `overflow-hidden` so the StatusDot's
+        // animate-ping isn't clipped on the left (the pulse extends
+        // ~5px past the dot edge).
+        // Round-14b: switched to `inline-flex` so the row sizes to
+        // content; combined with the parent's `flex justify-center`
+        // this actually centres the row. `max-w-md` caps overly-long
+        // observations so they ellipsis-clip inside the bar rather
+        // than pushing layout. The truncate span carries its own
+        // overflow-hidden so the dot's pulse stays visible.
+        "inline-flex max-w-full items-center gap-2.5 text-[13px] leading-snug sm:max-w-md",
         reduce ? "" : "aven-obs-in",
       ].join(" ")}
     >
@@ -317,8 +334,11 @@ function LiveObservation({
         Live
       </span>
       <span
+        // `min-w-0` lets this child shrink below its content width
+        // inside the inline-flex row so `truncate` can actually engage
+        // when the bar narrows.
         className={[
-          "truncate italic",
+          "min-w-0 truncate italic",
           reduce ? "text-foreground/85" : "aven-obs-shimmer",
         ].join(" ")}
       >

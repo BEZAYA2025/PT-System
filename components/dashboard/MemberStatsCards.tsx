@@ -10,9 +10,37 @@ import {
   buildBtcPriceView,
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
+import type { CredentialStatus } from "@/lib/dal";
 import { usePolling } from "@/lib/use-polling";
 
 const POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Source-of-truth resolution for "is this member connected to an
+ * exchange right now?". Mirrors ExchangeSettingsCard's resolveStatus —
+ * if `/api/auth/me`'s credential_status is `ok` or `founder_env` the
+ * member counts as connected, regardless of whether `/api/cockpit/my-
+ * trades` reported `has_exchange: false`.
+ *
+ * Round-14b production bug: my-trades returned `has_exchange: false`
+ * during a brief sync gap right after Paul connected Bitunix, and the
+ * card flipped to the "Connect exchange in Settings" empty-state even
+ * though credential_status was `ok` and an open position existed.
+ */
+function isConnected(
+  credentialStatus: CredentialStatus | undefined,
+  hasExchangeFromMyTrades: boolean,
+): boolean {
+  if (credentialStatus === "ok" || credentialStatus === "founder_env") {
+    return true;
+  }
+  if (credentialStatus === "missing" || credentialStatus === "invalid_please_relink") {
+    return false;
+  }
+  // credentialStatus undefined → older backend deploy, trust the
+  // my-trades flag as the legacy fallback.
+  return hasExchangeFromMyTrades;
+}
 
 function fmtCompactPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
@@ -45,6 +73,11 @@ interface Props {
   btcPrice: number | null;
   stats: TradesStats;
   meta?: YourTradesMeta;
+  /** From `/api/auth/me` — preferred over `meta.hasExchange` because
+   *  the my-trades endpoint can briefly lag right after a fresh
+   *  connection. Round-14b context: production hit a 5s window where
+   *  this matter and the card flashed the empty state. */
+  credentialStatus?: CredentialStatus;
 }
 
 /**
@@ -60,6 +93,7 @@ export function MemberStatsCards({
   btcPrice: initialBtcPrice,
   stats: initialStats,
   meta: initialMeta,
+  credentialStatus,
 }: Props) {
   const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
   const [stats, setStats] = useState<TradesStats>(initialStats);
@@ -95,7 +129,7 @@ export function MemberStatsCards({
 
   usePolling({ fn: refresh, intervalMs: POLL_INTERVAL_MS });
 
-  const connected = meta?.hasExchange ?? false;
+  const connected = isConnected(credentialStatus, meta?.hasExchange ?? false);
   const unrealized = stats.unrealizedPnlSum;
   const unrealizedPct = stats.unrealizedPnlPct;
   const realized = stats.realizedPnlSum;

@@ -341,9 +341,27 @@ function shapeMyEndpointOne(
   const status: TradeStatus =
     str(t.status)?.toLowerCase() === "closed" ? "closed" : "open";
   const exit = num(t.exit) ?? num(t.exit_price);
-  const sl = num(t.sl) ?? num(t.stop_loss);
-  const tp = num(t.tp) ?? num(t.take_profit);
-  const mark = num(t.mark) ?? num(t.mark_price) ?? num(t.current_price);
+  // Round-14b: Paul reported "—" in the modal for MARK + TP despite
+  // the VPS payload carrying them. Backend uses several casing /
+  // naming variants across exchanges — pick up every plausible one so
+  // the modal renders the right value regardless of which adapter
+  // shaped the row.
+  const sl =
+    num(t.sl) ??
+    num(t.stop_loss) ??
+    num(t.stop_loss_price) ??
+    num(t.sl_price);
+  const tp =
+    num(t.tp) ??
+    num(t.take_profit) ??
+    num(t.take_profit_price) ??
+    num(t.tp_price);
+  const mark =
+    num(t.mark) ??
+    num(t.mark_price) ??
+    num(t.current_price) ??
+    num(t.last_price) ??
+    num(t.market_price);
   const openedAt = str(t.opened_at) ?? "";
   const durationSec = num(t.duration_seconds);
 
