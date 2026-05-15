@@ -23,9 +23,9 @@ export function AvenAvatar({
   online = true,
   breath = false,
 }: Props) {
-  // Ring sits ~1.2× the avatar diameter. Combined with a heartbeat that
-  // peaks at scale 1.22 this keeps the maximum visual reach ≈ 1.45× the
-  // avatar — a contained aura, not a sweeping ping.
+  // Ring sits ~1.2× the avatar diameter. The soft-pulse keyframe scales
+  // it up to 1.5 while fading out, so the maximum visual reach is
+  // ≈ 1.8× the avatar — soft aura, not a notification ping.
   const ringSize = Math.round(size * 1.2);
   const isTriangle = AVEN_VARIANT === "triangle";
 
@@ -36,11 +36,14 @@ export function AvenAvatar({
     >
       {online && (
         <>
+          {/* Round 13: continuous soft-pulse, same shape as the status-dot
+              ping that Paul liked — scale 1→1.5, opacity 0.4→0, smooth
+              ease-out, no fade-pause stutter. */}
           <span
             aria-hidden
-            className="absolute inset-0 rounded-full bg-emerald/25"
+            className="absolute inset-0 rounded-full bg-emerald/35"
             style={{
-              animation: "avenHeartbeat 2.4s ease-out infinite",
+              animation: "avenSoftPulse 2.2s ease-out infinite",
               transformOrigin: "center",
             }}
           />
@@ -75,12 +78,10 @@ export function AvenAvatar({
       {/* Shared keyframes — defined once per render but the rules dedupe
           via the browser's CSSOM so repeated AvenAvatar mounts are free. */}
       <style>{`
-        @keyframes avenHeartbeat {
-          0% { transform: scale(1); opacity: 0.32; }
-          12% { transform: scale(1.18); opacity: 0.18; }
-          22% { transform: scale(1.05); opacity: 0.26; }
-          34% { transform: scale(1.22); opacity: 0.08; }
-          48%, 100% { transform: scale(1); opacity: 0; }
+        @keyframes avenSoftPulse {
+          0% { transform: scale(1); opacity: 0.45; }
+          80% { opacity: 0; }
+          100% { transform: scale(1.5); opacity: 0; }
         }
         @keyframes avenBreath {
           0%, 100% { transform: scale(1); }

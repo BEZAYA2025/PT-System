@@ -6,6 +6,8 @@ import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
 import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCard";
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
 import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
+import { PrivacyDataCard } from "@/components/dashboard/PrivacyDataCard";
+import { HelpSupportCard } from "@/components/dashboard/HelpSupportCard";
 
 export const metadata: Metadata = {
   title: "Settings · PT System",
@@ -19,7 +21,7 @@ export default async function SettingsPage() {
 
   return (
     <main id="main" className="px-2 py-8 sm:px-4 sm:py-10">
-      <div className="mx-auto max-w-3xl space-y-8">
+      <div className="mx-auto max-w-3xl space-y-10 sm:space-y-12">
         <header className="space-y-3">
           {/* Prominent back button — large hit target so it's easy to find
               on mobile. Sits above the title rather than as a tiny corner
@@ -52,12 +54,20 @@ export default async function SettingsPage() {
         <ExchangeSettingsCard
           connected={user.binance_api_key_connected}
           addedAt={user.binance_api_key_added_at}
+          credentialStatus={user.credential_status}
+          exchangeType={user.exchange_type ?? null}
+          hasExchangeConnection={user.has_exchange_connection}
+          invalidSince={user.exchange_credentials_invalid_since ?? null}
         />
 
         <AccountSettingsCard
           email={user.email}
           displayName={user.display_name}
         />
+
+        <PrivacyDataCard />
+
+        <HelpSupportCard />
       </div>
     </main>
   );

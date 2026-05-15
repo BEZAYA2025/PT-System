@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { IconBrandTelegram } from "@tabler/icons-react";
 import {
   buttonSecondaryClasses,
   cardClasses,
   submitErrorClasses,
 } from "@/lib/ui";
+import { Toast, type ToastState } from "@/components/Toast";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
@@ -20,6 +22,7 @@ export function TelegramSettingsCard({
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const connected = telegramUsername !== null;
 
@@ -42,6 +45,7 @@ export function TelegramSettingsCard({
         return;
       }
       setConfirming(false);
+      setToast({ message: "Telegram disconnected.", tone: "success" });
       router.refresh();
     } catch {
       setError("Connection issue. Please try again.");
@@ -57,6 +61,7 @@ export function TelegramSettingsCard({
           eyebrow="Notifications · Telegram"
           title="Telegram"
           description="Aven sends briefings, alerts, and trade-monitor pings here."
+          icon={<IconBrandTelegram size={18} stroke={1.75} aria-hidden />}
         />
 
         <dl className="mt-6 text-sm">
@@ -125,6 +130,8 @@ export function TelegramSettingsCard({
         onClose={() => setModalOpen(false)}
         isRelink={connected}
       />
+
+      <Toast value={toast} onDismiss={() => setToast(null)} />
     </>
   );
 }

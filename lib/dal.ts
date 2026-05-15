@@ -25,6 +25,23 @@ export type SubscriptionStatus =
   | "unpaid"
   | null;
 
+/**
+ * VPS Polish-Trio "credential_status" 4-state model. This is the
+ * source-of-truth for the Settings exchange card — the legacy
+ * `binance_api_key_connected` boolean stays as a fallback for backend
+ * deploys predating this field.
+ *
+ *   ok                     — key stored and last-validated successfully
+ *   missing                — no key in DB
+ *   invalid_please_relink  — key present but last validation failed
+ *   founder_env            — Paul's account; creds live in VPS .env, not DB
+ */
+export type CredentialStatus =
+  | "ok"
+  | "missing"
+  | "invalid_please_relink"
+  | "founder_env";
+
 export interface CurrentUser {
   id: string;
   email: string;
@@ -35,10 +52,26 @@ export interface CurrentUser {
   telegram_username: string | null;
   subscription_status: SubscriptionStatus;
   subscription_period_end: string | null;
-  /** Backend field stays named binance_* for historical reasons but the UI
-   *  treats this as a generic exchange-API connection (Binance/Bybit/OKX). */
+  /** Legacy field — single boolean from the pre-multi-exchange era.
+   *  Round-13b: this can drift from the actual key state in DB (we have
+   *  a confirmed case where the backend returned `true` with no row in
+   *  the keys table). Prefer `credential_status` when available. */
   binance_api_key_connected: boolean;
   binance_api_key_added_at: string | null;
+  /** Source-of-truth 4-state credential model exposed by the VPS
+   *  Polish-Trio. Optional because older backend deploys won't have
+   *  shipped this field yet — UI falls back to the legacy boolean. */
+  credential_status?: CredentialStatus;
+  /** Exchange the member's key belongs to (e.g. "binance" / "bitunix").
+   *  Surfaced in the Settings card so we never invent which exchange
+   *  is "connected". Optional for legacy parity. */
+  exchange_type?: string | null;
+  /** ISO timestamp set when the periodic VPS validator flips a key to
+   *  invalid. null / undefined while creds are valid. */
+  exchange_credentials_invalid_since?: string | null;
+  /** Mirror of credential_status !== "missing", kept for older clients
+   *  that don't yet wire up the 4-state model. */
+  has_exchange_connection?: boolean;
   aven_quota_used: number;
   aven_quota_limit: number | null;
   /** True once the welcome flow has been dismissed. Defaults undefined when

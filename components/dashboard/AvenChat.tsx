@@ -235,23 +235,32 @@ function AvenLiveBar({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 sm:gap-4">
-          <AvenAvatar size={28} online={streamConnected} breath />
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
-              AI Mentor
-            </p>
-            <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
-              Aven
-            </p>
-          </div>
+      {/* Top row — avatar vertically centered against the 2-line
+          AI MENTOR / Aven block. The right-side status dot moved to the
+          Live row (consolidated with the live-pulse) so the top row stays
+          identity-only. */}
+      <div className="flex items-center gap-3 sm:gap-4">
+        <AvenAvatar size={32} online={streamConnected} breath />
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
+            AI Mentor
+          </p>
+          <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
+            Aven
+          </p>
         </div>
-        <StatusDot online={streamConnected} quota={quota} />
       </div>
 
-      <div className="mt-3 sm:mt-4">
-        <LiveObservation text={obs} reduce={!!reduce} />
+      {/* Live observation — centered horizontally in the bar. Pulsing
+          dot replaces the ▸ chevron AND the old right-side status dot
+          (single visual heartbeat for the bar). */}
+      <div className="mt-3 flex justify-center sm:mt-4">
+        <LiveObservation
+          text={obs}
+          reduce={!!reduce}
+          streamConnected={streamConnected}
+          quota={quota}
+        />
       </div>
     </div>
   );
@@ -278,9 +287,13 @@ const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
 function LiveObservation({
   text,
   reduce,
+  streamConnected,
+  quota,
 }: {
   text: string;
   reduce: boolean;
+  streamConnected: boolean;
+  quota: QuotaState | null;
 }) {
   // Keying the wrapper on `text` forces React to remount on each rotation
   // so the entry animation re-fires. Cheap — the inner DOM is tiny.
@@ -289,13 +302,11 @@ function LiveObservation({
       key={text}
       aria-live="off"
       className={[
-        "flex items-baseline gap-2 overflow-hidden text-[13px] leading-snug",
+        "flex max-w-full items-center gap-2.5 overflow-hidden text-[13px] leading-snug",
         reduce ? "" : "aven-obs-in",
       ].join(" ")}
     >
-      <span aria-hidden className="shrink-0 text-emerald/80">
-        ▸
-      </span>
+      <StatusDot online={streamConnected} quota={quota} />
       <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/75">
         Live
       </span>
