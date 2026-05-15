@@ -30,7 +30,7 @@ interface Props {
 
 function formatTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleTimeString(undefined, {
+    return new Date(iso).toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -302,7 +302,13 @@ function LiveObservation({
       key={text}
       aria-live="off"
       className={[
-        "flex max-w-full items-center gap-2.5 overflow-hidden text-[13px] leading-snug",
+        // Round-14a: `overflow-hidden` was clipping the StatusDot's
+        // animate-ping on the left edge (the pulse extends ~5px past
+        // the dot, but only the right side was visible because the
+        // text-truncate parent clipped left of x=0). Drop the wrapper
+        // overflow — the `truncate` utility on the text span has its
+        // own overflow-hidden, so the ellipsis still works.
+        "flex max-w-full items-center gap-2.5 text-[13px] leading-snug",
         reduce ? "" : "aven-obs-in",
       ].join(" ")}
     >

@@ -170,7 +170,7 @@ function detectStructuredSetup(
 function fmtPrice(n: number | null): string {
   if (n === null) return "—";
   if (n >= 1000)
-    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   return `$${n.toFixed(2)}`;
 }
 

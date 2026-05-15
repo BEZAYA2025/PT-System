@@ -31,6 +31,10 @@ interface CommonTrade {
 export interface YourTrade extends CommonTrade {
   owner: "self";
   pnlUsd: number;
+  /** Initial margin posted on the position (notional / leverage).
+   *  Used to compute Unrealized PnL %. Null when backend doesn't ship it
+   *  — the % display gracefully hides in that case. */
+  marginUsd?: number | null;
   leverage?: number | null;
   tradeNumber?: number | null;
 }
@@ -66,6 +70,10 @@ export interface TradesStats {
   /** Sum of live unrealized PnL across all currently-open positions
    *  (member-side only — Paul's response strips USD server-side). */
   unrealizedPnlSum: number | null;
+  /** Aggregate unrealized PnL as a % of total margin posted — i.e.
+   *  "Your open book is +X% right now". Null when margin data isn't
+   *  available so the % chip can hide gracefully. */
+  unrealizedPnlPct: number | null;
   realizedPnlSum: number | null;
   winRatePct: number | null;
   closedCount: number | null;
@@ -357,12 +365,34 @@ function shapeMyEndpointOne(
       ? durationFromSeconds(durationSec)
       : durationFromOpened(openedAt, closedAt);
 
+  // Round-14c: backend ships `last_unrealized_pnl_usd` as the live mark
+  // for open positions; the older `unrealized_pnl_usd` is the close-on-
+  // last-tick value. Prefer the live field, fall through to the older
+  // aliases so any backend version still produces something sensible.
   const pnlUsd =
     num(t.pnl_usd) ??
     num(t.realized_pnl_usd) ??
+    num(t.last_unrealized_pnl_usd) ??
     num(t.unrealized_pnl_usd) ??
     num(t.pnl) ??
     0;
+
+  // Margin posted on the position — drives the Unrealized PnL %
+  // top-card. Many backend payloads carry it under different names;
+  // fall back to notional/leverage when the explicit field is missing.
+  const marginUsd =
+    num(t.margin_usd) ??
+    num(t.margin) ??
+    num(t.initial_margin) ??
+    num(t.position_margin) ??
+    (() => {
+      const notional = num(t.notional) ?? num(t.position_size_usd);
+      const lev = num(t.leverage);
+      if (notional !== null && lev !== null && lev > 0) {
+        return notional / lev;
+      }
+      return null;
+    })();
 
   const referencePrice = status === "open" ? mark : exit;
 
@@ -384,6 +414,7 @@ function shapeMyEndpointOne(
     mark: status === "open" ? mark : null,
     exit: status === "closed" ? exit : null,
     pnlUsd,
+    marginUsd,
     pnlPct: num(t.roi_pct) ?? num(t.realized_pnl_pct) ?? 0,
     slPrice: sl,
     tpPrice: tp,
@@ -408,60 +439,88 @@ function shapeMyEndpointOne(
 function extractStats(
   raw: Record<string, unknown> | null,
   recent: Array<{ pnlPct: number; pnlUsd?: number }>,
-  open: Array<{ pnlUsd?: number }> = [],
+  open: Array<{ pnlUsd?: number; marginUsd?: number | null }> = [],
 ): TradesStats {
   const fromStatsEnvelope =
     raw && typeof raw.stats === "object" && raw.stats !== null
       ? (raw.stats as Record<string, unknown>)
       : null;
-  if (fromStatsEnvelope) {
-    // Backend confirmed: win_rate_pct is the canonical field (already %).
-    // Tolerate legacy `win_rate` (0..1) by auto-scaling.
-    const rawWinPct = num(fromStatsEnvelope.win_rate_pct);
-    const rawWin = num(fromStatsEnvelope.win_rate);
-    const winRatePct =
-      rawWinPct !== null
-        ? rawWinPct
-        : rawWin === null
-          ? null
-          : rawWin <= 1.5
-            ? rawWin * 100
-            : rawWin;
-    return {
-      unrealizedPnlSum:
-        num(fromStatsEnvelope.open_unrealized_pnl_usd) ??
-        num(fromStatsEnvelope.unrealized_pnl_usd) ??
-        null,
-      realizedPnlSum:
-        num(fromStatsEnvelope.realized_pnl_usd) ??
-        num(fromStatsEnvelope.realized_pnl_sum) ??
-        null,
-      winRatePct,
-      closedCount:
-        num(fromStatsEnvelope.closed_count) ??
-        num(fromStatsEnvelope.total_closed) ??
-        null,
-    };
-  }
-  if (recent.length === 0 && open.length === 0) {
-    return {
-      unrealizedPnlSum: null,
-      realizedPnlSum: null,
-      winRatePct: null,
-      closedCount: null,
-    };
-  }
+
+  // Per-trade sums — used both as the fallback when the stats envelope
+  // is missing AND as the source-of-truth for unrealizedPnlPct (which
+  // the envelope rarely exposes).
   const wins = recent.filter((t) => t.pnlPct > 0).length;
-  const usdRealized = recent.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
-  const usdUnrealized = open.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
-  const hasRealizedUsd = recent.some((t) => typeof t.pnlUsd === "number");
-  const hasUnrealizedUsd = open.some((t) => typeof t.pnlUsd === "number");
+  const usdRealizedTrades = recent.reduce(
+    (a, t) => a + (t.pnlUsd ?? 0),
+    0,
+  );
+  const usdUnrealizedTrades = open.reduce(
+    (a, t) => a + (t.pnlUsd ?? 0),
+    0,
+  );
+  const usdMarginTrades = open.reduce(
+    (a, t) => a + (t.marginUsd ?? 0),
+    0,
+  );
+  const hasRealizedUsd = recent.some(
+    (t) => typeof t.pnlUsd === "number",
+  );
+  const hasUnrealizedUsd = open.some(
+    (t) => typeof t.pnlUsd === "number",
+  );
+  const hasMarginUsd = open.some(
+    (t) => typeof t.marginUsd === "number" && (t.marginUsd ?? 0) > 0,
+  );
+
+  // Envelope is preferred for the aggregates the backend pre-computes
+  // (winRatePct, closedCount, realized totals). Unrealized falls
+  // through to the per-trade sum if the envelope doesn't carry a fresh
+  // figure — Round-14c context: production envelope was missing both
+  // open_unrealized_pnl_usd and unrealized_pnl_usd, so the card showed
+  // "—" despite a live open position.
+  const envUnrealized = fromStatsEnvelope
+    ? (num(fromStatsEnvelope.open_unrealized_pnl_usd) ??
+        num(fromStatsEnvelope.last_unrealized_pnl_usd) ??
+        num(fromStatsEnvelope.unrealized_pnl_usd))
+    : null;
+  const envRealized = fromStatsEnvelope
+    ? (num(fromStatsEnvelope.realized_pnl_usd) ??
+        num(fromStatsEnvelope.realized_pnl_sum))
+    : null;
+  const envWinPct = fromStatsEnvelope
+    ? (() => {
+        const pct = num(fromStatsEnvelope.win_rate_pct);
+        if (pct !== null) return pct;
+        const ratio = num(fromStatsEnvelope.win_rate);
+        if (ratio === null) return null;
+        // Tolerate the legacy 0..1 ratio by auto-scaling.
+        return ratio <= 1.5 ? ratio * 100 : ratio;
+      })()
+    : null;
+  const envClosed = fromStatsEnvelope
+    ? (num(fromStatsEnvelope.closed_count) ??
+        num(fromStatsEnvelope.total_closed))
+    : null;
+
+  const unrealizedPnlSum =
+    envUnrealized ?? (hasUnrealizedUsd ? usdUnrealizedTrades : null);
+
+  // % = aggregate unrealized / aggregate posted margin. Only meaningful
+  // when we actually have margin data on the open trades.
+  const unrealizedPnlPct =
+    unrealizedPnlSum !== null && hasMarginUsd && usdMarginTrades > 0
+      ? (unrealizedPnlSum / usdMarginTrades) * 100
+      : null;
+
   return {
-    unrealizedPnlSum: hasUnrealizedUsd ? usdUnrealized : null,
-    realizedPnlSum: hasRealizedUsd ? usdRealized : null,
+    unrealizedPnlSum,
+    unrealizedPnlPct,
+    realizedPnlSum:
+      envRealized ?? (hasRealizedUsd ? usdRealizedTrades : null),
     winRatePct:
-      recent.length > 0 ? (wins / recent.length) * 100 : null,
-    closedCount: recent.length > 0 ? recent.length : null,
+      envWinPct ?? (recent.length > 0 ? (wins / recent.length) * 100 : null),
+    closedCount:
+      envClosed ?? (recent.length > 0 ? recent.length : null),
   };
 }
 
@@ -482,6 +541,7 @@ export function shapeMyTrades(raw: unknown): {
       recent: [],
       stats: {
         unrealizedPnlSum: null,
+        unrealizedPnlPct: null,
         realizedPnlSum: null,
         winRatePct: null,
         closedCount: null,
@@ -528,6 +588,7 @@ export function shapePaulTrades(raw: unknown): {
       recent: [],
       stats: {
         unrealizedPnlSum: null,
+        unrealizedPnlPct: null,
         realizedPnlSum: null,
         winRatePct: null,
         closedCount: null,
@@ -641,6 +702,7 @@ export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
 
   const emptyStats: TradesStats = {
     unrealizedPnlSum: null,
+    unrealizedPnlPct: null,
     realizedPnlSum: null,
     winRatePct: null,
     closedCount: null,

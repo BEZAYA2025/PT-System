@@ -16,8 +16,13 @@ import {
   type RawSnapshotMetrics,
   type Trend,
 } from "@/lib/metrics";
+import { usePolling } from "@/lib/use-polling";
 
-const POLL_INTERVAL_MS = 60_000;
+// Round-14d: 60s → 5s. Market context needs to feel live now that the
+// member-cockpit promises a 5s heartbeat. usePolling pauses the loop
+// when the tab is hidden so we're not hammering /snapshot in the
+// background.
+const POLL_INTERVAL_MS = 5_000;
 const STALE_THRESHOLD_MS = 2 * 60_000;
 const STALE_TICK_MS = 15_000;
 
@@ -112,10 +117,7 @@ export function MarketPulse({ initial }: Props) {
     void fetchOnce();
   }, [initial, fetchOnce]);
 
-  useEffect(() => {
-    const id = setInterval(() => void fetchOnce(), POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [fetchOnce]);
+  usePolling({ fn: fetchOnce, intervalMs: POLL_INTERVAL_MS });
 
   useEffect(() => {
     const id = setInterval(() => setStaleTick((n) => n + 1), STALE_TICK_MS);
@@ -302,7 +304,7 @@ function fmtCompactUsd(n: number | null): string {
   if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`;
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`;
   if (n >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return `$${n.toLocaleString()}`;
+  return `$${n.toLocaleString("en-US")}`;
 }
 
 function fmtCompactBtc(n: number | null): string | null {

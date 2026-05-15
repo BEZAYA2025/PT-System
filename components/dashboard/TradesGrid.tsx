@@ -16,8 +16,12 @@ import {
   type AnyTrade,
   type TradesView,
 } from "@/lib/trades";
+import { usePolling } from "@/lib/use-polling";
 
-const POLL_INTERVAL_MS = 30_000;
+// Round-14d: 30s → 5s so the Unrealized PnL top-card breathes in
+// near-real-time alongside the price ticker. Page Visibility pause via
+// usePolling avoids hammering the VPS while the tab is backgrounded.
+const POLL_INTERVAL_MS = 5_000;
 const STALE_THRESHOLD_MS = 2 * 60_000;
 const STALE_TICK_MS = 15_000;
 
@@ -65,10 +69,7 @@ export function TradesGrid({ initial }: Props) {
     void fetchOnce();
   }, [initial, fetchOnce]);
 
-  useEffect(() => {
-    const id = setInterval(() => void fetchOnce(), POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [fetchOnce]);
+  usePolling({ fn: fetchOnce, intervalMs: POLL_INTERVAL_MS });
 
   useEffect(() => {
     const id = setInterval(() => setTick((n) => n + 1), STALE_TICK_MS);
@@ -122,6 +123,7 @@ export function TradesGrid({ initial }: Props) {
             stats={
               view?.your.stats ?? {
                 unrealizedPnlSum: null,
+                unrealizedPnlPct: null,
                 realizedPnlSum: null,
                 winRatePct: null,
                 closedCount: null,
@@ -136,6 +138,7 @@ export function TradesGrid({ initial }: Props) {
             stats={
               view?.pauls.stats ?? {
                 unrealizedPnlSum: null,
+                unrealizedPnlPct: null,
                 realizedPnlSum: null,
                 winRatePct: null,
                 closedCount: null,

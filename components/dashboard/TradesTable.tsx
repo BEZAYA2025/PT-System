@@ -2,7 +2,7 @@ import type { PublicTrade } from "@/lib/dal";
 
 function formatNumber(n: number | null, digits = 2) {
   if (n === null || Number.isNaN(n)) return "—";
-  return n.toLocaleString(undefined, {
+  return n.toLocaleString("en-US", {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -17,7 +17,7 @@ function formatPct(n: number | null) {
 function formatTime(iso: string | null) {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
