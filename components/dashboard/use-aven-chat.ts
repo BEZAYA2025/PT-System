@@ -301,6 +301,20 @@ export function useAvenChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Round-22a: surface SSE state to the rest of the dashboard via a
+  // window custom event. The ConnectionStatusPill in the header
+  // listens; any future header-bound diagnostics can subscribe too
+  // without needing a shared context. Fires on every change including
+  // the initial false→true transition after the stream opens.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.dispatchEvent(
+      new CustomEvent("pt-system:sse-state", {
+        detail: { connected: streamConnected },
+      }),
+    );
+  }, [streamConnected]);
+
   // Send ----------------------------------------------------------------------
   const performSend = useCallback(
     async (content: string, localId: string) => {

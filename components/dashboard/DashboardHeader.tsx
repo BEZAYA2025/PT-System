@@ -12,6 +12,7 @@ import {
 // removed in Round 11 since it duplicates the user-pill dropdown entry.
 import { NotificationCenter } from "./NotificationCenter";
 import { BrandLogo } from "./BrandLogo";
+import { ConnectionStatusPill } from "./ConnectionStatusPill";
 import { UserPill } from "./UserPill";
 import type { NotificationItem } from "@/lib/notifications";
 
@@ -56,16 +57,7 @@ export function DashboardHeader({
             <span className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
               PT System
             </span>
-            <span className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
-              <span aria-hidden className="relative flex size-1.5">
-                <span
-                  className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-                  style={{ animationDuration: "2s" }}
-                />
-                <span className="relative inline-flex size-1.5 rounded-full bg-emerald" />
-              </span>
-              Live
-            </span>
+            <ConnectionStatusPill />
           </Link>
         </div>
 
