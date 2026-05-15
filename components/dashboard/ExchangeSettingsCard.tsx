@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconAlertTriangle,
@@ -16,6 +16,11 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import type { CredentialStatus } from "@/lib/dal";
+import {
+  findExchange,
+  formatExchangeLabel,
+  type ExchangeId,
+} from "@/lib/exchanges";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
@@ -32,15 +37,9 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function formatExchange(type: string | null | undefined): string {
-  if (!type) return "exchange";
-  // Capitalise per-character for known brands so "okx" doesn't render
-  // as "Okx" — friendlier than blanket title-case.
-  const lower = type.toLowerCase();
-  const SHOUT: ReadonlyArray<string> = ["okx", "mexc"];
-  if (SHOUT.includes(lower)) return lower.toUpperCase();
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
-}
+// Exchange label resolution moved to lib/exchanges.ts so the wizard and
+// the settings card share the same registry. The local helper used to
+// hand-roll the casing logic; now we just call formatExchangeLabel.
 
 /**
  * Resolve the effective credential state from whatever the backend
@@ -86,13 +85,43 @@ export function ExchangeSettingsCard({
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [highlight, setHighlight] = useState(false);
 
   const status = resolveStatus({
     credentialStatus,
     hasExchangeConnection,
     legacyConnected: connected,
   });
-  const exchangeLabel = formatExchange(exchangeType);
+  const exchangeLabel = formatExchangeLabel(exchangeType);
+  const currentExchangeId: ExchangeId | null = (() => {
+    const def = findExchange(exchangeType ?? null);
+    return def ? def.id : null;
+  })();
+
+  // Round-13c deep-link flow: landing at /dashboard/settings#exchange-api
+  // (from the "Connect your exchange" empty-state on the dashboard) should
+  // auto-open the wizard + flash a brief highlight so the member sees
+  // exactly where to click. Only fires when there's no connected key —
+  // for already-connected members the deep-link still scrolls them here
+  // but doesn't ambush them with a modal.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.location.hash !== "#exchange-api") return;
+    // Highlight pulses every time we land via the hash.
+    setHighlight(true);
+    const off = window.setTimeout(() => setHighlight(false), 2400);
+    // Only auto-open the picker when the member isn't already connected.
+    if (status === "missing") {
+      const open = window.setTimeout(() => setModalOpen(true), 320);
+      return () => {
+        window.clearTimeout(off);
+        window.clearTimeout(open);
+      };
+    }
+    return () => window.clearTimeout(off);
+    // status is derived from props — re-run when SSR-served props change.
+  }, [status]);
 
   const handleDisconnect = async () => {
     setDisconnecting(true);
@@ -131,7 +160,14 @@ export function ExchangeSettingsCard({
     <>
       <section
         id="exchange-api"
-        className={`${cardClasses} scroll-mt-24`}
+        ref={sectionRef}
+        className={[
+          cardClasses,
+          "scroll-mt-24 transition-shadow duration-500",
+          highlight
+            ? "ring-2 ring-emerald/40 shadow-[0_0_48px_-12px_rgba(16,185,129,0.55)]"
+            : "",
+        ].join(" ")}
       >
         <SettingsCardHeader
           eyebrow="Exchange · API"
@@ -191,6 +227,7 @@ export function ExchangeSettingsCard({
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         isUpdate={status === "ok" || status === "invalid_please_relink"}
+        currentExchangeId={currentExchangeId}
       />
     </>
   );
