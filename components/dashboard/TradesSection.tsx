@@ -1,10 +1,9 @@
 "use client";
 
+import { useRef, useState } from "react";
 import Link from "next/link";
 import {
-  IconArrowDownRight,
   IconArrowRight,
-  IconArrowUpRight,
   IconChartCandle,
   IconPlugConnected,
   IconUserCheck,
@@ -121,23 +120,34 @@ function OpenTradesPanel({
         <p className="rounded-lg border border-dashed border-border bg-background px-4 py-5 text-center text-sm text-muted-foreground">
           No open trades
         </p>
+      ) : trades.length === 1 ? (
+        <OpenTradeCard
+          trade={trades[0]}
+          hideUsd={hideUsd}
+          onClick={() => onSelect(trades[0])}
+        />
       ) : (
-        <div className="space-y-1.5">
-          {trades.map((t) => (
-            <OpenTradeRow
-              key={t.id}
-              trade={t}
-              hideUsd={hideUsd}
-              onClick={() => onSelect(t)}
-            />
-          ))}
-        </div>
+        <OpenTradesCarousel
+          trades={trades}
+          hideUsd={hideUsd}
+          onSelect={onSelect}
+        />
       )}
     </div>
   );
 }
 
-function OpenTradeRow({
+// ---------------------------------------------------------------------------
+// Round-20 OpenTradeCard — vertical card with prices, not distances.
+//
+// Member sees the static contract (entry / SL / TP prices) at a glance.
+// PnL % + $ are the only coloured values; labels and prices stay
+// neutral per the dashboard-wide colour rule. The mark price moved
+// inside the implicit PnL % calculation — surfacing it again here
+// would just duplicate the same information.
+// ---------------------------------------------------------------------------
+
+function OpenTradeCard({
   trade,
   hideUsd,
   onClick,
@@ -148,66 +158,164 @@ function OpenTradeRow({
 }) {
   const positive = trade.pnlPct >= 0;
   const tone = positive ? "text-emerald" : "text-red-300";
-  const leverage =
-    trade.owner === "self" ? trade.leverage : trade.leverage;
+  const leverage = trade.leverage;
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className="grid w-full grid-cols-[1fr_auto] items-center gap-3 rounded-lg border border-border bg-background px-3 py-3 text-left transition-colors hover:border-foreground/20 sm:grid-cols-[1.4fr_auto_auto]"
+      className="block w-full rounded-lg border border-border bg-background p-4 text-left transition-colors hover:border-foreground/20"
     >
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="truncate font-mono text-sm font-semibold text-foreground">
-            {trade.symbol}
-          </p>
-          <SideBadge side={trade.side} leverage={leverage} />
-        </div>
-        <p className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
-          {fmtPrice(trade.entry)} → {fmtPrice(trade.mark)} ·{" "}
-          {trade.durationLabel}
+      {/* Header — symbol + side + leverage on the left, duration
+          on the right. Duration's text-node carries
+          suppressHydrationWarning (timeAgo / durationLabel both
+          depend on Date.now() — see Round-16 hydration fix). */}
+      <div className="flex items-center gap-2">
+        <p className="truncate font-mono text-sm font-semibold text-foreground">
+          {trade.symbol}
         </p>
-        {(trade.slDistancePct !== null || trade.tpDistancePct !== null) && (
-          <p className="mt-0.5 font-mono text-[11px]">
-            {trade.slDistancePct !== null && (
-              <span className="text-red-300/80">
-                SL {trade.slDistancePct.toFixed(1)}%
-              </span>
-            )}
-            {trade.slDistancePct !== null && trade.tpDistancePct !== null && (
-              <span className="text-muted-foreground"> · </span>
-            )}
-            {trade.tpDistancePct !== null && (
-              <span className="text-emerald/80">
-                TP {trade.tpDistancePct.toFixed(1)}%
-              </span>
-            )}
-          </p>
+        <SideBadge side={trade.side} leverage={leverage} />
+        <span
+          className="ml-auto font-mono text-[10px] text-muted-foreground"
+          suppressHydrationWarning
+        >
+          {trade.durationLabel}
+        </span>
+      </div>
+
+      {/* PnL prominent — % left at text-lg, $ right at text-sm,
+          both signed and same-toned. */}
+      <div className="mt-3 flex items-baseline gap-3">
+        <span className={`font-mono text-lg font-semibold ${tone}`}>
+          {fmtSignedPct(trade.pnlPct)}
+        </span>
+        {!hideUsd && trade.owner === "self" && (
+          <span className={`font-mono text-sm ${tone}`}>
+            {fmtSignedUsd(trade.pnlUsd)}
+          </span>
         )}
       </div>
 
-      <div className={`text-right ${tone}`}>
-        <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-          ROI
+      {/* Entry / SL / TP — 3-col mini-grid of prices. Labels neutral
+          (text-muted-foreground), prices neutral (text-foreground).
+          The dashboard-wide colour rule keeps the eye on the PnL above. */}
+      <dl className="mt-4 grid grid-cols-3 gap-2 font-mono text-[11px]">
+        <div>
+          <dt className="text-muted-foreground">Entry</dt>
+          <dd className="mt-0.5 text-foreground">{fmtPrice(trade.entry)}</dd>
         </div>
-        <div className="flex items-center justify-end gap-1 font-mono text-sm font-semibold">
-          {positive ? (
-            <IconArrowUpRight size={14} stroke={2} aria-hidden />
-          ) : (
-            <IconArrowDownRight size={14} stroke={2} aria-hidden />
-          )}
-          {fmtSignedPct(trade.pnlPct)}
+        <div>
+          <dt className="text-muted-foreground">SL</dt>
+          <dd className="mt-0.5 text-foreground">
+            {trade.slPrice !== null ? fmtPrice(trade.slPrice) : "—"}
+          </dd>
         </div>
-      </div>
-      {!hideUsd && trade.owner === "self" && (
-        <div className={`hidden text-right sm:block ${tone}`}>
-          <div className="font-mono text-[9px] uppercase tracking-wider text-muted-foreground">
-            USD
-          </div>
-          <div className="font-mono text-sm">{fmtSignedUsd(trade.pnlUsd)}</div>
+        <div>
+          <dt className="text-muted-foreground">TP</dt>
+          <dd className="mt-0.5 text-foreground">
+            {trade.tpPrice !== null ? fmtPrice(trade.tpPrice) : "—"}
+          </dd>
         </div>
-      )}
+      </dl>
+
+      <p className="mt-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        Tap for details
+      </p>
     </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Round-20c — horizontal swipe carousel for multi-trade open lists.
+//
+// Pure CSS scroll-snap (no embla/swiper dependency). Each card is
+// `snap-start shrink-0` so the browser's native momentum-scroll
+// produces clean snap-to-card behaviour on touch + trackpad. Below
+// the row, indicator dots surface position; clicking a dot scrolls
+// the matching card into view.
+// ---------------------------------------------------------------------------
+
+function OpenTradesCarousel({
+  trades,
+  hideUsd,
+  onSelect,
+}: {
+  trades: AnyTrade[];
+  hideUsd: boolean;
+  onSelect: (t: AnyTrade) => void;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  // Track which card is currently snapped by reading scrollLeft on
+  // every scroll event. cardWidth comes from the first child's
+  // bounding rect so the calc adapts to the responsive width
+  // (full width on mobile, ~340px on sm+).
+  const onScroll = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const first = el.firstElementChild as HTMLElement | null;
+    if (!first) return;
+    const cardWidth = first.getBoundingClientRect().width;
+    if (cardWidth <= 0) return;
+    const idx = Math.round(el.scrollLeft / cardWidth);
+    setActiveIdx(Math.min(Math.max(idx, 0), trades.length - 1));
+  };
+
+  const scrollToIndex = (idx: number) => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const first = el.firstElementChild as HTMLElement | null;
+    if (!first) return;
+    const cardWidth = first.getBoundingClientRect().width;
+    el.scrollTo({ left: cardWidth * idx, behavior: "smooth" });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div
+        ref={scrollerRef}
+        onScroll={onScroll}
+        className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-1 scroll-smooth [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {trades.map((t) => (
+          <div
+            key={t.id}
+            className="w-full shrink-0 snap-start sm:w-[340px]"
+          >
+            <OpenTradeCard
+              trade={t}
+              hideUsd={hideUsd}
+              onClick={() => onSelect(t)}
+            />
+          </div>
+        ))}
+      </div>
+      {/* Indicator dots */}
+      <div
+        role="tablist"
+        aria-label="Open trades pagination"
+        className="flex justify-center gap-1.5"
+      >
+        {trades.map((t, i) => (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={i === activeIdx}
+            aria-label={`Show trade ${i + 1} of ${trades.length}`}
+            onClick={() => scrollToIndex(i)}
+            className={[
+              "h-1.5 rounded-full transition-all",
+              i === activeIdx
+                ? "w-6 bg-emerald"
+                : "w-1.5 bg-border hover:bg-muted-foreground/40",
+            ].join(" ")}
+          />
+        ))}
+      </div>
+    </div>
   );
 }
 
