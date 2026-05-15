@@ -144,8 +144,19 @@ export function MarketPulse({ initial }: Props) {
   return (
     <section aria-label="Market pulse" className="space-y-3">
       <header className="flex items-baseline justify-between gap-3">
-        <p className="font-mono text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
-          Market Pulse
+        <p className="inline-flex items-baseline gap-2 font-mono text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
+          <span>Market Pulse</span>
+          {/* Round-22b: subtle in-flight cue while a poll is round-
+              tripping. Only renders when an actual fetch is happening
+              so the chip doesn't strobe continuously. */}
+          {refreshing && !error && (
+            <IconRefresh
+              size={10}
+              stroke={1.75}
+              className="animate-spin text-emerald/70"
+              aria-label="Refreshing"
+            />
+          )}
         </p>
         {isStale && !error && ageMs !== null && (
           <p className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
