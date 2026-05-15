@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from "react";
 import {
   aggregateExposure,
   buildTradesView,
-  pctDistanceFromMark,
   pnlAtPrice,
   type TradesStats,
   type YourTrade,
@@ -347,12 +346,12 @@ function UnrealizedPnlBody({
           {fmtBigUsd(unrealized)}
         </p>
         {unrealizedPct !== null && (
-          <p className="font-mono text-base font-semibold text-foreground">
+          <p className="font-mono text-base font-semibold text-muted-foreground">
             (
             <span className={toneFor(unrealizedPct)}>
               {fmtSignedPct(unrealizedPct)}
             </span>
-            <span className="ml-1 text-muted-foreground">ROI</span>)
+            <span className="ml-1">ROI</span>)
           </p>
         )}
       </div>
@@ -436,9 +435,7 @@ function TradeExposureRow({
   showSymbol: boolean;
 }) {
   const slPnl = pnlAtPrice(trade, trade.slPrice);
-  const slDist = pctDistanceFromMark(trade, trade.slPrice);
   const tpPnl = pnlAtPrice(trade, trade.tpPrice);
-  const tpDist = pctDistanceFromMark(trade, trade.tpPrice);
 
   // Round-18 mobile: SL and TP sides stack on narrow viewports
   // (flex-col), sit on one line at sm+ (flex-row). The "·" separator
@@ -454,7 +451,6 @@ function TradeExposureRow({
           label="SL"
           price={trade.slPrice}
           dollar={slPnl}
-          distPct={slDist}
           tone="text-red-300"
         />
       )}
@@ -471,7 +467,6 @@ function TradeExposureRow({
           label="TP"
           price={trade.tpPrice}
           dollar={tpPnl}
-          distPct={tpDist}
           tone="text-emerald"
         />
       )}
@@ -480,19 +475,19 @@ function TradeExposureRow({
 }
 
 // Round-18 colour rule: label + price + brackets stay neutral. Only
-// the $ value and the % distance carry the tone. Generic — same shape
-// for both SL (red tone) and TP (emerald tone).
+// the $ value carries the tone. Round-19 spec change: distance % is
+// dropped from the Top-Card row — the modal still surfaces SL/TP
+// distance in its own dedicated cards, but the dashboard top-line
+// stays compact with just price + $-outcome.
 function ExposureLeg({
   label,
   price,
   dollar,
-  distPct,
   tone,
 }: {
   label: string;
   price: number;
   dollar: number | null;
-  distPct: number | null;
   tone: string;
 }) {
   return (
@@ -500,12 +495,9 @@ function ExposureLeg({
       <span className="text-muted-foreground">{label}</span>
       <span className="text-foreground">{fmtPriceCompact(price)}</span>
       {dollar !== null && (
-        <span className="text-foreground">
+        <span className="text-muted-foreground">
           (<span className={tone}>{fmtUsdSuffix(dollar)}</span>)
         </span>
-      )}
-      {distPct !== null && (
-        <span className={tone}>{fmtSignedPct(distPct)}</span>
       )}
     </span>
   );
