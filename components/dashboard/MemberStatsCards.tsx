@@ -355,6 +355,11 @@ function UnrealizedPnlBody({
           </p>
         )}
       </div>
+      {openCount > 1 && (
+        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+          across {openCount} open positions
+        </p>
+      )}
       <SlTpExposureLine openTrades={openTrades} />
     </>
   );
@@ -376,15 +381,20 @@ function UnrealizedPnlBody({
 // adapter chain — no exchange-specific assumptions.
 // ---------------------------------------------------------------------------
 
+const TOP_TRADES_VISIBLE = 3;
+
 function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
+  const [expanded, setExpanded] = useState(false);
+
   // Filter out trades that have nothing useful to surface.
   const rows = openTrades.filter(
     (t) => t.slPrice !== null || t.tpPrice !== null,
   );
+
+  // Aggregate-fallback path — when no trade has SL or TP we still try
+  // the $-only summary so the card isn't empty for backends that ship
+  // qty + pnl but no SL/TP per trade.
   if (rows.length === 0) {
-    // Last-resort aggregate (no per-trade SL/TP) — still try the $-only
-    // summary so the card isn't completely empty for backends that
-    // omit SL/TP entirely.
     const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
     if (slLossUsd === null && tpGainUsd === null) return null;
     return (
@@ -413,27 +423,70 @@ function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
     );
   }
 
-  const showSymbol = rows.length > 1;
+  // Single open trade — single compact row, no per-trade header.
+  if (rows.length === 1) {
+    return (
+      <div className="mt-2 border-t border-border/60 pt-2">
+        <TradeExposureRow trade={rows[0]} />
+      </div>
+    );
+  }
+
+  // 2+ open trades — render per-trade BLOCK (symbol + PnL$/% header
+  // row, then the SL/TP row). For 4+ trades, sort by absolute PnL
+  // impact and show top-3 by default with a "+N more" toggle.
+  const sorted =
+    rows.length > TOP_TRADES_VISIBLE
+      ? [...rows].sort(
+          (a, b) => Math.abs(b.pnlUsd) - Math.abs(a.pnlUsd),
+        )
+      : rows;
+  const visible =
+    !expanded && sorted.length > TOP_TRADES_VISIBLE
+      ? sorted.slice(0, TOP_TRADES_VISIBLE)
+      : sorted;
+  const hiddenCount = sorted.length - visible.length;
+
   return (
-    <div className="mt-2 space-y-1 border-t border-border/60 pt-2">
-      {rows.map((t) => (
-        <TradeExposureRow
-          key={t.id}
-          trade={t}
-          showSymbol={showSymbol}
-        />
+    <div className="mt-2 space-y-2.5 border-t border-border/60 pt-2">
+      {visible.map((t) => (
+        <TradeExposureBlock key={t.id} trade={t} />
       ))}
+      {sorted.length > TOP_TRADES_VISIBLE && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="font-mono text-[10px] uppercase tracking-wider text-emerald transition-colors hover:text-emerald-hover"
+        >
+          {expanded
+            ? "Show fewer"
+            : `+${hiddenCount} more position${hiddenCount === 1 ? "" : "s"}`}
+        </button>
+      )}
     </div>
   );
 }
 
-function TradeExposureRow({
-  trade,
-  showSymbol,
-}: {
-  trade: YourTrade;
-  showSymbol: boolean;
-}) {
+// Per-trade BLOCK — two lines: header (symbol + $ + %) on top, SL/TP
+// row below. Used in the multi-trade Top-Card view.
+function TradeExposureBlock({ trade }: { trade: YourTrade }) {
+  return (
+    <div className="space-y-0.5">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 font-mono text-[11px]">
+        <span className="text-foreground">{trade.symbol}</span>
+        <span className={toneFor(trade.pnlUsd)}>
+          {fmtSignedUsd(trade.pnlUsd)}
+        </span>
+        <span className={toneFor(trade.pnlPct)}>
+          {fmtSignedPct(trade.pnlPct)}
+        </span>
+      </div>
+      <TradeExposureRow trade={trade} />
+    </div>
+  );
+}
+
+function TradeExposureRow({ trade }: { trade: YourTrade }) {
   const slPnl = pnlAtPrice(trade, trade.slPrice);
   const tpPnl = pnlAtPrice(trade, trade.tpPrice);
 
@@ -443,9 +496,6 @@ function TradeExposureRow({
   // awkwardly between stacked rows.
   return (
     <p className="flex flex-col gap-y-1 font-mono text-[11px] sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
-      {showSymbol && (
-        <span className="text-muted-foreground">{trade.symbol}</span>
-      )}
       {trade.slPrice !== null && (
         <ExposureLeg
           label="SL"
