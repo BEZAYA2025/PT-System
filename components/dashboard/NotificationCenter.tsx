@@ -679,7 +679,7 @@ function NotificationRowInner({
           </p>
         )}
         <p className="mt-1 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span>
+          <span suppressHydrationWarning>
             {tone.label} · {timeAgo(item.ts)}
           </span>
           {item.hasChart && (
@@ -726,7 +726,10 @@ function NotificationDetailBody({
           {tone.label}
         </span>
         {item.severity && <SeverityBadge severity={item.severity} />}
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span
+          className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+          suppressHydrationWarning
+        >
           {timeAgo(item.ts)}
         </span>
       </div>

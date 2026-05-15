@@ -29,5 +29,10 @@ export function timeAgo(input: string | Date): string {
   return date.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
+    // Round-16: anchor to UTC so SSR + client hydration render the
+    // same calendar date for dates older than 7 days. Callers still
+    // wrap timeAgo's output in suppressHydrationWarning for the
+    // "Xm/Xh ago" branches that depend on Date.now().
+    timeZone: "UTC",
   });
 }

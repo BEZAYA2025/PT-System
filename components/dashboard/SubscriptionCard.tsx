@@ -69,6 +69,11 @@ function formatDate(input: string | number | null): string {
       year: "numeric",
       month: "short",
       day: "numeric",
+      // Round-16 hydration fix: anchor to UTC so the calendar date
+      // renders the same on the server (Vercel UTC) and the client
+      // (any local TZ). Without this, a 23:30 UTC timestamp shows
+      // "May 15" server-side and "May 16" in Berlin client-side.
+      timeZone: "UTC",
     });
   } catch {
     return String(input);
@@ -180,7 +185,10 @@ export function SubscriptionCard({
           <dd className="mt-1 font-mono text-foreground">
             {formatDate(periodEnd)}
             {dateRel && (
-              <span className="ml-2 font-sans text-xs text-muted-foreground">
+              <span
+                className="ml-2 font-sans text-xs text-muted-foreground"
+                suppressHydrationWarning
+              >
                 · {dateRel}
               </span>
             )}

@@ -76,10 +76,28 @@ export function TradesGrid({ initial }: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // Round-16: re-tick uses `mountedNow` (null before mount → null
+  // after server pass) so isStale is always null/false during SSR.
+  // Client populates the real timestamp on mount + every STALE_TICK_MS.
+  const [mountedNow, setMountedNow] = useState<number | null>(null);
+  useEffect(() => {
+    setMountedNow(Date.now());
+    const id = setInterval(() => setMountedNow(Date.now()), STALE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   if (loading) return <SkeletonTrades />;
 
-  const ageMs = view ? Date.now() - view.fetchedAt : Infinity;
-  const isStale = ageMs > STALE_THRESHOLD_MS;
+  // Round-16 hydration #418 fix: Date.now() during SSR ≠ Date.now()
+  // on client mount, so reading it in the render body produces a
+  // text-node mismatch (the "Xm ago" label) AND a tree mismatch (the
+  // stale badge appearing/disappearing). useTick triggers a re-render
+  // on the client only — the SSR pass renders with `null` for the
+  // banner, the client populates after mount. Wrapping the visible
+  // "Xm ago" text in suppressHydrationWarning would still throw on
+  // tree-shape differences, so deferring is the right call here.
+  const ageMs = view && mountedNow !== null ? mountedNow - view.fetchedAt : null;
+  const isStale = ageMs !== null && ageMs > STALE_THRESHOLD_MS;
 
   return (
     <>
@@ -109,7 +127,7 @@ export function TradesGrid({ initial }: Props) {
           </div>
         )}
 
-        {isStale && !error && (
+        {isStale && !error && ageMs !== null && (
           <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
             <IconClockHour4 size={12} stroke={1.75} aria-hidden />
             Stale data · last refresh {Math.floor(ageMs / 60_000)}m ago

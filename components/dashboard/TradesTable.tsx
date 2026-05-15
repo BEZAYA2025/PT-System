@@ -98,7 +98,10 @@ export function TradesTable({
                 >
                   {formatPct(t.roi)}
                 </td>
-                <td className="px-4 py-3 text-right text-muted-foreground">
+                <td
+                  className="px-4 py-3 text-right text-muted-foreground"
+                  suppressHydrationWarning
+                >
                   {formatTime(t.closed_at)}
                 </td>
               </tr>

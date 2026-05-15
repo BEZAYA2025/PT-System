@@ -351,7 +351,10 @@ function LastTradeRow({
       <td className={`px-3 py-2 text-right font-mono text-sm ${tone}`}>
         {fmtSignedPct(trade.pnlPct)}
       </td>
-      <td className="px-3 py-2 text-right text-xs text-muted-foreground">
+      <td
+        className="px-3 py-2 text-right text-xs text-muted-foreground"
+        suppressHydrationWarning
+      >
         {trade.closedAt ? timeAgo(trade.closedAt) : trade.durationLabel}
       </td>
     </tr>
@@ -395,7 +398,10 @@ function LastTradeCard({
           </p>
           <SideBadge side={trade.side} leverage={trade.leverage} />
         </div>
-        <span className="text-[10px] text-muted-foreground">
+        <span
+          className="text-[10px] text-muted-foreground"
+          suppressHydrationWarning
+        >
           {trade.closedAt ? timeAgo(trade.closedAt) : trade.durationLabel}
         </span>
       </div>

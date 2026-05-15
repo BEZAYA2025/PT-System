@@ -124,10 +124,22 @@ export function MarketPulse({ initial }: Props) {
     return () => clearInterval(id);
   }, []);
 
+  // Round-16: defer Date.now() until after mount so SSR + client
+  // hydration render the same DOM. Without this, the stale badge can
+  // appear in one and not the other, triggering a tree-shape
+  // hydration mismatch (#418).
+  const [mountedNow, setMountedNow] = useState<number | null>(null);
+  useEffect(() => {
+    setMountedNow(Date.now());
+    const id = setInterval(() => setMountedNow(Date.now()), STALE_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+
   if (loading) return <SkeletonPulse />;
 
-  const ageMs = view ? Date.now() - view.fetchedAt : Infinity;
-  const isStale = ageMs > STALE_THRESHOLD_MS;
+  const ageMs =
+    view && mountedNow !== null ? mountedNow - view.fetchedAt : null;
+  const isStale = ageMs !== null && ageMs > STALE_THRESHOLD_MS;
 
   return (
     <section aria-label="Market pulse" className="space-y-3">
@@ -135,7 +147,7 @@ export function MarketPulse({ initial }: Props) {
         <p className="font-mono text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
           Market Pulse
         </p>
-        {isStale && !error && (
+        {isStale && !error && ageMs !== null && (
           <p className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             <IconClockHour4 size={11} stroke={1.75} aria-hidden />
             stale · {Math.floor(ageMs / 60_000)}m
@@ -150,7 +162,7 @@ export function MarketPulse({ initial }: Props) {
         >
           <p className="flex items-center gap-2 text-amber-200">
             <IconAlertCircle size={16} stroke={1.75} aria-hidden />
-            Daten kurz nicht erreichbar
+            Market data temporarily unreachable
           </p>
           <button
             type="button"
