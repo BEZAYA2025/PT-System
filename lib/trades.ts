@@ -61,6 +61,10 @@ export type AnyTrade = YourTrade | PaulsTrade;
 export interface YourTradesMeta {
   hasExchange: boolean;
   exchangeType: string | null;
+  /** Round-14c: VPS now mirrors `credential_status` on `/api/cockpit/
+   *  my-trades` too, so the 5s poll carries the freshest signal
+   *  without a separate `/api/auth/me` round-trip. */
+  credentialStatus: import("@/lib/dal").CredentialStatus | null;
 }
 
 /** Cumulative stats for the section header / top-cards. Backend may
@@ -341,27 +345,45 @@ function shapeMyEndpointOne(
   const status: TradeStatus =
     str(t.status)?.toLowerCase() === "closed" ? "closed" : "open";
   const exit = num(t.exit) ?? num(t.exit_price);
-  // Round-14b: Paul reported "—" in the modal for MARK + TP despite
-  // the VPS payload carrying them. Backend uses several casing /
-  // naming variants across exchanges — pick up every plausible one so
-  // the modal renders the right value regardless of which adapter
-  // shaped the row.
+  // Round-14c (verified): chains validated against the VPS
+  // field-reference. Backend-confirmed aliases listed first; the
+  // camelCase + extra variants below them stay as defensive cover
+  // for any single-adapter drift inside the multi-tenant adapter.
+  //
+  // SL  ← stop_loss | sl_price | sl
+  // TP  ← take_profit | take_profit_1 | tp_price | tp1
+  //       (take_profit_2/3 + tp2/tp3 are multi-TP — not rendered yet)
+  // Mark ← mark_price | mark_price_usd | current_price | last_mark_price
   const sl =
-    num(t.sl) ??
     num(t.stop_loss) ??
+    num(t.sl_price) ??
+    num(t.sl) ??
     num(t.stop_loss_price) ??
-    num(t.sl_price);
+    num(t.stopLoss) ??
+    num(t.stopLossPrice);
   const tp =
-    num(t.tp) ??
     num(t.take_profit) ??
+    num(t.take_profit_1) ??
+    num(t.tp_price) ??
+    num(t.tp1) ??
+    num(t.tp) ??
     num(t.take_profit_price) ??
-    num(t.tp_price);
+    num(t.takeProfit) ??
+    num(t.takeProfit1) ??
+    num(t.takeProfitPrice);
   const mark =
-    num(t.mark) ??
     num(t.mark_price) ??
+    num(t.mark_price_usd) ??
     num(t.current_price) ??
+    num(t.last_mark_price) ??
+    num(t.mark) ??
     num(t.last_price) ??
-    num(t.market_price);
+    num(t.market_price) ??
+    num(t.markPrice) ??
+    num(t.markPriceUsd) ??
+    num(t.currentPrice) ??
+    num(t.lastMarkPrice) ??
+    num(t.lastPrice);
   const openedAt = str(t.opened_at) ?? "";
   const durationSec = num(t.duration_seconds);
 
@@ -383,15 +405,20 @@ function shapeMyEndpointOne(
       ? durationFromSeconds(durationSec)
       : durationFromOpened(openedAt, closedAt);
 
-  // Round-14c: backend ships `last_unrealized_pnl_usd` as the live mark
-  // for open positions; the older `unrealized_pnl_usd` is the close-on-
-  // last-tick value. Prefer the live field, fall through to the older
-  // aliases so any backend version still produces something sensible.
+  // Round-14c (verified): VPS field-reference confirms
+  // `unrealized_pnl_usd` as the open-trade live PnL field name.
+  // `last_unrealized_pnl_usd` stays as a defensive fallback (older
+  // spec). camelCase variants kept as low-cost insurance against
+  // single-adapter drift.
   const pnlUsd =
+    num(t.unrealized_pnl_usd) ??
     num(t.pnl_usd) ??
     num(t.realized_pnl_usd) ??
     num(t.last_unrealized_pnl_usd) ??
-    num(t.unrealized_pnl_usd) ??
+    num(t.unrealizedPnlUsd) ??
+    num(t.pnlUsd) ??
+    num(t.lastUnrealizedPnlUsd) ??
+    num(t.realizedPnlUsd) ??
     num(t.pnl) ??
     0;
 
@@ -433,7 +460,27 @@ function shapeMyEndpointOne(
     exit: status === "closed" ? exit : null,
     pnlUsd,
     marginUsd,
-    pnlPct: num(t.roi_pct) ?? num(t.realized_pnl_pct) ?? 0,
+    // Round-14c (verified): `unrealized_pnl_pct` is the VPS-confirmed
+    // per-trade field for open positions. Closed trades typically
+    // expose `roi_pct` / `realized_pnl_pct` instead — picker stacks
+    // both groups with the open-trade field first because
+    // `??` short-circuits on the first non-null value, so closed
+    // trades whose unrealized_pnl_pct is missing/null still reach the
+    // closed-trade alias. Mark-based fallback handles the case where
+    // none of the percent fields ship at all.
+    pnlPct:
+      num(t.unrealized_pnl_pct) ??
+      num(t.roi_pct) ??
+      num(t.realized_pnl_pct) ??
+      num(t.unrealizedPnlPct) ??
+      num(t.roiPct) ??
+      num(t.realizedPnlPct) ??
+      (() => {
+        const ref = status === "open" ? mark : exit;
+        if (entry <= 0 || ref === null) return 0;
+        const sideSign = lowerSide(t.side) === "long" ? 1 : -1;
+        return ((ref - entry) / entry) * 100 * sideSign;
+      })(),
     slPrice: sl,
     tpPrice: tp,
     slDistancePct:
@@ -499,7 +546,10 @@ function extractStats(
   const envUnrealized = fromStatsEnvelope
     ? (num(fromStatsEnvelope.open_unrealized_pnl_usd) ??
         num(fromStatsEnvelope.last_unrealized_pnl_usd) ??
-        num(fromStatsEnvelope.unrealized_pnl_usd))
+        num(fromStatsEnvelope.unrealized_pnl_usd) ??
+        num(fromStatsEnvelope.openUnrealizedPnlUsd) ??
+        num(fromStatsEnvelope.lastUnrealizedPnlUsd) ??
+        num(fromStatsEnvelope.unrealizedPnlUsd))
     : null;
   const envRealized = fromStatsEnvelope
     ? (num(fromStatsEnvelope.realized_pnl_usd) ??
@@ -552,6 +602,7 @@ export function shapeMyTrades(raw: unknown): {
   stats: TradesStats;
   hasExchange: boolean;
   exchangeType: string | null;
+  credentialStatus: import("@/lib/dal").CredentialStatus | null;
 } {
   if (!raw || typeof raw !== "object") {
     return {
@@ -566,6 +617,7 @@ export function shapeMyTrades(raw: unknown): {
       },
       hasExchange: false,
       exchangeType: null,
+      credentialStatus: null,
     };
   }
   const t = raw as Record<string, unknown>;
@@ -582,15 +634,36 @@ export function shapeMyTrades(raw: unknown): {
 
   const stats = extractStats(t, recent, active);
 
+  // Round-14c (verified): VPS field-reference confirms
+  // `has_exchange_connection` as the top-level field on my-trades.
+  // Legacy `has_exchange` kept as a fallback for older backend deploys.
+  const hasExchange =
+    t.has_exchange_connection === true || t.has_exchange === true;
+
+  const KNOWN_STATUSES: ReadonlyArray<string> = [
+    "ok",
+    "missing",
+    "invalid_please_relink",
+    "founder_env",
+  ];
+  const rawStatus = typeof t.credential_status === "string"
+    ? t.credential_status
+    : null;
+  const credentialStatus =
+    rawStatus !== null && KNOWN_STATUSES.includes(rawStatus)
+      ? (rawStatus as import("@/lib/dal").CredentialStatus)
+      : null;
+
   return {
     active,
     recent,
     stats,
-    hasExchange: t.has_exchange === true,
+    hasExchange,
     exchangeType:
       typeof t.exchange_type === "string" && t.exchange_type.length > 0
         ? t.exchange_type
         : null,
+    credentialStatus,
   };
 }
 
@@ -691,6 +764,7 @@ export function buildTradesView(
     yourMeta: {
       hasExchange: my.hasExchange,
       exchangeType: my.exchangeType,
+      credentialStatus: my.credentialStatus,
     },
     fetchedAt,
   };

@@ -239,11 +239,16 @@ function AvenLiveBar({
           AI MENTOR / Aven block. The right-side status dot moved to the
           Live row (consolidated with the live-pulse) so the top row stays
           identity-only.
-          Round-14b: avatar dropped to 28px (size-7) to sit more
-          quietly next to the name; the breathing pulse is the visual
-          weight, not the glyph. */}
-      <div className="flex items-center gap-3 sm:gap-4">
-        <AvenAvatar size={28} online={streamConnected} breath />
+          Round-14c: avatar dropped 28→24px (size-6) and the pulse ring
+          tightened to 1.1× the avatar. Centering enforced via the
+          inline style alongside Tailwind utilities so the row layout
+          can't drift when nested inside a container with conflicting
+          flex defaults. */}
+      <div
+        className="flex items-center gap-3 sm:gap-4"
+        style={{ display: "flex", alignItems: "center" }}
+      >
+        <AvenAvatar size={24} online={streamConnected} breath />
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
             AI Mentor
