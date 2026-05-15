@@ -124,6 +124,7 @@ export function TradesGrid({ initial, initialBtcPrice }: Props) {
             recent={view?.your.recent ?? []}
             stats={
               view?.your.stats ?? {
+                unrealizedPnlSum: null,
                 realizedPnlSum: null,
                 winRatePct: null,
                 closedCount: null,
@@ -138,6 +139,7 @@ export function TradesGrid({ initial, initialBtcPrice }: Props) {
             recent={view?.pauls.recent ?? []}
             stats={
               view?.pauls.stats ?? {
+                unrealizedPnlSum: null,
                 realizedPnlSum: null,
                 winRatePct: null,
                 closedCount: null,

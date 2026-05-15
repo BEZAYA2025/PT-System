@@ -321,11 +321,21 @@ export const mockPaulsTrades: { active: PaulsTrade[]; recent: PaulsTrade[] } = {
 export const mockTradesView: TradesView = {
   your: {
     ...mockYourTrades,
-    stats: { realizedPnlSum: 1573, winRatePct: 75, closedCount: 4 },
+    stats: {
+      unrealizedPnlSum: 1560.5,
+      realizedPnlSum: 1573,
+      winRatePct: 75,
+      closedCount: 4,
+    },
   },
   pauls: {
     ...mockPaulsTrades,
-    stats: { realizedPnlSum: null, winRatePct: 80, closedCount: 5 },
+    stats: {
+      unrealizedPnlSum: null,
+      realizedPnlSum: null,
+      winRatePct: 80,
+      closedCount: 5,
+    },
   },
   fetchedAt: now,
 };

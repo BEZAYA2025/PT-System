@@ -623,9 +623,11 @@ export function MyTradesSection({
   const empty = active.length === 0 && recent.length === 0;
   const showColdStart = empty && meta !== undefined;
 
-  // Unrealized comes from the first open trade's live PnL.
+  // Unrealized USD comes from the backend stats envelope (sum across all
+  // open positions). ROI caption still uses the first open trade's roi_pct
+  // since stats doesn't aggregate that.
   const firstOpen = active[0] as YourTrade | undefined;
-  const unrealizedUsd = firstOpen?.pnlUsd ?? null;
+  const unrealizedUsd = stats.unrealizedPnlSum ?? firstOpen?.pnlUsd ?? null;
   const unrealizedPct = firstOpen?.pnlPct ?? null;
 
   return (

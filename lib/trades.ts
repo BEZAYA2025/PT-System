@@ -63,6 +63,9 @@ export interface YourTradesMeta {
  *  expose them under `stats.*`; falls back to derive-from-recent when
  *  the field is absent. */
 export interface TradesStats {
+  /** Sum of live unrealized PnL across all currently-open positions
+   *  (member-side only — Paul's response strips USD server-side). */
+  unrealizedPnlSum: number | null;
   realizedPnlSum: number | null;
   winRatePct: number | null;
   closedCount: number | null;
@@ -405,36 +408,60 @@ function shapeMyEndpointOne(
 function extractStats(
   raw: Record<string, unknown> | null,
   recent: Array<{ pnlPct: number; pnlUsd?: number }>,
+  open: Array<{ pnlUsd?: number }> = [],
 ): TradesStats {
   const fromStatsEnvelope =
     raw && typeof raw.stats === "object" && raw.stats !== null
       ? (raw.stats as Record<string, unknown>)
       : null;
   if (fromStatsEnvelope) {
+    // Backend confirmed: win_rate_pct is the canonical field (already %).
+    // Tolerate legacy `win_rate` (0..1) by auto-scaling.
+    const rawWinPct = num(fromStatsEnvelope.win_rate_pct);
     const rawWin = num(fromStatsEnvelope.win_rate);
+    const winRatePct =
+      rawWinPct !== null
+        ? rawWinPct
+        : rawWin === null
+          ? null
+          : rawWin <= 1.5
+            ? rawWin * 100
+            : rawWin;
     return {
-      realizedPnlSum:
-        num(fromStatsEnvelope.realized_pnl_sum) ??
-        num(fromStatsEnvelope.realized_pnl_usd) ??
+      unrealizedPnlSum:
+        num(fromStatsEnvelope.open_unrealized_pnl_usd) ??
+        num(fromStatsEnvelope.unrealized_pnl_usd) ??
         null,
-      winRatePct:
-        rawWin === null ? null : rawWin <= 1.5 ? rawWin * 100 : rawWin,
+      realizedPnlSum:
+        num(fromStatsEnvelope.realized_pnl_usd) ??
+        num(fromStatsEnvelope.realized_pnl_sum) ??
+        null,
+      winRatePct,
       closedCount:
         num(fromStatsEnvelope.closed_count) ??
         num(fromStatsEnvelope.total_closed) ??
         null,
     };
   }
-  if (recent.length === 0) {
-    return { realizedPnlSum: null, winRatePct: null, closedCount: null };
+  if (recent.length === 0 && open.length === 0) {
+    return {
+      unrealizedPnlSum: null,
+      realizedPnlSum: null,
+      winRatePct: null,
+      closedCount: null,
+    };
   }
   const wins = recent.filter((t) => t.pnlPct > 0).length;
-  const usdTotal = recent.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
-  const hasUsd = recent.some((t) => typeof t.pnlUsd === "number");
+  const usdRealized = recent.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
+  const usdUnrealized = open.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
+  const hasRealizedUsd = recent.some((t) => typeof t.pnlUsd === "number");
+  const hasUnrealizedUsd = open.some((t) => typeof t.pnlUsd === "number");
   return {
-    realizedPnlSum: hasUsd ? usdTotal : null,
-    winRatePct: (wins / recent.length) * 100,
-    closedCount: recent.length,
+    unrealizedPnlSum: hasUnrealizedUsd ? usdUnrealized : null,
+    realizedPnlSum: hasRealizedUsd ? usdRealized : null,
+    winRatePct:
+      recent.length > 0 ? (wins / recent.length) * 100 : null,
+    closedCount: recent.length > 0 ? recent.length : null,
   };
 }
 
@@ -453,7 +480,12 @@ export function shapeMyTrades(raw: unknown): {
     return {
       active: [],
       recent: [],
-      stats: { realizedPnlSum: null, winRatePct: null, closedCount: null },
+      stats: {
+        unrealizedPnlSum: null,
+        realizedPnlSum: null,
+        winRatePct: null,
+        closedCount: null,
+      },
       hasExchange: false,
       exchangeType: null,
     };
@@ -470,7 +502,7 @@ export function shapeMyTrades(raw: unknown): {
     .filter((x): x is YourTrade => x !== null)
     .slice(0, 5);
 
-  const stats = extractStats(t, recent);
+  const stats = extractStats(t, recent, active);
 
   return {
     active,
@@ -494,7 +526,12 @@ export function shapePaulTrades(raw: unknown): {
     return {
       active: [],
       recent: [],
-      stats: { realizedPnlSum: null, winRatePct: null, closedCount: null },
+      stats: {
+        unrealizedPnlSum: null,
+        realizedPnlSum: null,
+        winRatePct: null,
+        closedCount: null,
+      },
     };
   }
   const t = raw as Record<string, unknown>;
@@ -509,8 +546,9 @@ export function shapePaulTrades(raw: unknown): {
     .filter((x): x is PaulsTrade => x !== null)
     .slice(0, 5);
 
-  // Paul's response strips USD server-side, so realizedPnlSum will end up
-  // null in the fallback path — UI already accounts for that.
+  // Paul's response strips USD server-side. Even if a USD field leaked
+  // into stats, the PaulsTradesSection passes hideUsd=true so it never
+  // surfaces in the UI.
   const stats = extractStats(t, recent);
 
   return { active, recent, stats };
@@ -602,6 +640,7 @@ export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
     .slice(0, 5);
 
   const emptyStats: TradesStats = {
+    unrealizedPnlSum: null,
     realizedPnlSum: null,
     winRatePct: null,
     closedCount: null,
