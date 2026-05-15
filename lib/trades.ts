@@ -475,22 +475,44 @@ function shapeMyEndpointOne(
       ? durationFromSeconds(durationSec)
       : durationFromOpened(openedAt, closedAt);
 
-  // Round-14c (verified): VPS field-reference confirms
-  // `unrealized_pnl_usd` as the open-trade live PnL field name.
-  // `last_unrealized_pnl_usd` stays as a defensive fallback (older
-  // spec). camelCase variants kept as low-cost insurance against
-  // single-adapter drift.
+  // Status-aware PnL picker. The previous round-14c chain put
+  // `unrealized_pnl_usd` FIRST regardless of status; backends ship
+  // `unrealized_pnl_usd: 0` on closed trades (the position no longer
+  // has unrealized P&L), so the realized sum on the Top-Card came in
+  // as 0 even when `realized_pnl_usd` carried the real outcome.
+  //
+  // Open trades → prefer `unrealized_pnl_usd` (live mark P&L).
+  // Closed trades → prefer `realized_pnl_usd` (final outcome).
+  // `pnl_usd` and `pnl` stay as last-resort generic fallbacks for
+  // adapters that don't distinguish.
   const pnlUsd =
-    num(t.unrealized_pnl_usd) ??
-    num(t.pnl_usd) ??
-    num(t.realized_pnl_usd) ??
-    num(t.last_unrealized_pnl_usd) ??
-    num(t.unrealizedPnlUsd) ??
-    num(t.pnlUsd) ??
-    num(t.lastUnrealizedPnlUsd) ??
-    num(t.realizedPnlUsd) ??
-    num(t.pnl) ??
-    0;
+    status === "closed"
+      ? (num(t.realized_pnl_usd) ??
+          num(t.realizedPnlUsd) ??
+          num(t.pnl_usd) ??
+          num(t.pnlUsd) ??
+          num(t.pnl) ??
+          // Defensive: some adapters keep the final value in the
+          // unrealized field after close. Last-resort fallback —
+          // never the primary path for closed trades.
+          num(t.unrealized_pnl_usd) ??
+          num(t.last_unrealized_pnl_usd) ??
+          num(t.unrealizedPnlUsd) ??
+          num(t.lastUnrealizedPnlUsd) ??
+          0)
+      : (num(t.unrealized_pnl_usd) ??
+          num(t.last_unrealized_pnl_usd) ??
+          num(t.unrealizedPnlUsd) ??
+          num(t.lastUnrealizedPnlUsd) ??
+          num(t.pnl_usd) ??
+          num(t.pnlUsd) ??
+          num(t.pnl) ??
+          // Defensive: realized field shouldn't appear on open trades
+          // but keep as last-resort so a backend that misuses the
+          // schema still renders something.
+          num(t.realized_pnl_usd) ??
+          num(t.realizedPnlUsd) ??
+          0);
 
   // Margin posted on the position — drives the Unrealized PnL %
   // top-card. Many backend payloads carry it under different names;
@@ -740,12 +762,17 @@ export function shapeMyTrades(raw: unknown): {
   const active = open
     .map((x, i) => shapeMyEndpointOne(x, `my-open-${i}`))
     .filter((x): x is YourTrade => x !== null);
-  const recent = closed
+  // Round-22b realized-PnL fix: shape every closed trade, then take
+  // a 5-item slice for the UI table. Stats are computed over the
+  // FULL closed list — slicing for display before stats would
+  // under-count the realized sum + win-rate whenever a member has
+  // more than 5 closed trades.
+  const allClosed = closed
     .map((x, i) => shapeMyEndpointOne(x, `my-closed-${i}`))
-    .filter((x): x is YourTrade => x !== null)
-    .slice(0, 5);
+    .filter((x): x is YourTrade => x !== null);
+  const recent = allClosed.slice(0, 5);
 
-  const stats = extractStats(t, recent, active);
+  const stats = extractStats(t, allClosed, active);
 
   // Round-14c (verified): VPS field-reference confirms
   // `has_exchange_connection` as the top-level field on my-trades.
