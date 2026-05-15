@@ -33,6 +33,9 @@ function formatDate(iso: string | null): string {
       year: "numeric",
       month: "short",
       day: "numeric",
+      // Round-16 hydration fix: anchor to UTC so server (Vercel UTC)
+      // and client (any local TZ) format the same calendar date.
+      timeZone: "UTC",
     });
   } catch {
     return iso;

@@ -28,6 +28,15 @@ interface Props {
   initialQuota?: QuotaState | null;
 }
 
+// Round-16 hydration #418 root cause: this formatter uses
+// `toLocaleTimeString` without a timeZone option, so the server
+// (Vercel = UTC) renders one clock-time and the browser (user's local
+// TZ) renders another. The two text nodes then mismatch on hydration,
+// triggering React's text-node hydration error.
+//
+// Fix: caller wraps the output in a <span suppressHydrationWarning>
+// so React accepts the server-rendered text on first paint and
+// silently swaps in the client's local time after hydration.
 function formatTime(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString("en-US", {
@@ -474,7 +483,7 @@ function ChatBubble({
       <div className="flex items-center gap-2 px-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <span>{isUser ? "you" : "Aven"}</span>
         <span aria-hidden>·</span>
-        <span>{formatTime(message.ts)}</span>
+        <span suppressHydrationWarning>{formatTime(message.ts)}</span>
         <SourceTag source={message.source} />
         {failed && (
           <button

@@ -46,7 +46,10 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
                   Morning briefing
                 </h2>
               </div>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+              <p
+                className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
+                suppressHydrationWarning
+              >
                 Aven · {timeAgo(brief.generatedAt)}
               </p>
             </div>
