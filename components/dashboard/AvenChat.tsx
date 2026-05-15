@@ -231,44 +231,36 @@ function AvenLiveBar({
 
   return (
     <div
-      className="relative px-6 pb-4 pt-5 sm:px-8 sm:pb-5 sm:pt-6"
+      // Round-15: switched the bar from stacked flex rows to a 2x2 CSS
+      // grid. The avatar cell stretches to match the name-block's
+      // height and `self-center` does the actual vertical centering —
+      // the previous flex+items-center version was geometrically
+      // correct but visually mis-aligned because the 2-line text
+      // block's baseline shifts the perceived centre away from the
+      // computed centre. Grid removes that ambiguity: avatar cell
+      // mirrors the text cell's exact box, then centres inside it.
+      //
+      // Layout:
+      //   [Avatar]  [AI Mentor]
+      //             [Aven      ]
+      //   [Live observation — col-span-2, centred horizontally]
+      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:gap-x-4 sm:gap-y-4 sm:px-8 sm:pb-5 sm:pt-6"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Top row — avatar vertically centered against the 2-line
-          AI MENTOR / Aven block. The right-side status dot moved to the
-          Live row (consolidated with the live-pulse) so the top row stays
-          identity-only.
-          Round-14c: avatar dropped 28→24px (size-6) and the pulse ring
-          tightened to 1.1× the avatar. Centering enforced via the
-          inline style alongside Tailwind utilities so the row layout
-          can't drift when nested inside a container with conflicting
-          flex defaults. */}
-      <div
-        className="flex items-center gap-3 sm:gap-4"
-        style={{ display: "flex", alignItems: "center" }}
-      >
+      <div className="flex self-center">
         <AvenAvatar size={24} online={streamConnected} breath />
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
-            AI Mentor
-          </p>
-          <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
-            Aven
-          </p>
-        </div>
+      </div>
+      <div className="min-w-0 self-center">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
+          AI Mentor
+        </p>
+        <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
+          Aven
+        </p>
       </div>
 
-      {/* Live observation — centered horizontally in the bar. Pulsing
-          dot replaces the ▸ chevron AND the old right-side status dot
-          (single visual heartbeat for the bar).
-          Round-14b: previous attempt left LiveObservation as a flex
-          block (default 100%-width) — `justify-center` on the parent
-          had nothing to centre against. Wrap in a centered container
-          AND give the row `inline-flex` so it sizes to content; the
-          truncate child gets `min-w-0` so long observations clip
-          inside the bar's max-width cap rather than blowing the layout. */}
-      <div className="mt-3 flex w-full justify-center sm:mt-4">
+      <div className="col-span-2 flex justify-center">
         <LiveObservation
           text={obs}
           reduce={!!reduce}
@@ -407,7 +399,7 @@ function StatusDot({
     <span
       title={title}
       aria-label={title}
-      className="relative inline-flex size-2.5 shrink-0"
+      className="relative inline-flex size-1.5 shrink-0"
     >
       {online && (
         <span
@@ -419,8 +411,10 @@ function StatusDot({
       <span
         aria-hidden
         className={[
-          "relative inline-flex size-2.5 rounded-full",
-          online ? "bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.7)]" : "bg-muted-foreground",
+          "relative inline-flex size-1.5 rounded-full",
+          online
+            ? "bg-emerald shadow-[0_0_6px_rgba(16,185,129,0.65)]"
+            : "bg-muted-foreground",
         ].join(" ")}
       />
     </span>

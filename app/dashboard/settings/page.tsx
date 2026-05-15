@@ -4,6 +4,7 @@ import { IconArrowLeft } from "@tabler/icons-react";
 import { requireUser } from "@/lib/dal";
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
 import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCard";
+import { NotificationPrefsCard } from "@/components/dashboard/NotificationPrefsCard";
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
 import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
 import { PrivacyDataCard } from "@/components/dashboard/PrivacyDataCard";
@@ -50,6 +51,8 @@ export default async function SettingsPage() {
         />
 
         <TelegramSettingsCard telegramUsername={user.telegram_username} />
+
+        <NotificationPrefsCard />
 
         <ExchangeSettingsCard
           connected={user.binance_api_key_connected}

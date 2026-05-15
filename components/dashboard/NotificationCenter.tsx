@@ -29,7 +29,45 @@ import {
   shapeNotificationsResponse,
   type NotificationItem,
   type NotificationKind,
+  type NotificationSeverity,
 } from "@/lib/notifications";
+
+// Round-15 notifications: severity drives the badge colour ladder in
+// both the bell-row and the detail modal.
+const SEVERITY_TONE: Record<
+  NotificationSeverity,
+  { bg: string; text: string; ring: string; label: string }
+> = {
+  watch: {
+    bg: "bg-yellow-400/[0.12]",
+    text: "text-yellow-200",
+    ring: "ring-yellow-400/40",
+    label: "Watch",
+  },
+  warn: {
+    bg: "bg-amber-500/[0.14]",
+    text: "text-amber-200",
+    ring: "ring-amber-500/40",
+    label: "Warn",
+  },
+  critical: {
+    bg: "bg-red-500/[0.14]",
+    text: "text-red-200",
+    ring: "ring-red-500/45",
+    label: "Critical",
+  },
+};
+
+function SeverityBadge({ severity }: { severity: NotificationSeverity }) {
+  const tone = SEVERITY_TONE[severity];
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tone.bg} ${tone.text}`}
+    >
+      {tone.label}
+    </span>
+  );
+}
 
 const KIND_TONE: Record<
   NotificationKind,
@@ -363,6 +401,7 @@ export function NotificationCenter({ initial }: Props) {
               list={list}
               loading={loading}
               showError={showError}
+              errorDetail={error}
               hasUnread={unreadCount > 0}
               onClose={() => setOpen(false)}
               onMarkAllRead={() => void markAllRead()}
@@ -435,6 +474,7 @@ function NotificationPanel({
   list,
   loading,
   showError,
+  errorDetail,
   hasUnread,
   onClose,
   onMarkAllRead,
@@ -445,6 +485,7 @@ function NotificationPanel({
   list: NotificationItem[];
   loading: boolean;
   showError: boolean;
+  errorDetail: string | null;
   hasUnread: boolean;
   onClose: () => void;
   onMarkAllRead: () => void;
@@ -508,12 +549,12 @@ function NotificationPanel({
           </div>
         </header>
 
-        {showError && (
+        {showError && errorDetail && (
           <div className="border-b border-amber-500/20 bg-amber-500/[0.06] px-4 py-2">
             <div className="flex items-center justify-between gap-2 text-xs">
               <p className="flex items-center gap-2 text-amber-200">
                 <IconAlertCircle size={14} stroke={1.75} aria-hidden />
-                Couldn&apos;t load notifications
+                Couldn&apos;t load notifications · {errorDetail}
               </p>
               <button
                 type="button"
@@ -619,23 +660,36 @@ function NotificationRowInner({
         <KindIcon kind={item.kind} />
       </span>
       <div className="flex-1 min-w-0">
-        <p
-          className={[
-            "line-clamp-2 text-sm",
-            item.read
-              ? "text-muted-foreground"
-              : "font-medium text-foreground",
-          ].join(" ")}
-        >
-          {item.title}
-        </p>
+        <div className="flex items-start gap-2">
+          <p
+            className={[
+              "line-clamp-2 flex-1 text-sm",
+              item.read
+                ? "text-muted-foreground"
+                : "font-medium text-foreground",
+            ].join(" ")}
+          >
+            {item.title}
+          </p>
+          {item.severity && <SeverityBadge severity={item.severity} />}
+        </div>
         {item.detail && (
           <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
             {renderMarkdown(item.detail)}
           </p>
         )}
-        <p className="mt-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {tone.label} · {timeAgo(item.ts)}
+        <p className="mt-1 inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          <span>
+            {tone.label} · {timeAgo(item.ts)}
+          </span>
+          {item.hasChart && (
+            <span
+              className="inline-flex items-center gap-1 text-emerald/70"
+              aria-label="Chart attached"
+            >
+              <IconChartCandle size={10} stroke={1.75} aria-hidden />
+            </span>
+          )}
         </p>
       </div>
       {!item.read && (
@@ -664,17 +718,20 @@ function NotificationDetailBody({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <span
           className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tone.iconBg} ${tone.iconText}`}
         >
           <KindIcon kind={item.kind} />
           {tone.label}
         </span>
+        {item.severity && <SeverityBadge severity={item.severity} />}
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {timeAgo(item.ts)}
         </span>
       </div>
+
+      {item.hasChart && <NotificationChart id={item.id} title={item.title} />}
 
       {structured ? (
         <EnhancedSetupCard data={structured} />
@@ -736,6 +793,31 @@ function NotificationDetailBody({
         </button>
       </div>
     </div>
+  );
+}
+
+// Round-15: chart image fetched lazily from
+// /api/proxy/notifications/{id}/chart. Renders an <img> that swaps to
+// an inline error block if the upstream 404s or the fetch fails. No
+// extra request management here — <img> handles caching + retries via
+// the proxy's Cache-Control header.
+function NotificationChart({ id, title }: { id: string; title: string }) {
+  const [errored, setErrored] = useState(false);
+  if (errored) {
+    return (
+      <div className="rounded-lg border border-border bg-surface px-4 py-6 text-center text-xs text-muted-foreground">
+        Chart unavailable.
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`/api/proxy/notifications/${id}/chart`}
+      alt={`${title} chart`}
+      onError={() => setErrored(true)}
+      className="block w-full rounded-lg border border-border bg-surface"
+    />
   );
 }
 

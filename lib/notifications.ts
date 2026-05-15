@@ -4,6 +4,15 @@
 
 export type NotificationKind = "setup" | "trade" | "system";
 
+/** Round-15 notifications brief: backend now carries an explicit
+ *  severity field on alert notifications. Drives the badge colour in
+ *  the bell drop-down + detail modal.
+ *    watch    → yellow ("worth a look")
+ *    warn     → amber  ("act soon")
+ *    critical → red    ("act now")
+ */
+export type NotificationSeverity = "watch" | "warn" | "critical";
+
 export interface NotificationItem {
   id: string;
   kind: NotificationKind;
@@ -11,6 +20,14 @@ export interface NotificationItem {
   detail: string;
   ts: string;
   read: boolean;
+  /** Round-15: explicit severity from the backend. Null when the
+   *  notification doesn't carry one (system / info-only events). */
+  severity: NotificationSeverity | null;
+  /** Round-15: true when /api/notifications/{id}/chart will serve an
+   *  image for this notification. The detail modal renders the image
+   *  unconditionally with an onError fallback, but this flag lets the
+   *  drop-down hint at it before opening the modal. */
+  hasChart: boolean;
   /** Raw metadata blob from backend; used to render the detail modal. */
   metadata?: Record<string, unknown>;
   /** Pre-formatted context bullets for the detail modal. Computed from
@@ -71,6 +88,17 @@ function bulletsFromMetadata(
   return bullets;
 }
 
+function normaliseSeverity(v: unknown): NotificationSeverity | null {
+  if (typeof v !== "string") return null;
+  const s = v.toLowerCase();
+  if (s === "watch" || s === "warn" || s === "critical") return s;
+  // Tolerate plausible aliases the backend might emit.
+  if (s === "warning") return "warn";
+  if (s === "info") return "watch";
+  if (s === "danger" || s === "error") return "critical";
+  return null;
+}
+
 export function shapeNotification(raw: unknown): NotificationItem | null {
   if (!raw || typeof raw !== "object") return null;
   const t = raw as Record<string, unknown>;
@@ -98,6 +126,22 @@ export function shapeNotification(raw: unknown): NotificationItem | null {
       ? (t.metadata as Record<string, unknown>)
       : undefined;
 
+  // Severity: prefer the top-level field; fall back to metadata.severity
+  // for older backend payloads that nested it under metadata for the
+  // trade kind only.
+  const severity =
+    normaliseSeverity(t.severity) ??
+    (metadata ? normaliseSeverity(metadata.severity) : null);
+
+  // Chart presence flag: backend can set `has_chart` explicitly, or we
+  // can infer from a `chart_url` / `chart_image_url` field. False when
+  // none of those signals are present.
+  const hasChart =
+    t.has_chart === true ||
+    typeof t.chart_url === "string" ||
+    typeof t.chart_image_url === "string" ||
+    (metadata ? metadata.has_chart === true : false);
+
   return {
     id,
     kind,
@@ -105,6 +149,8 @@ export function shapeNotification(raw: unknown): NotificationItem | null {
     detail,
     ts,
     read: readAt !== null,
+    severity,
+    hasChart,
     metadata,
     context: bulletsFromMetadata(kind, metadata),
   };

@@ -10,8 +10,12 @@ function formatNumber(n: number | null, digits = 2) {
 
 function formatPct(n: number | null) {
   if (n === null || Number.isNaN(n)) return "—";
-  const sign = n > 0 ? "+" : "";
-  return `${sign}${(n * 100).toFixed(2)}%`;
+  // Round-15: match the dashboard-wide sign convention — use the
+  // Unicode minus ("−" U+2212) so a positive "+1.23%" and a
+  // negative "−1.23%" read with the same visual weight across
+  // every component (TradesSection, TradeDetailModal, MemberStatsCards).
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  return `${sign}${Math.abs(n * 100).toFixed(2)}%`;
 }
 
 function formatTime(iso: string | null) {
