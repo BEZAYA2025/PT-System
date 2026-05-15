@@ -33,8 +33,14 @@ export function AvenAvatar({
   const isTriangle = AVEN_VARIANT === "triangle";
 
   return (
-    <span
-      className="relative inline-flex shrink-0 items-center justify-center"
+    // Round-18: switched the root from <span inline-flex> to <div
+    // flex>. Inline-flex defaults to baseline vertical-align which
+    // can pull the avatar visually low inside a flex/grid parent;
+    // a block-level flex avoids that entirely. The avatar's outer
+    // box is exactly ringSize × ringSize, dead-centred via the
+    // grid-cell's `place-items: center` in AvenLiveBar.
+    <div
+      className="relative flex shrink-0 items-center justify-center"
       style={{ width: ringSize, height: ringSize }}
     >
       {online && (
@@ -91,7 +97,7 @@ export function AvenAvatar({
           50% { transform: scale(1.04); }
         }
       `}</style>
-    </span>
+    </div>
   );
 }
 

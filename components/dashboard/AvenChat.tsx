@@ -257,14 +257,20 @@ function AvenLiveBar({
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      <div className="flex self-center">
+      {/* Round-18: avatar cell uses `place-items-center` so the avatar
+          dead-centres within the cell horizontally AND vertically.
+          The text cell uses `flex flex-col justify-center` with
+          tightened leading so its 2-line content has a clean
+          geometric centre — matches the avatar's centre with no
+          baseline / inline-flex quirks dragging the visual centre off. */}
+      <div className="grid place-items-center">
         <AvenAvatar size={24} online={streamConnected} breath />
       </div>
-      <div className="min-w-0 self-center">
+      <div className="flex min-w-0 flex-col justify-center leading-tight">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
           AI Mentor
         </p>
-        <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
+        <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
           Aven
         </p>
       </div>
@@ -408,7 +414,7 @@ function StatusDot({
     <span
       title={title}
       aria-label={title}
-      className="relative inline-flex size-1.5 shrink-0"
+      className="relative inline-flex size-1 shrink-0"
     >
       {online && (
         <span
@@ -420,7 +426,7 @@ function StatusDot({
       <span
         aria-hidden
         className={[
-          "relative inline-flex size-1.5 rounded-full",
+          "relative inline-flex size-1 rounded-full",
           online
             ? "bg-emerald shadow-[0_0_6px_rgba(16,185,129,0.65)]"
             : "bg-muted-foreground",
@@ -545,7 +551,7 @@ function Dot({ delay }: { delay: string }) {
   return (
     <span
       aria-hidden
-      className="inline-block size-1.5 animate-bounce rounded-full bg-emerald/70"
+      className="inline-block size-1 animate-bounce rounded-full bg-emerald/70"
       style={{ animationDelay: delay, animationDuration: "1.2s" }}
     />
   );

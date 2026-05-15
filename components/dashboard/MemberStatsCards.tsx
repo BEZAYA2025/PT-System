@@ -336,23 +336,23 @@ function UnrealizedPnlBody({
       </>
     );
   }
-  // Round-17 layout: $ value on the left, ROI % on the right of the
-  // same row. Same tone driven by the sign of each value independently
-  // (they almost always agree, but display the % tone per its own
-  // sign so a $0 + +2% mark-shift still reads correctly).
+  // Round-18 colour rule: only the value strings carry tone; the
+  // "ROI" word, the brackets, the labels ("SL", "TP"), the prices,
+  // and the separators stay neutral. Centralised in each render
+  // block below by wrapping just the value span in a coloured class.
   return (
     <>
-      <div className="mt-1 flex items-baseline justify-between gap-2">
-        <p
-          className={`font-mono text-2xl font-semibold ${toneFor(unrealized)}`}
-        >
+      <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <p className={`font-mono text-2xl font-semibold ${toneFor(unrealized)}`}>
           {fmtBigUsd(unrealized)}
         </p>
         {unrealizedPct !== null && (
-          <p
-            className={`font-mono text-xl font-semibold ${toneFor(unrealizedPct)}`}
-          >
-            {fmtSignedPct(unrealizedPct)}
+          <p className="font-mono text-base font-semibold text-foreground">
+            (
+            <span className={toneFor(unrealizedPct)}>
+              {fmtSignedPct(unrealizedPct)}
+            </span>
+            <span className="ml-1 text-muted-foreground">ROI</span>)
           </p>
         )}
       </div>
@@ -389,18 +389,25 @@ function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
     const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
     if (slLossUsd === null && tpGainUsd === null) return null;
     return (
-      <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
+      <p className="mt-2 flex flex-col gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px] sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
         {slLossUsd !== null && (
-          <span className="text-red-300">
-            SL exposure {fmtSignedUsd(slLossUsd)}
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-muted-foreground">SL exposure</span>
+            <span className="text-red-300">{fmtSignedUsd(slLossUsd)}</span>
           </span>
         )}
         {slLossUsd !== null && tpGainUsd !== null && (
-          <span aria-hidden className="text-muted-foreground">·</span>
+          <span
+            aria-hidden
+            className="hidden text-muted-foreground sm:inline"
+          >
+            ·
+          </span>
         )}
         {tpGainUsd !== null && (
-          <span className="text-emerald">
-            TP target {fmtSignedUsd(tpGainUsd)}
+          <span className="inline-flex items-baseline gap-1">
+            <span className="text-muted-foreground">TP target</span>
+            <span className="text-emerald">{fmtSignedUsd(tpGainUsd)}</span>
           </span>
         )}
       </p>
@@ -433,37 +440,74 @@ function TradeExposureRow({
   const tpPnl = pnlAtPrice(trade, trade.tpPrice);
   const tpDist = pctDistanceFromMark(trade, trade.tpPrice);
 
+  // Round-18 mobile: SL and TP sides stack on narrow viewports
+  // (flex-col), sit on one line at sm+ (flex-row). The "·" separator
+  // is only rendered for the sm+ horizontal layout — it would float
+  // awkwardly between stacked rows.
   return (
-    <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-[11px]">
+    <p className="flex flex-col gap-y-1 font-mono text-[11px] sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
       {showSymbol && (
         <span className="text-muted-foreground">{trade.symbol}</span>
       )}
       {trade.slPrice !== null && (
-        <span className="text-red-300">
-          SL {fmtPriceCompact(trade.slPrice)}
-          {slPnl !== null && (
-            <span className="ml-1 opacity-80">({fmtSignedUsd(slPnl)})</span>
-          )}
-          {slDist !== null && (
-            <span className="ml-1 opacity-80">{fmtSignedPct(slDist)}</span>
-          )}
-        </span>
+        <ExposureLeg
+          label="SL"
+          price={trade.slPrice}
+          dollar={slPnl}
+          distPct={slDist}
+          tone="text-red-300"
+        />
       )}
       {trade.slPrice !== null && trade.tpPrice !== null && (
-        <span aria-hidden className="text-muted-foreground">·</span>
-      )}
-      {trade.tpPrice !== null && (
-        <span className="text-emerald">
-          TP {fmtPriceCompact(trade.tpPrice)}
-          {tpPnl !== null && (
-            <span className="ml-1 opacity-80">({fmtSignedUsd(tpPnl)})</span>
-          )}
-          {tpDist !== null && (
-            <span className="ml-1 opacity-80">{fmtSignedPct(tpDist)}</span>
-          )}
+        <span
+          aria-hidden
+          className="hidden text-muted-foreground sm:inline"
+        >
+          ·
         </span>
       )}
+      {trade.tpPrice !== null && (
+        <ExposureLeg
+          label="TP"
+          price={trade.tpPrice}
+          dollar={tpPnl}
+          distPct={tpDist}
+          tone="text-emerald"
+        />
+      )}
     </p>
+  );
+}
+
+// Round-18 colour rule: label + price + brackets stay neutral. Only
+// the $ value and the % distance carry the tone. Generic — same shape
+// for both SL (red tone) and TP (emerald tone).
+function ExposureLeg({
+  label,
+  price,
+  dollar,
+  distPct,
+  tone,
+}: {
+  label: string;
+  price: number;
+  dollar: number | null;
+  distPct: number | null;
+  tone: string;
+}) {
+  return (
+    <span className="inline-flex items-baseline gap-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-foreground">{fmtPriceCompact(price)}</span>
+      {dollar !== null && (
+        <span className="text-foreground">
+          (<span className={tone}>{fmtUsdSuffix(dollar)}</span>)
+        </span>
+      )}
+      {distPct !== null && (
+        <span className={tone}>{fmtSignedPct(distPct)}</span>
+      )}
+    </span>
   );
 }
 
@@ -478,6 +522,18 @@ function fmtPriceCompact(n: number | null): string {
   return n.toFixed(4);
 }
 
+// Round-18: $-suffix sign format per Paul's spec — "-267$" / "+235$"
+// rather than the conventional "$-267" / "+$235". Brackets are added
+// by the caller so the value-span itself is exactly what gets coloured.
+function fmtUsdSuffix(n: number): string {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return `${sign}${v}$`;
+}
+
+// Kept for the aggregate-fallback path in SlTpExposureLine — Paul's
+// brief lets us stay with the conventional "$N" form when we can't
+// produce a per-trade breakdown.
 function fmtSignedUsd(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
   const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
