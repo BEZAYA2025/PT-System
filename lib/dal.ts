@@ -183,6 +183,22 @@ export const getInitialPaulTrades = cache(
   },
 );
 
+/** Initial member-owned trades feed for SSR seed. Returns the raw payload
+ *  (includes has_exchange + exchange_type meta) so shapeMyTrades can build
+ *  the empty-state copy without an extra fetch. */
+export const getInitialMyTrades = cache(
+  async (): Promise<unknown | null> => {
+    const token = await getAccessToken();
+    if (!token) return null;
+    const res = await backendFetch<unknown>("/api/cockpit/my-trades", {
+      method: "GET",
+      token,
+    });
+    if (!res.ok) return null;
+    return res.data;
+  },
+);
+
 /** Initial Aven chat history for fast first paint. Returns the shaped
  *  messages plus the cursor info so the client knows whether to show the
  *  "Load older" pill. Empty list / hasMore=false on backend failure. */

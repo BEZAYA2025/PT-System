@@ -31,6 +31,8 @@ interface CommonTrade {
 export interface YourTrade extends CommonTrade {
   owner: "self";
   pnlUsd: number;
+  leverage?: number | null;
+  tradeNumber?: number | null;
 }
 
 export interface PaulsTrade extends CommonTrade {
@@ -51,9 +53,36 @@ export interface PaulsTrade extends CommonTrade {
 
 export type AnyTrade = YourTrade | PaulsTrade;
 
+/** Member-side metadata for the empty-state copy. */
+export interface YourTradesMeta {
+  hasExchange: boolean;
+  exchangeType: string | null;
+}
+
+/** Cumulative stats for the section header / top-cards. Backend may
+ *  expose them under `stats.*`; falls back to derive-from-recent when
+ *  the field is absent. */
+export interface TradesStats {
+  /** Sum of live unrealized PnL across all currently-open positions
+   *  (member-side only — Paul's response strips USD server-side). */
+  unrealizedPnlSum: number | null;
+  realizedPnlSum: number | null;
+  winRatePct: number | null;
+  closedCount: number | null;
+}
+
 export interface TradesView {
-  your: { active: YourTrade[]; recent: YourTrade[] };
-  pauls: { active: PaulsTrade[]; recent: PaulsTrade[] };
+  your: {
+    active: YourTrade[];
+    recent: YourTrade[];
+    stats: TradesStats;
+  };
+  pauls: {
+    active: PaulsTrade[];
+    recent: PaulsTrade[];
+    stats: TradesStats;
+  };
+  yourMeta?: YourTradesMeta;
   fetchedAt: number;
 }
 
@@ -283,13 +312,227 @@ function shapePaulEndpointOne(
   };
 }
 
+/**
+ * Shape a single entry from the dedicated /api/cockpit/my-trades feed.
+ * Mirrors shapePaulEndpointOne but preserves USD PnL (member sees their
+ * own absolute money).
+ */
+function shapeMyEndpointOne(
+  raw: unknown,
+  fallbackId: string,
+): YourTrade | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+
+  const symbol = str(t.symbol);
+  if (!symbol) return null;
+
+  const entry = num(t.entry) ?? num(t.entry_price);
+  if (entry === null) return null;
+
+  const status: TradeStatus =
+    str(t.status)?.toLowerCase() === "closed" ? "closed" : "open";
+  const exit = num(t.exit) ?? num(t.exit_price);
+  const sl = num(t.sl) ?? num(t.stop_loss);
+  const tp = num(t.tp) ?? num(t.take_profit);
+  const mark = num(t.mark) ?? num(t.mark_price) ?? num(t.current_price);
+  const openedAt = str(t.opened_at) ?? "";
+  const durationSec = num(t.duration_seconds);
+
+  const closedAt =
+    status === "closed" && openedAt && durationSec !== null
+      ? (() => {
+          try {
+            const startMs = new Date(openedAt).getTime();
+            if (!Number.isFinite(startMs)) return null;
+            return new Date(startMs + durationSec * 1000).toISOString();
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  const durationLabel =
+    durationSec !== null && durationSec > 0
+      ? durationFromSeconds(durationSec)
+      : durationFromOpened(openedAt, closedAt);
+
+  const pnlUsd =
+    num(t.pnl_usd) ??
+    num(t.realized_pnl_usd) ??
+    num(t.unrealized_pnl_usd) ??
+    num(t.pnl) ??
+    0;
+
+  const referencePrice = status === "open" ? mark : exit;
+
+  const idRaw = t.id ?? t.trade_id;
+  const id =
+    typeof idRaw === "number"
+      ? String(idRaw)
+      : typeof idRaw === "string"
+        ? idRaw
+        : fallbackId;
+
+  return {
+    id,
+    owner: "self",
+    symbol,
+    side: lowerSide(t.side),
+    status,
+    entry,
+    mark: status === "open" ? mark : null,
+    exit: status === "closed" ? exit : null,
+    pnlUsd,
+    pnlPct: num(t.roi_pct) ?? num(t.realized_pnl_pct) ?? 0,
+    slPrice: sl,
+    tpPrice: tp,
+    slDistancePct:
+      status === "open" ? computeDistancePct(referencePrice, sl) : null,
+    tpDistancePct:
+      status === "open" ? computeDistancePct(referencePrice, tp) : null,
+    openedAt,
+    closedAt,
+    durationLabel,
+    leverage: num(t.leverage),
+    tradeNumber: num(t.trade_number),
+  };
+}
+
+/**
+ * Pull cumulative stats from a feed response. Reads backend's `stats`
+ * envelope first; falls back to deriving from the supplied recent array
+ * (which is capped at 5 → realizedPnlSum / closedCount may understate
+ * when backend doesn't expose the totals).
+ */
+function extractStats(
+  raw: Record<string, unknown> | null,
+  recent: Array<{ pnlPct: number; pnlUsd?: number }>,
+  open: Array<{ pnlUsd?: number }> = [],
+): TradesStats {
+  const fromStatsEnvelope =
+    raw && typeof raw.stats === "object" && raw.stats !== null
+      ? (raw.stats as Record<string, unknown>)
+      : null;
+  if (fromStatsEnvelope) {
+    // Backend confirmed: win_rate_pct is the canonical field (already %).
+    // Tolerate legacy `win_rate` (0..1) by auto-scaling.
+    const rawWinPct = num(fromStatsEnvelope.win_rate_pct);
+    const rawWin = num(fromStatsEnvelope.win_rate);
+    const winRatePct =
+      rawWinPct !== null
+        ? rawWinPct
+        : rawWin === null
+          ? null
+          : rawWin <= 1.5
+            ? rawWin * 100
+            : rawWin;
+    return {
+      unrealizedPnlSum:
+        num(fromStatsEnvelope.open_unrealized_pnl_usd) ??
+        num(fromStatsEnvelope.unrealized_pnl_usd) ??
+        null,
+      realizedPnlSum:
+        num(fromStatsEnvelope.realized_pnl_usd) ??
+        num(fromStatsEnvelope.realized_pnl_sum) ??
+        null,
+      winRatePct,
+      closedCount:
+        num(fromStatsEnvelope.closed_count) ??
+        num(fromStatsEnvelope.total_closed) ??
+        null,
+    };
+  }
+  if (recent.length === 0 && open.length === 0) {
+    return {
+      unrealizedPnlSum: null,
+      realizedPnlSum: null,
+      winRatePct: null,
+      closedCount: null,
+    };
+  }
+  const wins = recent.filter((t) => t.pnlPct > 0).length;
+  const usdRealized = recent.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
+  const usdUnrealized = open.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
+  const hasRealizedUsd = recent.some((t) => typeof t.pnlUsd === "number");
+  const hasUnrealizedUsd = open.some((t) => typeof t.pnlUsd === "number");
+  return {
+    unrealizedPnlSum: hasUnrealizedUsd ? usdUnrealized : null,
+    realizedPnlSum: hasRealizedUsd ? usdRealized : null,
+    winRatePct:
+      recent.length > 0 ? (wins / recent.length) * 100 : null,
+    closedCount: recent.length > 0 ? recent.length : null,
+  };
+}
+
+/**
+ * Shape the dedicated /api/cockpit/my-trades response. Empty + has_exchange=false
+ * is the cold-start state for unconnected members.
+ */
+export function shapeMyTrades(raw: unknown): {
+  active: YourTrade[];
+  recent: YourTrade[];
+  stats: TradesStats;
+  hasExchange: boolean;
+  exchangeType: string | null;
+} {
+  if (!raw || typeof raw !== "object") {
+    return {
+      active: [],
+      recent: [],
+      stats: {
+        unrealizedPnlSum: null,
+        realizedPnlSum: null,
+        winRatePct: null,
+        closedCount: null,
+      },
+      hasExchange: false,
+      exchangeType: null,
+    };
+  }
+  const t = raw as Record<string, unknown>;
+  const open = Array.isArray(t.open) ? t.open : [];
+  const closed = Array.isArray(t.closed) ? t.closed : [];
+
+  const active = open
+    .map((x, i) => shapeMyEndpointOne(x, `my-open-${i}`))
+    .filter((x): x is YourTrade => x !== null);
+  const recent = closed
+    .map((x, i) => shapeMyEndpointOne(x, `my-closed-${i}`))
+    .filter((x): x is YourTrade => x !== null)
+    .slice(0, 5);
+
+  const stats = extractStats(t, recent, active);
+
+  return {
+    active,
+    recent,
+    stats,
+    hasExchange: t.has_exchange === true,
+    exchangeType:
+      typeof t.exchange_type === "string" && t.exchange_type.length > 0
+        ? t.exchange_type
+        : null,
+  };
+}
+
 /** Shape the dedicated /api/cockpit/paul-trades response. */
 export function shapePaulTrades(raw: unknown): {
   active: PaulsTrade[];
   recent: PaulsTrade[];
+  stats: TradesStats;
 } {
   if (!raw || typeof raw !== "object") {
-    return { active: [], recent: [] };
+    return {
+      active: [],
+      recent: [],
+      stats: {
+        unrealizedPnlSum: null,
+        realizedPnlSum: null,
+        winRatePct: null,
+        closedCount: null,
+      },
+    };
   }
   const t = raw as Record<string, unknown>;
   const open = Array.isArray(t.open) ? t.open : [];
@@ -303,7 +546,12 @@ export function shapePaulTrades(raw: unknown): {
     .filter((x): x is PaulsTrade => x !== null)
     .slice(0, 5);
 
-  return { active, recent };
+  // Paul's response strips USD server-side. Even if a USD field leaked
+  // into stats, the PaulsTradesSection passes hideUsd=true so it never
+  // surfaces in the UI.
+  const stats = extractStats(t, recent);
+
+  return { active, recent, stats };
 }
 
 const OWN_ACTIVE_PATHS: string[][] = [
@@ -347,18 +595,24 @@ export function shapeOwnTrades(snapshotRaw: unknown): {
 }
 
 /**
- * Combine snapshot (own) + dedicated paul-trades endpoint into a single
+ * Combine the dedicated my-trades + paul-trades feeds into a single
  * TradesView. Either raw may be null/missing — caller will see empty
  * sections, not a crash.
  */
 export function buildTradesView(
-  snapshotRaw: unknown,
+  myRaw: unknown,
   paulRaw: unknown,
   fetchedAt: number,
 ): TradesView {
+  const my = shapeMyTrades(myRaw);
+  const pauls = shapePaulTrades(paulRaw);
   return {
-    your: shapeOwnTrades(snapshotRaw),
-    pauls: shapePaulTrades(paulRaw),
+    your: { active: my.active, recent: my.recent, stats: my.stats },
+    pauls,
+    yourMeta: {
+      hasExchange: my.hasExchange,
+      exchangeType: my.exchangeType,
+    },
     fetchedAt,
   };
 }
@@ -385,9 +639,15 @@ export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
     .filter((t): t is PaulsTrade => t !== null)
     .slice(0, 5);
 
+  const emptyStats: TradesStats = {
+    unrealizedPnlSum: null,
+    realizedPnlSum: null,
+    winRatePct: null,
+    closedCount: null,
+  };
   return {
-    your: { active: ownActive, recent: ownRecent },
-    pauls: { active: paulActive, recent: paulRecent },
+    your: { active: ownActive, recent: ownRecent, stats: emptyStats },
+    pauls: { active: paulActive, recent: paulRecent, stats: emptyStats },
     fetchedAt,
   };
 }

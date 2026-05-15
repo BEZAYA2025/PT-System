@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   getInitialAvenHistory,
+  getInitialMyTrades,
   getInitialPaulTrades,
   getRawSnapshot,
   requireUser,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/metrics";
 import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
 import { buildTradesView } from "@/lib/trades";
+import { buildBtcPriceView } from "@/lib/metrics";
 import { MarketPulse } from "@/components/dashboard/MarketPulse";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
@@ -37,8 +39,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [raw, paulRaw, history] = await Promise.all([
+  const [raw, myRaw, paulRaw, history] = await Promise.all([
     getRawSnapshot(),
+    getInitialMyTrades(),
     getInitialPaulTrades(),
     getInitialAvenHistory(50),
   ]);
@@ -47,7 +50,10 @@ export default async function DashboardPage() {
     ? buildMarketPulseView(raw as RawSnapshotMetrics, fetchedAt)
     : null;
   const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
-  const initialTrades = buildTradesView(raw, paulRaw, fetchedAt);
+  const initialTrades = buildTradesView(myRaw, paulRaw, fetchedAt);
+  const initialBtcPrice = raw
+    ? buildBtcPriceView(raw as RawSnapshotMetrics, fetchedAt).price
+    : null;
 
   const showTour = user.first_login_completed === false;
 
@@ -69,7 +75,10 @@ export default async function DashboardPage() {
       </MotionSection>
 
       <MotionSection tour="trades" delay={0.22}>
-        <TradesGrid initial={initialTrades} />
+        <TradesGrid
+          initial={initialTrades}
+          initialBtcPrice={initialBtcPrice}
+        />
       </MotionSection>
 
       {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
