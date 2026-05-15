@@ -222,13 +222,19 @@ function LastTradesTable({
   hideUsd: boolean;
   onSelect: (t: AnyTrade) => void;
 }) {
+  // Privacy: when hideUsd is true, this section is rendering Paul's
+  // trades — also hide the trade-id column and the "X total" count
+  // badge so members can't infer how many trades Paul has taken.
+  const hideId = hideUsd;
+  const hideCount = hideUsd;
+
   return (
     <div className="space-y-2">
       <div className="flex items-baseline gap-2">
         <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-muted-foreground">
           Last 5 trades
         </p>
-        {trades.length > 0 && (
+        {!hideCount && trades.length > 0 && (
           <span className="rounded-md bg-surface px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
             {trades.length} total
           </span>
@@ -246,7 +252,9 @@ function LastTradesTable({
             <table className="min-w-full divide-y divide-border text-sm">
               <thead className="bg-surface/40 text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
-                  <th scope="col" className="px-3 py-2 text-left">ID</th>
+                  {!hideId && (
+                    <th scope="col" className="px-3 py-2 text-left">ID</th>
+                  )}
                   <th scope="col" className="px-3 py-2 text-left">Symbol</th>
                   <th scope="col" className="px-3 py-2 text-left">Side</th>
                   <th scope="col" className="px-3 py-2 text-right">Entry</th>
@@ -265,6 +273,7 @@ function LastTradesTable({
                     trade={t}
                     fallbackIndex={i + 1}
                     hideUsd={hideUsd}
+                    hideId={hideId}
                     onClick={() => onSelect(t)}
                   />
                 ))}
@@ -280,6 +289,7 @@ function LastTradesTable({
                 trade={t}
                 fallbackIndex={i + 1}
                 hideUsd={hideUsd}
+                hideId={hideId}
                 onClick={() => onSelect(t)}
               />
             ))}
@@ -294,11 +304,13 @@ function LastTradeRow({
   trade,
   fallbackIndex,
   hideUsd,
+  hideId,
   onClick,
 }: {
   trade: AnyTrade;
   fallbackIndex: number;
   hideUsd: boolean;
+  hideId: boolean;
   onClick: () => void;
 }) {
   const positive = trade.pnlPct >= 0;
@@ -312,9 +324,11 @@ function LastTradeRow({
       onClick={onClick}
       className="cursor-pointer transition-colors hover:bg-surface/40"
     >
-      <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
-        {idLabel}
-      </td>
+      {!hideId && (
+        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+          {idLabel}
+        </td>
+      )}
       <td className="px-3 py-2 font-mono text-sm font-medium text-foreground">
         {trade.symbol}
       </td>
@@ -346,11 +360,13 @@ function LastTradeCard({
   trade,
   fallbackIndex,
   hideUsd,
+  hideId,
   onClick,
 }: {
   trade: AnyTrade;
   fallbackIndex: number;
   hideUsd: boolean;
+  hideId: boolean;
   onClick: () => void;
 }) {
   const positive = trade.pnlPct >= 0;
@@ -367,9 +383,11 @@ function LastTradeCard({
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="font-mono text-[10px] text-muted-foreground">
-            {idLabel}
-          </span>
+          {!hideId && (
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {idLabel}
+            </span>
+          )}
           <p className="truncate font-mono text-sm font-medium text-foreground">
             {trade.symbol}
           </p>
@@ -528,11 +546,12 @@ export function PaulsTradesSection({
   onSelect,
 }: CommonProps) {
   const winRate = stats.winRatePct;
-  const closed = stats.closedCount;
+  // Privacy: show win-rate alone — never the closed-trade count, since
+  // members shouldn't be able to infer how many trades Paul has taken
+  // (combined with the leak from a count this would let them reverse-
+  // engineer his daily volume).
   const headerStats =
-    winRate !== null && closed !== null
-      ? `Win-Rate ${winRate.toFixed(0)}% · ${closed} closed`
-      : null;
+    winRate !== null ? `Win-Rate ${winRate.toFixed(0)}%` : null;
 
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">

@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { IconArrowLeft } from "@tabler/icons-react";
 import { requireUser } from "@/lib/dal";
 import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
 import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCard";
@@ -16,13 +18,27 @@ export default async function SettingsPage() {
   const user = await requireUser();
 
   return (
-    <main id="main" className="px-6 py-10 sm:px-10 sm:py-14">
+    <main id="main" className="px-2 py-8 sm:px-4 sm:py-10">
       <div className="mx-auto max-w-3xl space-y-8">
-        <header>
-          <p className="text-sm text-muted-foreground">Settings</p>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Account &amp; subscription
-          </h1>
+        <header className="space-y-3">
+          {/* Prominent back button — large hit target so it's easy to find
+              on mobile. Sits above the title rather than as a tiny corner
+              link, per Round 9 layout polish. */}
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-emerald/40 hover:bg-emerald/[0.04] hover:text-foreground"
+          >
+            <IconArrowLeft size={16} stroke={1.75} aria-hidden />
+            Back to dashboard
+          </Link>
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-muted-foreground">
+              Settings
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+              Account &amp; subscription
+            </h1>
+          </div>
         </header>
 
         <SubscriptionCard

@@ -27,6 +27,52 @@ const TREND_TONE: Record<Trend, string> = {
   neutral: "text-muted-foreground",
 };
 
+// Per-accent border + faint background tints. Values stay readable on
+// the dark surface without overwhelming the grid layout.
+type Accent =
+  | "neutral"
+  | "fear"
+  | "anxious"
+  | "greedy"
+  | "extreme-greed"
+  | "bull"
+  | "bear"
+  | "cyan";
+
+const ACCENT_CARD: Record<Accent, string> = {
+  neutral: "border-border bg-surface",
+  fear: "border-red-500/35 bg-gradient-to-br from-surface to-red-500/[0.06]",
+  anxious:
+    "border-orange-500/35 bg-gradient-to-br from-surface to-orange-500/[0.06]",
+  greedy:
+    "border-emerald/35 bg-gradient-to-br from-surface to-emerald/[0.06]",
+  "extreme-greed":
+    "border-lime-400/40 bg-gradient-to-br from-surface to-lime-400/[0.07]",
+  bull: "border-emerald/35 bg-gradient-to-br from-surface to-emerald/[0.05]",
+  bear: "border-red-500/35 bg-gradient-to-br from-surface to-red-500/[0.05]",
+  cyan: "border-cyan-400/35 bg-gradient-to-br from-surface to-cyan-400/[0.05]",
+};
+
+const ACCENT_VALUE: Record<Accent, string> = {
+  neutral: "text-foreground",
+  fear: "text-red-300",
+  anxious: "text-orange-300",
+  greedy: "text-emerald",
+  "extreme-greed": "text-lime-300",
+  bull: "text-emerald",
+  bear: "text-red-300",
+  cyan: "text-cyan-300",
+};
+
+function fearGreedAccent(value: number | null): Accent {
+  if (value === null) return "neutral";
+  if (value <= 25) return "fear";
+  if (value <= 45) return "anxious";
+  if (value <= 55) return "neutral";
+  if (value <= 75) return "greedy";
+  return "extreme-greed";
+}
+
 interface Props {
   initial: MarketPulseView | null;
 }
@@ -145,18 +191,21 @@ function CardShell({
   tooltip,
   stale,
   delta,
+  accent = "neutral",
   children,
 }: {
   label: string;
   tooltip: { title: string; body: string };
   stale: boolean;
   delta?: { value: string; trend: Trend } | null;
+  accent?: Accent;
   children: React.ReactNode;
 }) {
   return (
     <li
       className={[
-        "min-w-[155px] rounded-xl border border-border bg-surface p-4 transition-opacity",
+        "min-w-[155px] rounded-xl border p-4 transition-opacity",
+        ACCENT_CARD[accent],
         stale ? "opacity-70" : "",
       ].join(" ")}
     >
@@ -197,19 +246,21 @@ function FearGreedCard({
   stale: boolean;
 }) {
   const value = data?.value ?? null;
+  const accent = fearGreedAccent(value);
   return (
     <CardShell
       label="Fear & Greed"
       tooltip={{ title: "Crypto Fear & Greed Index", body: PULSE_TOOLTIPS.fearGreed }}
       stale={stale}
+      accent={accent}
     >
       <p className="flex items-baseline gap-1">
-        <span className="font-mono text-2xl font-semibold text-foreground">
+        <span className={`font-mono text-2xl font-semibold ${ACCENT_VALUE[accent]}`}>
           {value !== null ? value : "—"}
         </span>
         <span className="font-mono text-xs text-muted-foreground">/ 100</span>
       </p>
-      <p className={`mt-1 text-[11px] ${TREND_TONE[data?.trend ?? "neutral"]}`}>
+      <p className={`mt-1 text-[11px] ${ACCENT_VALUE[accent]}`}>
         {data?.label ?? "—"}
       </p>
     </CardShell>
@@ -225,13 +276,16 @@ function FundingCard({
 }) {
   const rate = data?.rate ?? null;
   const pct = rate !== null && Math.abs(rate) < 0.01 ? rate * 100 : rate;
+  const accent: Accent =
+    rate === null ? "neutral" : rate > 0 ? "bull" : rate < 0 ? "bear" : "neutral";
   return (
     <CardShell
       label="BTC Funding"
       tooltip={{ title: "Perpetual funding rate", body: PULSE_TOOLTIPS.funding }}
       stale={stale}
+      accent={accent}
     >
-      <p className="font-mono text-lg font-semibold text-foreground">
+      <p className={`font-mono text-lg font-semibold ${ACCENT_VALUE[accent]}`}>
         {pct !== null
           ? `${pct > 0 ? "+" : ""}${pct.toFixed(4)}%`
           : "—"}
@@ -251,8 +305,8 @@ function fmtCompactUsd(n: number | null): string {
   return `$${n.toLocaleString()}`;
 }
 
-function fmtCompactBtc(n: number | null): string {
-  if (n === null) return null as unknown as string;
+function fmtCompactBtc(n: number | null): string | null {
+  if (n === null) return null;
   if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M BTC`;
   if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k BTC`;
   return `${n.toFixed(2)} BTC`;
@@ -268,6 +322,9 @@ function OpenInterestCard({
   const usd = data?.usd ?? null;
   const btc = data?.btc ?? null;
   const delta = data?.deltaPct ?? null;
+  // OI itself stays neutral chrome — the delta arrow carries the
+  // bull/bear signal (large OI rise on rally = leveraged push, on
+  // dump = capitulation; tone shouldn't double-encode).
   return (
     <CardShell
       label="Open Interest"
@@ -305,19 +362,28 @@ function LsRatioCard({
   const value = data?.value ?? null;
   const longP = data?.longPct ?? null;
   const shortP = data?.shortPct ?? null;
+  const accent: Accent =
+    value === null ? "neutral" : value > 1 ? "bull" : value < 1 ? "bear" : "neutral";
   return (
     <CardShell
       label="L/S Ratio"
       tooltip={{ title: "Long / Short ratio", body: PULSE_TOOLTIPS.lsRatio }}
       stale={stale}
+      accent={accent}
     >
-      <p className={`font-mono text-lg font-semibold ${TREND_TONE[data?.trend ?? "neutral"]}`}>
+      <p className={`font-mono text-lg font-semibold ${ACCENT_VALUE[accent]}`}>
         {value !== null ? value.toFixed(2) : "—"}
       </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">
-        {longP !== null && shortP !== null
-          ? `${longP.toFixed(0)}% L · ${shortP.toFixed(0)}% S`
-          : "Share split unavailable"}
+      <p className="mt-1 text-[11px]">
+        {longP !== null && shortP !== null ? (
+          <span>
+            <span className="text-emerald">{longP.toFixed(0)}% L</span>
+            <span className="text-muted-foreground"> · </span>
+            <span className="text-red-300">{shortP.toFixed(0)}% S</span>
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Share split unavailable</span>
+        )}
       </p>
     </CardShell>
   );
@@ -332,13 +398,22 @@ function BtcDominanceCard({
 }) {
   const dom = data?.pct ?? null;
   const cap = data?.marketCapUsd ?? null;
+  // BTC.D rising = capital rotating into BTC (cyan growth);
+  // falling = alt-season tilt (rose). When trend is neutral, leave neutral.
+  const accent: Accent =
+    data?.trend === "bullish"
+      ? "cyan"
+      : data?.trend === "bearish"
+        ? "bear"
+        : "neutral";
   return (
     <CardShell
       label="BTC Dominance"
       tooltip={{ title: "Bitcoin market-cap dominance", body: PULSE_TOOLTIPS.btcDominance }}
       stale={stale}
+      accent={accent}
     >
-      <p className="font-mono text-lg font-semibold text-foreground">
+      <p className={`font-mono text-lg font-semibold ${ACCENT_VALUE[accent]}`}>
         {dom !== null ? `${dom.toFixed(2)}%` : "—"}
       </p>
       <p className="mt-1 text-[11px] text-muted-foreground">

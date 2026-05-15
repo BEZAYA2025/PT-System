@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { IconBook2, IconClockHour4 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import { AvenAvatar } from "./AvenAvatar";
+import { BriefAvatar } from "./BriefAvatar";
 import { timeAgo } from "@/lib/format";
 import type { DailyBriefView } from "@/lib/daily-brief";
 
@@ -12,15 +12,18 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
 
   if (!brief) {
     return (
-      <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-        <div className="flex items-start gap-3">
-          <AvenAvatar size={36} online={false} />
+      <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 sm:p-8">
+        <div className="flex items-start gap-4">
+          <BriefAvatar size={36} />
           <div>
-            <h2 className="text-lg font-semibold tracking-tight text-foreground">
+            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-amber-300/80">
               Today&apos;s Brief
+            </p>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+              Aven is preparing today&apos;s brief…
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Aven is preparing today&apos;s brief…
+              Check back shortly — usually live around the open.
             </p>
           </div>
         </div>
@@ -30,14 +33,19 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
 
   return (
     <>
-      <section className="rounded-2xl border border-border bg-surface p-6 sm:p-8">
-        <div className="flex items-start gap-3">
-          <AvenAvatar size={36} online={false} />
+      <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 sm:p-8">
+        <div className="flex items-start gap-4">
+          <BriefAvatar size={36} />
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <h2 className="text-lg font-semibold tracking-tight text-foreground">
-                Today&apos;s Brief
-              </h2>
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-amber-300/80">
+                  Today&apos;s Brief
+                </p>
+                <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
+                  Morning briefing
+                </h2>
+              </div>
               <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
                 Aven · {timeAgo(brief.generatedAt)}
               </p>
