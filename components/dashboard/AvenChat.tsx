@@ -107,7 +107,19 @@ export function AvenChat({
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-emerald/25 bg-gradient-to-br from-surface via-surface to-emerald/[0.04] shadow-[0_0_60px_-20px_rgba(16,185,129,0.3),0_8px_32px_-12px_rgba(0,0,0,0.4)]">
+    <section className="relative overflow-hidden rounded-2xl border border-emerald/30 bg-gradient-to-br from-surface via-surface to-emerald/[0.05] shadow-[0_0_80px_-20px_rgba(16,185,129,0.4),0_8px_36px_-12px_rgba(0,0,0,0.5)]">
+      {/* Subtle ambient halo behind the avatar so the header feels alive
+          without a heavy on-card pattern. Pointer-events-none so it never
+          blocks chat interactions. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -left-12 -top-16 h-48 w-48 rounded-full bg-gradient-radial from-emerald/[0.18] via-emerald/[0.05] to-transparent blur-2xl"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.04) 45%, transparent 70%)",
+        }}
+      />
+
       <ChatHeader
         quota={chat.quota}
         streamConnected={chat.streamConnected}
@@ -116,7 +128,7 @@ export function AvenChat({
 
       <div
         ref={scrollRef}
-        className="flex max-h-[480px] flex-col gap-4 overflow-y-auto px-6 py-5 sm:px-8"
+        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto px-6 py-6 sm:px-8 sm:py-7"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -184,22 +196,41 @@ function ChatHeader({
   messageCount: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-emerald/15 px-6 py-5 sm:px-8">
-      <div className="flex items-center gap-3">
-        <AvenAvatar size={40} online={streamConnected} breath />
-        <div>
-          <p className="text-base font-semibold tracking-tight text-foreground">
+    <div className="relative flex items-center justify-between gap-4 border-b border-emerald/20 px-6 py-5 sm:gap-6 sm:px-8 sm:py-6">
+      <div className="flex items-center gap-4 sm:gap-5">
+        {/* Avatar lives in its own padded slot so the pulse-rings have
+            breathing room and don't overlap the wordmark. */}
+        <span className="relative inline-flex shrink-0 items-center justify-center">
+          <AvenAvatar size={36} online={streamConnected} breath />
+        </span>
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/80">
+            AI Mentor
+          </p>
+          <p className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
             Aven
           </p>
-          <p className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-emerald">
+          <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-emerald">
             <span
               aria-hidden
               className={[
-                "size-1.5 rounded-full",
-                streamConnected ? "bg-emerald" : "bg-muted-foreground",
+                "relative inline-flex size-1.5",
               ].join(" ")}
-            />
-            {streamConnected ? "Online" : "Reconnecting…"}
+            >
+              {streamConnected && (
+                <span
+                  className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+                  style={{ animationDuration: "2s" }}
+                />
+              )}
+              <span
+                className={[
+                  "relative inline-flex size-1.5 rounded-full",
+                  streamConnected ? "bg-emerald" : "bg-muted-foreground",
+                ].join(" ")}
+              />
+            </span>
+            {streamConnected ? "Online · streaming" : "Reconnecting…"}
           </p>
         </div>
       </div>
