@@ -4,11 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBrandTelegram,
-  IconChartCandle,
   IconChevronUp,
-  IconCrosshair,
   IconDeviceLaptop,
-  IconHelp,
   IconLoader2,
   IconMessageCircle,
   IconMicrophone,
@@ -123,32 +120,22 @@ export function AvenChat({
         }}
       />
 
-      <ChatHeader
+      <AvenLiveBar
         quota={chat.quota}
         streamConnected={chat.streamConnected}
       />
 
-      <PromptRotator
-        userMessageCount={
-          chat.messages.filter((m) => m.role === "user").length
-        }
-        onPick={(text) => {
-          chat.setInput(text);
-          // Defer so React commits the input value before send() reads it.
-          setTimeout(() => void chat.send(), 0);
-        }}
-      />
-
-      {/* Soft gradient fade between the header band and the chat scroll —
-          taller in Round 11 to keep the first bubble away from the dividers. */}
+      {/* Single gradient hairline — replaces Round 11's stacked
+          header-border + rotator-border + h-6 fade-band. One subtle line
+          gives the bar/chat boundary without feeling double-walled. */}
       <span
         aria-hidden
-        className="pointer-events-none block h-6 bg-gradient-to-b from-emerald/[0.06] via-emerald/[0.02] to-transparent"
+        className="pointer-events-none block h-px bg-gradient-to-r from-transparent via-emerald/25 to-transparent"
       />
 
       <div
         ref={scrollRef}
-        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/40 px-6 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12"
+        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/40 px-6 pb-8 pt-8 sm:px-8 sm:pb-10 sm:pt-10"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -206,66 +193,156 @@ export function AvenChat({
 
 // ---------------------------------------------------------------------------
 
-// Round 11 header: text-light. AI MENTOR + Aven on the left, capability
-// icons + status dot on the right (no "Online" / "Unlimited" / "X messages"
-// labels — words removed per Paul's spec, identity carries the meaning).
-function ChatHeader({
+// Round 12: Aven bar is now a Live-Stream area rather than a chat-header.
+// Top row stays the identity strip (avatar · AI Mentor / Aven · status dot)
+// but the capability-icon cluster + "Try …" prompt rotator are gone. In
+// their place a rotating "▸ Live: …" observation feed surfaces what Aven
+// is currently watching — visceral aliveness that's distinct from the
+// chat thread below.
+//
+// Phase-1 ships frontend mock observations (the array below). Phase-2
+// will swap the rotator for an SSE-fed stream from the VPS once
+// /api/aven/observations exists. The UI contract — single rotating
+// string, rendered via <LiveObservation /> — stays the same.
+
+function AvenLiveBar({
   quota,
   streamConnected,
 }: {
   quota: QuotaState | null;
   streamConnected: boolean;
 }) {
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const reduce = useReducedMotion();
+
+  // Hovering the bar freezes rotation so a member can finish reading the
+  // current observation. Reduced-motion users get a longer dwell.
+  useEffect(() => {
+    if (paused) return;
+    const dwell = reduce ? 11000 : 9000;
+    const id = setInterval(() => {
+      setIdx((i) => (i + 1) % LIVE_OBSERVATIONS.length);
+    }, dwell);
+    return () => clearInterval(id);
+  }, [paused, reduce]);
+
+  const obs = LIVE_OBSERVATIONS[idx];
+
   return (
-    <div className="relative flex items-center justify-between gap-4 border-b border-emerald/20 px-6 py-5 sm:gap-6 sm:px-8 sm:py-6">
-      <div className="flex items-center gap-4 sm:gap-5">
-        <AvenAvatar size={36} online={streamConnected} breath />
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
-            AI Mentor
-          </p>
-          <p className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
-            Aven
-          </p>
+    <div
+      className="relative px-6 pb-4 pt-5 sm:px-8 sm:pb-5 sm:pt-6"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <AvenAvatar size={28} online={streamConnected} breath />
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
+              AI Mentor
+            </p>
+            <p className="text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
+              Aven
+            </p>
+          </div>
         </div>
+        <StatusDot online={streamConnected} quota={quota} />
       </div>
 
-      <div className="flex items-center gap-3 sm:gap-4">
-        <CapabilityRow />
-        <StatusDot
-          online={streamConnected}
-          quota={quota}
-        />
+      <div className="mt-3 sm:mt-4">
+        <LiveObservation text={obs} reduce={!!reduce} />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Capability row — small emerald-tinted icons surfacing what Aven can do
-// without text-noise. Hidden below sm so the mobile header stays clean.
+// Live observations — frontend mock for Phase-1. Cover the categories
+// Paul listed: market state, setup hints, funding flips, liquidity
+// events, status updates. The array order also drives the rotation
+// order; shuffle on the backend later if it gets repetitive.
 // ---------------------------------------------------------------------------
 
-const CAPABILITIES = [
-  { Icon: IconMessageCircle, label: "Chat" },
-  { Icon: IconMicrophone, label: "Voice input" },
-  { Icon: IconBrandTelegram, label: "Telegram-synced" },
-  { Icon: IconChartCandle, label: "Live market data" },
-  { Icon: IconCrosshair, label: "Setup analysis" },
-] as const;
+const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
+  "Watching BTC 1H bull-cross at $80,308…",
+  "BTC at $81,200 · 4H VMC w7 forming",
+  "Setup detected: BTCUSDT LONG · 4H · score 8/10",
+  "Funding flipped negative on ETH-perp — bear shift watch",
+  "Liquidity sweep at $79,827 · sweep-reversion pattern",
+  "Analysing 4H structure across majors…",
+  "ETH 1H momentum building above $3,420",
+  "OI rising on perp longs — late-comers chasing",
+];
 
-function CapabilityRow() {
+function LiveObservation({
+  text,
+  reduce,
+}: {
+  text: string;
+  reduce: boolean;
+}) {
+  // Keying the wrapper on `text` forces React to remount on each rotation
+  // so the entry animation re-fires. Cheap — the inner DOM is tiny.
   return (
-    <div className="hidden items-center gap-1.5 sm:flex" aria-label="Aven capabilities">
-      {CAPABILITIES.map(({ Icon, label }) => (
-        <span
-          key={label}
-          title={label}
-          className="inline-flex size-7 items-center justify-center rounded-md text-emerald/65 transition-all hover:scale-110 hover:bg-emerald/[0.08] hover:text-emerald"
-        >
-          <Icon size={14} stroke={1.75} aria-hidden />
-        </span>
-      ))}
+    <div
+      key={text}
+      aria-live="off"
+      className={[
+        "flex items-baseline gap-2 overflow-hidden text-[13px] leading-snug",
+        reduce ? "" : "aven-obs-in",
+      ].join(" ")}
+    >
+      <span aria-hidden className="shrink-0 text-emerald/80">
+        ▸
+      </span>
+      <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/75">
+        Live
+      </span>
+      <span
+        className={[
+          "truncate italic",
+          reduce ? "text-foreground/85" : "aven-obs-shimmer",
+        ].join(" ")}
+      >
+        &ldquo;{text}&rdquo;
+      </span>
+      <style>{`
+        @keyframes aven-obs-in {
+          0% { opacity: 0; transform: translateX(8px); }
+          60% { opacity: 1; }
+          100% { opacity: 1; transform: translateX(0); }
+        }
+        .aven-obs-in {
+          animation: aven-obs-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes aven-obs-shimmer {
+          0% { background-position: -150% 0; }
+          100% { background-position: 250% 0; }
+        }
+        .aven-obs-shimmer {
+          background: linear-gradient(
+            90deg,
+            rgba(243, 244, 246, 0.85) 0%,
+            rgba(110, 231, 183, 1) 50%,
+            rgba(243, 244, 246, 0.85) 100%
+          );
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          background-clip: text;
+          color: transparent;
+          animation: aven-obs-shimmer 1.6s ease-out 1;
+          animation-fill-mode: forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .aven-obs-shimmer {
+            animation: none;
+            background: none;
+            -webkit-text-fill-color: rgba(243, 244, 246, 0.85);
+            color: rgba(243, 244, 246, 0.85);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -314,103 +391,6 @@ function quotaTitle(online: boolean, quota: QuotaState | null): string {
   if (quota.isUnlimited) return `${conn} · unlimited messages`;
   if (quota.limit === null || quota.limit === 0) return conn;
   return `${conn} · ${quota.used}/${quota.limit} today`;
-}
-
-// ---------------------------------------------------------------------------
-// Prompt rotator — single rotating "Try …" line under the header. Replaces
-// the static three-chip strip from Round 10. Auto-fades after the user
-// has sent three messages; the "?" pill restores it. Click-to-send.
-// ---------------------------------------------------------------------------
-
-const STARTER_PROMPTS: ReadonlyArray<string> = [
-  "How's BTC right now?",
-  "Explain Fibonacci retracements in Paul's method.",
-  "What's a good setup today based on the live market?",
-  "Review my last open trade.",
-];
-
-function PromptRotator({
-  userMessageCount,
-  onPick,
-}: {
-  userMessageCount: number;
-  onPick: (text: string) => void;
-}) {
-  const [dismissed, setDismissed] = useState(false);
-  const [idx, setIdx] = useState(0);
-  const [showing, setShowing] = useState(true);
-  const reduce = useReducedMotion();
-
-  const autoVisible = userMessageCount < 3;
-  const visible = autoVisible && !dismissed;
-
-  // Fade-out → swap text → fade-in every ~5.5s. Skip the animation when
-  // the user prefers reduced motion.
-  useEffect(() => {
-    if (!visible) return;
-    if (reduce) {
-      const id = setInterval(
-        () => setIdx((i) => (i + 1) % STARTER_PROMPTS.length),
-        5500,
-      );
-      return () => clearInterval(id);
-    }
-    const id = setInterval(() => {
-      setShowing(false);
-      const swap = setTimeout(() => {
-        setIdx((i) => (i + 1) % STARTER_PROMPTS.length);
-        setShowing(true);
-      }, 220);
-      return () => clearTimeout(swap);
-    }, 5500);
-    return () => clearInterval(id);
-  }, [visible, reduce]);
-
-  if (!visible) {
-    return (
-      <div className="flex justify-end border-b border-emerald/10 bg-surface/30 px-6 py-2 sm:px-8">
-        <button
-          type="button"
-          onClick={() => setDismissed(false)}
-          aria-label="Show starter prompts"
-          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-emerald/40 hover:text-emerald"
-        >
-          <IconHelp size={11} stroke={1.75} aria-hidden />
-        </button>
-      </div>
-    );
-  }
-
-  const current = STARTER_PROMPTS[idx];
-
-  return (
-    <div className="flex items-center gap-3 border-b border-emerald/10 bg-surface/30 px-6 py-2.5 sm:px-8">
-      <button
-        type="button"
-        onClick={() => onPick(current)}
-        aria-label={`Send: ${current}`}
-        className="group flex flex-1 items-center gap-2 truncate text-left"
-      >
-        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-emerald/70">
-          Try
-        </span>
-        <span
-          className="truncate text-[13px] text-muted-foreground transition-opacity duration-200 group-hover:text-foreground"
-          style={{ opacity: showing ? 1 : 0 }}
-        >
-          &ldquo;{current}&rdquo;
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={() => setDismissed(true)}
-        aria-label="Hide prompts"
-        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
-      >
-        <IconX size={12} stroke={1.75} aria-hidden />
-      </button>
-    </div>
-  );
 }
 
 // ---------------------------------------------------------------------------
