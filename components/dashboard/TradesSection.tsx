@@ -23,14 +23,14 @@ import type {
 export function fmtPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n >= 1000)
-    return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1) return n.toFixed(2);
   return n.toFixed(4);
 }
 
 function fmtSignedUsd(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  const abs = Math.abs(n).toLocaleString(undefined, {
+  const abs = Math.abs(n).toLocaleString("en-US", {
     maximumFractionDigits: 2,
   });
   return `${sign}$${abs}`;
@@ -45,7 +45,7 @@ function fmtBigUsd(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n === 0) return "$0";
   const sign = n > 0 ? "+" : "−";
-  const abs = Math.abs(n).toLocaleString(undefined, {
+  const abs = Math.abs(n).toLocaleString("en-US", {
     maximumFractionDigits: 0,
   });
   return `${sign}$${abs}`;
@@ -54,7 +54,7 @@ function fmtBigUsd(n: number | null): string {
 function fmtCompactPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n >= 1000)
-    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   return `$${n.toFixed(2)}`;
 }
 

@@ -6,13 +6,16 @@ import {
   type BtcPriceView,
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
+import { usePolling } from "@/lib/use-polling";
 
-const POLL_INTERVAL_MS = 60_000;
+// Round-14d: dropped 60s → 5s with Page Visibility pause. Price needs
+// to feel live; the hook stops the loop while the tab is backgrounded.
+const POLL_INTERVAL_MS = 5_000;
 
 function fmtPrice(n: number | null): string {
   if (n === null) return "—";
   if (n >= 1000)
-    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+    return `$${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   return `$${n.toFixed(2)}`;
 }
 
@@ -43,10 +46,7 @@ export function BtcPricePill({ initial }: Props) {
     if (!initial) void fetchOnce();
   }, [initial, fetchOnce]);
 
-  useEffect(() => {
-    const id = setInterval(() => void fetchOnce(), POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [fetchOnce]);
+  usePolling({ fn: fetchOnce, intervalMs: POLL_INTERVAL_MS });
 
   if (!view || view.price === null) return null;
 

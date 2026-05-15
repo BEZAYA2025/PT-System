@@ -65,7 +65,7 @@ function formatDate(input: string | number | null): string {
         ? new Date(input > 1e12 ? input : input * 1000)
         : new Date(input);
     if (Number.isNaN(d.getTime())) return String(input);
-    return d.toLocaleDateString(undefined, {
+    return d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",

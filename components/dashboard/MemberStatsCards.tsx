@@ -1,11 +1,23 @@
 "use client";
 
-import type { TradesStats, YourTradesMeta } from "@/lib/trades";
+import { useCallback, useRef, useState } from "react";
+import {
+  buildTradesView,
+  type TradesStats,
+  type YourTradesMeta,
+} from "@/lib/trades";
+import {
+  buildBtcPriceView,
+  type RawSnapshotMetrics,
+} from "@/lib/metrics";
+import { usePolling } from "@/lib/use-polling";
+
+const POLL_INTERVAL_MS = 5_000;
 
 function fmtCompactPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n >= 1000)
-    return `$${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+    return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   return `$${n.toFixed(2)}`;
 }
 
@@ -13,7 +25,7 @@ function fmtBigUsd(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n === 0) return "$0";
   const sign = n > 0 ? "+" : "−";
-  const abs = Math.abs(n).toLocaleString(undefined, {
+  const abs = Math.abs(n).toLocaleString("en-US", {
     maximumFractionDigits: 0,
   });
   return `${sign}$${abs}`;
@@ -22,6 +34,11 @@ function fmtBigUsd(n: number | null): string {
 function toneFor(n: number | null): string {
   if (n === null || n === 0) return "text-foreground";
   return n > 0 ? "text-emerald" : "text-red-300";
+}
+
+function fmtSignedPct(n: number): string {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  return `${sign}${Math.abs(n).toFixed(2)}%`;
 }
 
 interface Props {
@@ -34,10 +51,53 @@ interface Props {
  * Top-level dashboard stats — extracted from the trades sections so member
  * KPIs are visible above the fold. Cards 2+3 fall back to a friendly
  * "connect exchange" hint when no exchange is linked.
+ *
+ * Round-14d: card maintains its own state on top of the SSR props and
+ * polls /snapshot + /my-trades every 5s (Page Visibility pause). The
+ * Unrealized PnL value updates in near-real-time without a router refresh.
  */
-export function MemberStatsCards({ btcPrice, stats, meta }: Props) {
+export function MemberStatsCards({
+  btcPrice: initialBtcPrice,
+  stats: initialStats,
+  meta: initialMeta,
+}: Props) {
+  const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
+  const [stats, setStats] = useState<TradesStats>(initialStats);
+  const [meta, setMeta] = useState<YourTradesMeta | undefined>(initialMeta);
+  const inFlight = useRef(false);
+
+  const refresh = useCallback(async () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    try {
+      const [snapRes, myRes] = await Promise.all([
+        fetch("/api/proxy/snapshot", { cache: "no-store" }),
+        fetch("/api/proxy/cockpit/my-trades", { cache: "no-store" }),
+      ]);
+      if (snapRes.ok) {
+        const raw = (await snapRes.json()) as RawSnapshotMetrics;
+        setBtcPrice(buildBtcPriceView(raw, Date.now()).price);
+      }
+      if (myRes.ok) {
+        const myRaw = await myRes.json().catch(() => null);
+        // buildTradesView wants both my + paul; we only need the `your`
+        // half so pass null for paul (it doesn't affect your.stats).
+        const view = buildTradesView(myRaw, null, Date.now());
+        setStats(view.your.stats);
+        if (view.yourMeta) setMeta(view.yourMeta);
+      }
+    } catch {
+      // Silent — top-card values just don't refresh until next tick.
+    } finally {
+      inFlight.current = false;
+    }
+  }, []);
+
+  usePolling({ fn: refresh, intervalMs: POLL_INTERVAL_MS });
+
   const connected = meta?.hasExchange ?? false;
   const unrealized = stats.unrealizedPnlSum;
+  const unrealizedPct = stats.unrealizedPnlPct;
   const realized = stats.realizedPnlSum;
   const winRate = stats.winRatePct;
   const closed = stats.closedCount;
@@ -65,7 +125,15 @@ export function MemberStatsCards({ btcPrice, stats, meta }: Props) {
             <BigValue tone={toneFor(unrealized)}>
               {fmtBigUsd(unrealized)}
             </BigValue>
-            <SubLine muted>across open positions</SubLine>
+            <SubLine muted>
+              {unrealizedPct !== null ? (
+                <span className={toneFor(unrealizedPct)}>
+                  {fmtSignedPct(unrealizedPct)}
+                </span>
+              ) : null}
+              {unrealizedPct !== null && <span aria-hidden>·</span>}
+              <span>across open positions</span>
+            </SubLine>
           </>
         ) : (
           <>

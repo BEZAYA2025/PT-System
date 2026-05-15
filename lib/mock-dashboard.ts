@@ -323,6 +323,7 @@ export const mockTradesView: TradesView = {
     ...mockYourTrades,
     stats: {
       unrealizedPnlSum: 1560.5,
+      unrealizedPnlPct: 12.4,
       realizedPnlSum: 1573,
       winRatePct: 75,
       closedCount: 4,
@@ -332,6 +333,7 @@ export const mockTradesView: TradesView = {
     ...mockPaulsTrades,
     stats: {
       unrealizedPnlSum: null,
+      unrealizedPnlPct: null,
       realizedPnlSum: null,
       winRatePct: 80,
       closedCount: 5,

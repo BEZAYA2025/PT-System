@@ -115,8 +115,14 @@ function TriangleGlyph({ size }: { size: number }) {
           <stop offset="100%" stopColor="#10b981" />
         </linearGradient>
       </defs>
+      {/* Round-14a: centroid sat at y=18.67 in the previous coords
+          (apex 4 / base 26 / centroid (4+26+26)/3). That offset made
+          the triangle read low within its wrapper, so the avatar
+          looked top-shifted next to the centred "AI Mentor / Aven"
+          text. New coords (apex 1.33 / base 23.33) preserve the same
+          22-unit height while putting the centroid exactly at y=16. */}
       <polygon
-        points="16,4 28.5,26 3.5,26"
+        points="16,1.33 28.5,23.33 3.5,23.33"
         fill="url(#aven-tri-grad)"
         stroke="url(#aven-tri-grad)"
         strokeWidth="3"

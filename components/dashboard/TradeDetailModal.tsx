@@ -7,14 +7,14 @@ import type { AnyTrade } from "@/lib/trades";
 
 function fmtPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
-  if (n >= 1000) return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (n >= 1000) return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
   if (n >= 1) return n.toFixed(2);
   return n.toFixed(4);
 }
 
 function fmtSignedUsd(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  const v = Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
   return `${sign}$${v}`;
 }
 
@@ -33,13 +33,13 @@ function fmtIsoUtc(iso: string | null): string {
   try {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "—";
-    const date = d.toLocaleDateString(undefined, {
+    const date = d.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
       timeZone: "UTC",
     });
-    const time = d.toLocaleTimeString(undefined, {
+    const time = d.toLocaleTimeString("en-US", {
       hour: "2-digit",
       minute: "2-digit",
       timeZone: "UTC",
