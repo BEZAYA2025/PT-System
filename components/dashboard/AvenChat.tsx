@@ -4,7 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBrandTelegram,
+  IconChartCandle,
   IconChevronUp,
+  IconCrosshair,
   IconDeviceLaptop,
   IconHelp,
   IconLoader2,
@@ -124,10 +126,9 @@ export function AvenChat({
       <ChatHeader
         quota={chat.quota}
         streamConnected={chat.streamConnected}
-        messageCount={chat.messages.length}
       />
 
-      <SuggestionStrip
+      <PromptRotator
         userMessageCount={
           chat.messages.filter((m) => m.role === "user").length
         }
@@ -139,15 +140,15 @@ export function AvenChat({
       />
 
       {/* Soft gradient fade between the header band and the chat scroll —
-          stops the first bubble from kissing the header divider. */}
+          taller in Round 11 to keep the first bubble away from the dividers. */}
       <span
         aria-hidden
-        className="pointer-events-none block h-3 bg-gradient-to-b from-emerald/[0.05] to-transparent"
+        className="pointer-events-none block h-6 bg-gradient-to-b from-emerald/[0.06] via-emerald/[0.02] to-transparent"
       />
 
       <div
         ref={scrollRef}
-        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/30 px-6 py-7 sm:px-8 sm:py-9"
+        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/40 px-6 pb-8 pt-10 sm:px-8 sm:pb-10 sm:pt-12"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -205,23 +206,20 @@ export function AvenChat({
 
 // ---------------------------------------------------------------------------
 
+// Round 11 header: text-light. AI MENTOR + Aven on the left, capability
+// icons + status dot on the right (no "Online" / "Unlimited" / "X messages"
+// labels — words removed per Paul's spec, identity carries the meaning).
 function ChatHeader({
   quota,
   streamConnected,
-  messageCount,
 }: {
   quota: QuotaState | null;
   streamConnected: boolean;
-  messageCount: number;
 }) {
   return (
     <div className="relative flex items-center justify-between gap-4 border-b border-emerald/20 px-6 py-5 sm:gap-6 sm:px-8 sm:py-6">
       <div className="flex items-center gap-4 sm:gap-5">
-        {/* Avatar lives in its own padded slot so the pulse-rings have
-            breathing room and don't overlap the wordmark. */}
-        <span className="relative inline-flex shrink-0 items-center justify-center">
-          <AvenAvatar size={36} online={streamConnected} breath />
-        </span>
+        <AvenAvatar size={36} online={streamConnected} breath />
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
             AI Mentor
@@ -229,76 +227,109 @@ function ChatHeader({
           <p className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
             Aven
           </p>
-          <p className="mt-0.5 text-[12px] text-muted-foreground">
-            Trading methodology · live market context
-          </p>
         </div>
       </div>
 
-      <div className="flex flex-col items-end gap-1.5">
-        <span
-          className={[
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-            streamConnected
-              ? "border-emerald/35 bg-emerald/[0.08] text-emerald"
-              : "border-border bg-surface text-muted-foreground",
-          ].join(" ")}
-        >
-          <span aria-hidden className="relative inline-flex size-1.5">
-            {streamConnected && (
-              <span
-                className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-                style={{ animationDuration: "2s" }}
-              />
-            )}
-            <span
-              className={[
-                "relative inline-flex size-1.5 rounded-full",
-                streamConnected ? "bg-emerald" : "bg-muted-foreground",
-              ].join(" ")}
-            />
-          </span>
-          {streamConnected ? "Online" : "Reconnecting…"}
-        </span>
-
-        {quota ? (
-          quota.isUnlimited ? (
-            <p className="font-mono text-[10px] uppercase tracking-wider text-emerald/80">
-              Unlimited
-            </p>
-          ) : (
-            <QuotaPill quota={quota} />
-          )
-        ) : (
-          <p className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:block">
-            {messageCount} {messageCount === 1 ? "message" : "messages"}
-          </p>
-        )}
+      <div className="flex items-center gap-3 sm:gap-4">
+        <CapabilityRow />
+        <StatusDot
+          online={streamConnected}
+          quota={quota}
+        />
       </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Educational suggestion strip — clickable starter prompts. Auto-fades after
-// the first three user messages; a small "?" button restores them on demand.
-// Lives in component-state only (no localStorage), so a fresh tab gives a
-// fresh hint surface, but in-session dismissal is respected.
+// Capability row — small emerald-tinted icons surfacing what Aven can do
+// without text-noise. Hidden below sm so the mobile header stays clean.
 // ---------------------------------------------------------------------------
 
-const STARTER_SUGGESTIONS: ReadonlyArray<{ label: string; prompt: string }> = [
-  { label: "How's BTC right now?", prompt: "How's BTC right now?" },
-  {
-    label: "Explain Fib retracements",
-    prompt: "Explain Fibonacci retracements in Paul's method.",
-  },
-  {
-    label: "What's a good setup today?",
-    prompt: "What's a good setup today based on the live market?",
-  },
+const CAPABILITIES = [
+  { Icon: IconMessageCircle, label: "Chat" },
+  { Icon: IconMicrophone, label: "Voice input" },
+  { Icon: IconBrandTelegram, label: "Telegram-synced" },
+  { Icon: IconChartCandle, label: "Live market data" },
+  { Icon: IconCrosshair, label: "Setup analysis" },
+] as const;
+
+function CapabilityRow() {
+  return (
+    <div className="hidden items-center gap-1.5 sm:flex" aria-label="Aven capabilities">
+      {CAPABILITIES.map(({ Icon, label }) => (
+        <span
+          key={label}
+          title={label}
+          className="inline-flex size-7 items-center justify-center rounded-md text-emerald/65 transition-all hover:scale-110 hover:bg-emerald/[0.08] hover:text-emerald"
+        >
+          <Icon size={14} stroke={1.75} aria-hidden />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Status dot — pure visual: pulsing emerald when streaming, grey otherwise.
+// Quota state is folded into the title so the data is still discoverable
+// without adding header text.
+// ---------------------------------------------------------------------------
+
+function StatusDot({
+  online,
+  quota,
+}: {
+  online: boolean;
+  quota: QuotaState | null;
+}) {
+  const title = quotaTitle(online, quota);
+  return (
+    <span
+      title={title}
+      aria-label={title}
+      className="relative inline-flex size-2.5 shrink-0"
+    >
+      {online && (
+        <span
+          aria-hidden
+          className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+          style={{ animationDuration: "2s" }}
+        />
+      )}
+      <span
+        aria-hidden
+        className={[
+          "relative inline-flex size-2.5 rounded-full",
+          online ? "bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.7)]" : "bg-muted-foreground",
+        ].join(" ")}
+      />
+    </span>
+  );
+}
+
+function quotaTitle(online: boolean, quota: QuotaState | null): string {
+  const conn = online ? "Online" : "Reconnecting…";
+  if (!quota) return conn;
+  if (quota.isUnlimited) return `${conn} · unlimited messages`;
+  if (quota.limit === null || quota.limit === 0) return conn;
+  return `${conn} · ${quota.used}/${quota.limit} today`;
+}
+
+// ---------------------------------------------------------------------------
+// Prompt rotator — single rotating "Try …" line under the header. Replaces
+// the static three-chip strip from Round 10. Auto-fades after the user
+// has sent three messages; the "?" pill restores it. Click-to-send.
+// ---------------------------------------------------------------------------
+
+const STARTER_PROMPTS: ReadonlyArray<string> = [
+  "How's BTC right now?",
+  "Explain Fibonacci retracements in Paul's method.",
+  "What's a good setup today based on the live market?",
+  "Review my last open trade.",
 ];
 
-function SuggestionStrip({
+function PromptRotator({
   userMessageCount,
   onPick,
 }: {
@@ -306,71 +337,78 @@ function SuggestionStrip({
   onPick: (text: string) => void;
 }) {
   const [dismissed, setDismissed] = useState(false);
+  const [idx, setIdx] = useState(0);
+  const [showing, setShowing] = useState(true);
+  const reduce = useReducedMotion();
+
   const autoVisible = userMessageCount < 3;
   const visible = autoVisible && !dismissed;
 
+  // Fade-out → swap text → fade-in every ~5.5s. Skip the animation when
+  // the user prefers reduced motion.
+  useEffect(() => {
+    if (!visible) return;
+    if (reduce) {
+      const id = setInterval(
+        () => setIdx((i) => (i + 1) % STARTER_PROMPTS.length),
+        5500,
+      );
+      return () => clearInterval(id);
+    }
+    const id = setInterval(() => {
+      setShowing(false);
+      const swap = setTimeout(() => {
+        setIdx((i) => (i + 1) % STARTER_PROMPTS.length);
+        setShowing(true);
+      }, 220);
+      return () => clearTimeout(swap);
+    }, 5500);
+    return () => clearInterval(id);
+  }, [visible, reduce]);
+
   if (!visible) {
-    // Compact "?" affordance once hints have faded — keeps the pattern
-    // discoverable without re-cluttering the header.
     return (
       <div className="flex justify-end border-b border-emerald/10 bg-surface/30 px-6 py-2 sm:px-8">
         <button
           type="button"
           onClick={() => setDismissed(false)}
-          aria-label="Show starter suggestions"
+          aria-label="Show starter prompts"
           className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-emerald/40 hover:text-emerald"
         >
           <IconHelp size={11} stroke={1.75} aria-hidden />
-          Suggestions
         </button>
       </div>
     );
   }
 
+  const current = STARTER_PROMPTS[idx];
+
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-emerald/10 bg-surface/30 px-6 py-3 sm:px-8">
-      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
-        Try
-      </span>
-      <div className="flex flex-wrap gap-1.5">
-        {STARTER_SUGGESTIONS.map((s) => (
-          <button
-            key={s.prompt}
-            type="button"
-            onClick={() => onPick(s.prompt)}
-            className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.06] px-3 py-1 text-[12px] text-foreground transition-colors hover:border-emerald/60 hover:bg-emerald/[0.12]"
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+    <div className="flex items-center gap-3 border-b border-emerald/10 bg-surface/30 px-6 py-2.5 sm:px-8">
+      <button
+        type="button"
+        onClick={() => onPick(current)}
+        aria-label={`Send: ${current}`}
+        className="group flex flex-1 items-center gap-2 truncate text-left"
+      >
+        <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-emerald/70">
+          Try
+        </span>
+        <span
+          className="truncate text-[13px] text-muted-foreground transition-opacity duration-200 group-hover:text-foreground"
+          style={{ opacity: showing ? 1 : 0 }}
+        >
+          &ldquo;{current}&rdquo;
+        </span>
+      </button>
       <button
         type="button"
         onClick={() => setDismissed(true)}
-        aria-label="Hide suggestions"
-        className="ml-auto inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+        aria-label="Hide prompts"
+        className="inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
       >
         <IconX size={12} stroke={1.75} aria-hidden />
       </button>
-    </div>
-  );
-}
-
-function QuotaPill({ quota }: { quota: QuotaState }) {
-  // Skip the pill when the backend gave us nothing meaningful to render.
-  if (quota.limit === null || quota.limit === 0) return null;
-  const pct = Math.min(100, Math.round((quota.used / quota.limit) * 100));
-  return (
-    <div className="hidden items-center gap-2 sm:flex">
-      <div className="h-1 w-20 overflow-hidden rounded-full bg-surface-elevated">
-        <div
-          className="h-full bg-emerald transition-all"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        {quota.used}/{quota.limit} today
-      </p>
     </div>
   );
 }

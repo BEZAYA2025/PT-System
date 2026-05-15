@@ -8,6 +8,8 @@ import {
   IconSettings,
   IconX,
 } from "@tabler/icons-react";
+// IconSettings retained for the mobile drawer; the desktop gear icon was
+// removed in Round 11 since it duplicates the user-pill dropdown entry.
 import { NotificationCenter } from "./NotificationCenter";
 import { BrandLogo } from "./BrandLogo";
 import { UserPill } from "./UserPill";
@@ -41,10 +43,12 @@ export function DashboardHeader({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-        {/* Brand: triangle logo + wordmark + Live pill */}
+        {/* Brand: triangle logo + wordmark + Live pill — clicking inside
+            the cockpit should keep you in the cockpit (Round 11). */}
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href="/dashboard"
+            aria-label="PT System dashboard"
             data-tour="brand"
             className="flex items-center gap-2"
           >
@@ -65,19 +69,14 @@ export function DashboardHeader({
           </Link>
         </div>
 
-        {/* Desktop right cluster — bell, settings icon, user pill */}
+        {/* Desktop right cluster — bell + user pill (Settings reachable
+            via the user-pill dropdown; the standalone gear icon was
+            redundant and removed in Round 11). */}
         <div className="hidden items-center gap-2 sm:flex">
           <NotificationCenter
             initial={notifications}
             initialUnreadCount={unreadCount}
           />
-          <Link
-            href="/dashboard/settings"
-            aria-label="Settings"
-            className="inline-flex size-10 items-center justify-center rounded-full border border-border bg-surface text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-          >
-            <IconSettings size={18} stroke={1.75} />
-          </Link>
           <UserPill
             displayName={displayName}
             email={email}
