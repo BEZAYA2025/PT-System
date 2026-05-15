@@ -8,6 +8,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
+import { SettingsCardHeader } from "./SettingsCardHeader";
 
 export function TelegramSettingsCard({
   telegramUsername,
@@ -52,12 +53,11 @@ export function TelegramSettingsCard({
   return (
     <>
       <section className={cardClasses}>
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Telegram
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Aven sends briefings, alerts, and trade-monitor pings here.
-        </p>
+        <SettingsCardHeader
+          eyebrow="Notifications · Telegram"
+          title="Telegram"
+          description="Aven sends briefings, alerts, and trade-monitor pings here."
+        />
 
         <dl className="mt-6 text-sm">
           <dt className="text-xs uppercase tracking-wider text-muted-foreground">

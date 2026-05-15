@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import {
   IconArrowDownRight,
+  IconArrowRight,
   IconArrowUpRight,
   IconChartCandle,
   IconPlugConnected,
@@ -420,14 +422,7 @@ function LastTradeCard({
 
 function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
   if (!meta.hasExchange) {
-    return (
-      <ColdStart
-        tone="emerald"
-        Icon={IconPlugConnected}
-        title="Connect your exchange"
-        body="Open Settings → Exchange API and link a read-only key to track your positions here."
-      />
-    );
+    return <ConnectExchangeColdStart />;
   }
   const ex = meta.exchangeType?.toLowerCase() ?? null;
   if (ex === "bitunix") {
@@ -448,6 +443,41 @@ function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
       title="No positions yet"
       body={`Start trading on ${exchangeLabel} — your live PnL appears here as soon as a position opens.`}
     />
+  );
+}
+
+// Round-10: clickable empty-state — whole card navigates to Settings →
+// Exchange API (deep-link via #exchange-api anchor on that section). The
+// nested "Connect Now" pill is decorative; the entire Link captures clicks.
+function ConnectExchangeColdStart() {
+  return (
+    <Link
+      href="/dashboard/settings#exchange-api"
+      aria-label="Connect your exchange in Settings"
+      className="group flex flex-col items-center gap-4 rounded-lg border border-dashed border-emerald/40 bg-gradient-to-br from-surface to-emerald/[0.05] px-6 py-10 text-center transition-all hover:border-emerald/70 hover:bg-emerald/[0.08] hover:shadow-[0_0_30px_-8px_rgba(16,185,129,0.35)]"
+    >
+      <span className="inline-flex size-14 items-center justify-center rounded-full bg-emerald/[0.12] text-emerald transition-transform group-hover:scale-105">
+        <IconPlugConnected size={26} stroke={1.5} aria-hidden />
+      </span>
+      <div>
+        <p className="text-base font-semibold text-foreground">
+          Connect your exchange
+        </p>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Link a read-only key to track your live positions, ROI, and stats
+          right here on the dashboard.
+        </p>
+      </div>
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald px-5 py-2.5 text-sm font-medium text-background transition-colors group-hover:bg-emerald-hover">
+        Connect Now
+        <IconArrowRight
+          size={14}
+          stroke={2}
+          className="transition-transform group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      </span>
+    </Link>
   );
 }
 

@@ -8,6 +8,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
+import { SettingsCardHeader } from "./SettingsCardHeader";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -39,17 +40,27 @@ export function ExchangeSettingsCard({
     setDisconnecting(true);
     setError(null);
     try {
-      const res = await fetch("/api/proxy/auth/remove-binance-key", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+      // Round-10 fix: backend went exchange-agnostic — REST DELETE on
+      // /api/auth/api-key replaces the legacy POST /remove-binance-key.
+      const res = await fetch("/api/proxy/auth/api-key", {
+        method: "DELETE",
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res
+        .json()
+        .catch(() => ({}))) as Record<string, unknown>;
       if (!res.ok) {
-        setError(
+        const backendMsg =
           typeof data?.message === "string"
             ? data.message
-            : "Couldn’t remove the key — please try again.",
+            : typeof data?.error === "string"
+              ? data.error
+              : null;
+        // Surface the status code so production-test failures are
+        // diagnosable without opening the network tab.
+        setError(
+          backendMsg
+            ? `${backendMsg} (${res.status})`
+            : `Couldn't remove the key — backend returned ${res.status}.`,
         );
         return;
       }
@@ -64,14 +75,18 @@ export function ExchangeSettingsCard({
 
   return (
     <>
-      <section className={cardClasses}>
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Exchange API
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Read-only key — Binance, Bybit, OKX, or any major exchange. Locked to our server via IP
-          restriction.
-        </p>
+      {/* scroll-mt offset accounts for the sticky DashboardHeader so
+          deep-links (e.g. /dashboard/settings#exchange-api from the
+          empty-state on the dashboard) don't land underneath it. */}
+      <section
+        id="exchange-api"
+        className={`${cardClasses} scroll-mt-24`}
+      >
+        <SettingsCardHeader
+          eyebrow="Exchange · API"
+          title="Exchange API"
+          description="Read-only key — Binance, Bybit, OKX, or any major exchange. Locked to our server via IP restriction."
+        />
 
         <dl className="mt-6 text-sm">
           <dt className="text-xs uppercase tracking-wider text-muted-foreground">

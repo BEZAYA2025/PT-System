@@ -1,11 +1,16 @@
-// Aven brand avatar. Three SVG variants — flip AVEN_VARIANT below to
-// preview "crystal" or "monogram"; "wave" is the default. Each variant
-// is fully inline (zero network cost on swap). Today's Brief uses a
-// distinct BriefAvatar so the two surfaces don't blur into one identity.
+// Aven brand avatar. Four inline-SVG variants — flip AVEN_VARIANT below
+// to preview each (zero-network swap). All variants live in the brand-
+// green family (#10b981 ↔ #34d399 ↔ #a7f3d0) so the identity stays
+// consistent with the PT logo regardless of which glyph wins.
+//   - prism   (default): equilateral triangle face with depth shading,
+//                        echoes the PT logo's triangle identity.
+//   - eye             : geometric almond + iris — "AI vision".
+//   - monogram        : custom "A" with cut-out triangle.
+//   - crystal         : faceted diamond with reflective gradient.
 
-type AvenVariant = "wave" | "crystal" | "monogram";
+type AvenVariant = "prism" | "eye" | "monogram" | "crystal";
 
-const AVEN_VARIANT: AvenVariant = "wave";
+const AVEN_VARIANT: AvenVariant = "prism";
 
 interface Props {
   size?: number;
@@ -19,7 +24,7 @@ export function AvenAvatar({
   online = true,
   breath = false,
 }: Props) {
-  const ringSize = size + 6;
+  const ringSize = size + 8;
 
   return (
     <span
@@ -35,7 +40,7 @@ export function AvenAvatar({
           />
           <span
             aria-hidden
-            className="absolute inset-1 animate-ping rounded-full bg-cyan-400/20"
+            className="absolute inset-1 animate-ping rounded-full bg-emerald/20"
             style={{ animationDuration: "3.6s", animationDelay: "0.6s" }}
           />
         </>
@@ -63,10 +68,6 @@ export function AvenAvatar({
 }
 
 function AvenSvg({ variant, size }: { variant: AvenVariant; size: number }) {
-  // Same emerald → cyan → emerald gradient across variants so the swap
-  // changes only the foreground glyph, never the brand colour identity.
-  const gradId = `aven-grad-${variant}`;
-  const haloId = `aven-halo-${variant}`;
   return (
     <svg
       width={size}
@@ -76,71 +77,142 @@ function AvenSvg({ variant, size }: { variant: AvenVariant; size: number }) {
       role="img"
       aria-label="Aven"
     >
+      {variant === "prism" && <PrismGlyph />}
+      {variant === "eye" && <EyeGlyph />}
+      {variant === "monogram" && <MonogramGlyph />}
+      {variant === "crystal" && <CrystalGlyph />}
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Variant glyphs
+// ---------------------------------------------------------------------------
+
+function PrismGlyph() {
+  return (
+    <>
       <defs>
-        <radialGradient id={gradId} cx="0.5" cy="0.45" r="0.6">
-          <stop offset="0%" stopColor="#a7f3d0" />
-          <stop offset="50%" stopColor="#22d3ee" />
+        <linearGradient id="aven-prism-face" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#34d399" />
           <stop offset="100%" stopColor="#10b981" />
-        </radialGradient>
-        <radialGradient id={haloId} cx="0.5" cy="0.5" r="0.55">
-          <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
-          <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+        </linearGradient>
+        <linearGradient id="aven-prism-shade" x1="0" y1="0" x2="32" y2="0">
+          <stop offset="0%" stopColor="rgba(255,255,255,0.16)" />
+          <stop offset="55%" stopColor="rgba(255,255,255,0)" />
+          <stop offset="100%" stopColor="rgba(0,0,0,0.22)" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="16" fill="#0a0a0a" />
+      <polygon
+        points="16,7 25,23 7,23"
+        fill="url(#aven-prism-face)"
+        stroke="url(#aven-prism-face)"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+      <polygon
+        points="16,7 25,23 7,23"
+        fill="url(#aven-prism-shade)"
+      />
+      <polyline
+        points="16,7 25,23"
+        stroke="#a7f3d0"
+        strokeWidth="0.7"
+        strokeLinecap="round"
+        opacity="0.85"
+      />
+    </>
+  );
+}
+
+function EyeGlyph() {
+  return (
+    <>
+      <defs>
+        <radialGradient id="aven-eye-iris" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor="#a7f3d0" />
+          <stop offset="60%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#065f46" />
         </radialGradient>
       </defs>
-      <circle cx="16" cy="16" r="16" fill={`url(#${gradId})`} />
-      <circle cx="16" cy="14" r="14" fill={`url(#${haloId})`} />
+      <circle cx="16" cy="16" r="16" fill="#0a0a0a" />
+      <path
+        d="M3.5 16 Q16 6 28.5 16 Q16 26 3.5 16 Z"
+        fill="none"
+        stroke="#10b981"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="16" cy="16" r="5" fill="url(#aven-eye-iris)" />
+      <circle cx="16" cy="16" r="1.7" fill="#0a0a0a" />
+      <circle
+        cx="14.2"
+        cy="14.2"
+        r="0.95"
+        fill="rgba(255,255,255,0.55)"
+      />
+    </>
+  );
+}
 
-      {variant === "wave" && (
-        // Sine wave — market rhythm meeting AI; minimal, calm.
-        <path
-          d="M5 17 Q9 11, 13 17 T21 17 T27 17"
-          stroke="#0a0a0a"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          fill="none"
-          opacity="0.85"
-        />
-      )}
+function MonogramGlyph() {
+  return (
+    <>
+      <defs>
+        <linearGradient id="aven-mono-bg" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#34d399" />
+          <stop offset="100%" stopColor="#10b981" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="16" fill="url(#aven-mono-bg)" />
+      <path
+        // Outer "A" silhouette + inner triangular cut-out, evenodd punches
+        // the cut-out so the gradient bg shows through.
+        d="M16 7.5 L24 24 L20.5 24 L19 21 L13 21 L11.5 24 L8 24 Z M14.2 18.5 L17.8 18.5 L16 14.5 Z"
+        fill="#0a0a0a"
+        fillRule="evenodd"
+        opacity="0.92"
+      />
+    </>
+  );
+}
 
-      {variant === "crystal" && (
-        // Diamond / crystal — facetted "AI mind" mark.
-        <>
-          <path
-            d="M16 6 L24 15 L16 26 L8 15 Z"
-            fill="rgba(10,10,10,0.85)"
-            stroke="#0a0a0a"
-            strokeWidth="0.6"
-            strokeLinejoin="round"
-          />
-          <path d="M8 15 L24 15" stroke="#6ee7b7" strokeWidth="0.7" />
-          <path
-            d="M16 6 L16 26"
-            stroke="#6ee7b7"
-            strokeWidth="0.6"
-            opacity="0.6"
-          />
-        </>
-      )}
-
-      {variant === "monogram" && (
-        // Stylized "A" — apex up, crossbar — recalls the brand triangle.
-        <>
-          <path
-            d="M16 8 L23 24 L9 24 Z"
-            stroke="#0a0a0a"
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-            fill="none"
-          />
-          <path
-            d="M12.5 19.5 L19.5 19.5"
-            stroke="#0a0a0a"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        </>
-      )}
-    </svg>
+function CrystalGlyph() {
+  return (
+    <>
+      <defs>
+        <linearGradient id="aven-crystal-face" x1="0" y1="0" x2="32" y2="32">
+          <stop offset="0%" stopColor="#a7f3d0" />
+          <stop offset="50%" stopColor="#10b981" />
+          <stop offset="100%" stopColor="#065f46" />
+        </linearGradient>
+      </defs>
+      <circle cx="16" cy="16" r="16" fill="#0a0a0a" />
+      <polygon
+        points="16,5 25,16 16,27 7,16"
+        fill="url(#aven-crystal-face)"
+      />
+      <polygon
+        points="16,5 21,12 16,16 11,12"
+        fill="rgba(255,255,255,0.14)"
+      />
+      <line
+        x1="7"
+        y1="16"
+        x2="25"
+        y2="16"
+        stroke="rgba(167,243,208,0.55)"
+        strokeWidth="0.5"
+      />
+      <line
+        x1="16"
+        y1="5"
+        x2="16"
+        y2="27"
+        stroke="rgba(0,0,0,0.32)"
+        strokeWidth="0.4"
+      />
+    </>
   );
 }
