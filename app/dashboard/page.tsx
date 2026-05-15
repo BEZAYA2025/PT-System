@@ -7,17 +7,18 @@ import {
   requireUser,
 } from "@/lib/dal";
 import {
+  buildBtcPriceView,
   buildMarketPulseView,
   type MarketPulseView,
   type RawSnapshotMetrics,
 } from "@/lib/metrics";
 import { shapeBrief, type RawBriefShape } from "@/lib/daily-brief";
 import { buildTradesView } from "@/lib/trades";
-import { buildBtcPriceView } from "@/lib/metrics";
 import { MarketPulse } from "@/components/dashboard/MarketPulse";
 import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
+import { MemberStatsCards } from "@/components/dashboard/MemberStatsCards";
 import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
 import { MotionSection } from "@/components/dashboard/MotionSection";
 
@@ -28,14 +29,13 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-// ITERATION 7 — Coached spotlight tour for first-time members and proper
-// daily-greeting integration.
-//   - SpotlightTour mounts only when user.first_login_completed === false.
-//     The 6-step flow targets sections via data-tour selectors (resilient to
-//     component refactors) and POSTs first-login-complete on Done/Skip.
-//   - The synthetic greeting injection from iter 5 is gone. The greeting is
-//     now a real Aven message stamped meta.greeting=true on the backend; the
-//     bubble surfaces a subtle "Daily greeting" badge.
+// ROUND 8 — Layout iteration (Variant A):
+//   1. Header (Brand + Live + BTC pill + bell + settings)
+//   2. MemberStatsCards   (NEW — top-level: BTC live · Unrealized · Realized)
+//   3. AvenChat            (visually prominent — emerald glow + breathing avatar)
+//   4. DailyBriefCard
+//   5. MarketPulse         (5-card market metrics)
+//   6. TradesGrid          (Your + Paul's, Open + Last 5 only — top-cards moved up)
 
 export default async function DashboardPage() {
   const user = await requireUser();
@@ -59,26 +59,31 @@ export default async function DashboardPage() {
 
   return (
     <main id="main" className="space-y-8 sm:space-y-10">
-      <MotionSection tour="market" delay={0.04}>
-        <MarketPulse initial={initialMetrics} />
+      <MotionSection delay={0.02}>
+        <MemberStatsCards
+          btcPrice={initialBtcPrice}
+          stats={initialTrades.your.stats}
+          meta={initialTrades.yourMeta}
+        />
       </MotionSection>
 
-      <MotionSection tour="aven" delay={0.1}>
+      <MotionSection tour="aven" delay={0.08}>
         <AvenChat
           initialMessages={history.messages}
           initialHasOlder={history.hasMore}
         />
       </MotionSection>
 
-      <MotionSection tour="brief" delay={0.16}>
+      <MotionSection tour="brief" delay={0.14}>
         <DailyBriefCard brief={initialBrief} />
       </MotionSection>
 
-      <MotionSection tour="trades" delay={0.22}>
-        <TradesGrid
-          initial={initialTrades}
-          initialBtcPrice={initialBtcPrice}
-        />
+      <MotionSection tour="market" delay={0.20}>
+        <MarketPulse initial={initialMetrics} />
+      </MotionSection>
+
+      <MotionSection tour="trades" delay={0.26}>
+        <TradesGrid initial={initialTrades} />
       </MotionSection>
 
       {showTour && <SpotlightTour displayName={user.display_name ?? null} />}

@@ -1,6 +1,6 @@
 "use client";
 
-import { IconBulb } from "@tabler/icons-react";
+import { IconBulb, IconClock } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { timeAgo } from "@/lib/format";
 import type { AnyTrade } from "@/lib/trades";
@@ -26,6 +26,29 @@ function fmtSignedPct(n: number): string {
 function fmtSignedR(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
   return `${sign}${Math.abs(n).toFixed(1)}R`;
+}
+
+function fmtIsoUtc(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const date = d.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      timeZone: "UTC",
+    });
+    const time = d.toLocaleTimeString(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "UTC",
+      hour12: false,
+    });
+    return `${date} · ${time} UTC`;
+  } catch {
+    return "—";
+  }
 }
 
 export function TradeDetailModal({
@@ -82,6 +105,10 @@ export function TradeDetailModal({
           )}
         </div>
 
+        {/* Trade-timeline panel — prominent for closed trades, especially
+         *  Paul's, so members see the holding-period at a glance. */}
+        <TradeTimeline trade={trade} />
+
         {/* Price grid */}
         <div className="grid gap-3 sm:grid-cols-4">
           <DetailField label="Entry" value={fmtPrice(trade.entry)} />
@@ -105,9 +132,9 @@ export function TradeDetailModal({
           />
         </div>
 
-        {/* Distance + duration */}
+        {/* Distance grid (open trades only — duration is in TradeTimeline) */}
         {trade.status === "open" && (
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             <DetailField
               label="SL distance"
               value={
@@ -125,20 +152,6 @@ export function TradeDetailModal({
                   : "—"
               }
               tone="text-emerald"
-            />
-            <DetailField
-              label="In trade"
-              value={trade.durationLabel}
-            />
-          </div>
-        )}
-
-        {trade.status === "closed" && (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <DetailField label="Duration" value={trade.durationLabel} />
-            <DetailField
-              label="Closed"
-              value={trade.closedAt ? timeAgo(trade.closedAt) : "—"}
             />
           </div>
         )}
@@ -178,6 +191,52 @@ function DetailField({
       <p className={`mt-1 font-mono text-sm font-semibold ${tone ?? "text-foreground"}`}>
         {value}
       </p>
+    </div>
+  );
+}
+
+function TradeTimeline({ trade }: { trade: AnyTrade }) {
+  const isOpen = trade.status === "open";
+  return (
+    <div className="rounded-lg border border-border bg-surface/60 p-4">
+      <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
+        <IconClock size={12} stroke={1.75} aria-hidden />
+        Trade timeline
+      </p>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Opened
+          </p>
+          <p className="mt-1 font-mono text-sm text-foreground">
+            {fmtIsoUtc(trade.openedAt)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            {isOpen ? "Status" : "Closed"}
+          </p>
+          <p className="mt-1 font-mono text-sm text-foreground">
+            {isOpen ? "Still open" : fmtIsoUtc(trade.closedAt)}
+          </p>
+        </div>
+      </div>
+
+      {/* Held / In-trade — large + emerald, the standout line */}
+      <div className="mt-4 flex items-baseline gap-2 border-t border-border pt-3">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {isOpen ? "In trade" : "Held"}
+        </span>
+        <span className="font-mono text-lg font-semibold text-emerald">
+          {trade.durationLabel}
+        </span>
+        {!isOpen && trade.closedAt && (
+          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+            · closed {timeAgo(trade.closedAt)}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
