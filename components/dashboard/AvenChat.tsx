@@ -6,6 +6,7 @@ import {
   IconBrandTelegram,
   IconChevronUp,
   IconDeviceLaptop,
+  IconHelp,
   IconLoader2,
   IconMessageCircle,
   IconMicrophone,
@@ -126,9 +127,27 @@ export function AvenChat({
         messageCount={chat.messages.length}
       />
 
+      <SuggestionStrip
+        userMessageCount={
+          chat.messages.filter((m) => m.role === "user").length
+        }
+        onPick={(text) => {
+          chat.setInput(text);
+          // Defer so React commits the input value before send() reads it.
+          setTimeout(() => void chat.send(), 0);
+        }}
+      />
+
+      {/* Soft gradient fade between the header band and the chat scroll —
+          stops the first bubble from kissing the header divider. */}
+      <span
+        aria-hidden
+        className="pointer-events-none block h-3 bg-gradient-to-b from-emerald/[0.05] to-transparent"
+      />
+
       <div
         ref={scrollRef}
-        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto px-6 py-6 sm:px-8 sm:py-7"
+        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/30 px-6 py-7 sm:px-8 sm:py-9"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -204,50 +223,135 @@ function ChatHeader({
           <AvenAvatar size={36} online={streamConnected} breath />
         </span>
         <div className="min-w-0">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/80">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
             AI Mentor
           </p>
           <p className="text-base font-semibold tracking-tight text-foreground sm:text-lg">
             Aven
           </p>
-          <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-wider text-emerald">
-            <span
-              aria-hidden
-              className={[
-                "relative inline-flex size-1.5",
-              ].join(" ")}
-            >
-              {streamConnected && (
-                <span
-                  className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-                  style={{ animationDuration: "2s" }}
-                />
-              )}
-              <span
-                className={[
-                  "relative inline-flex size-1.5 rounded-full",
-                  streamConnected ? "bg-emerald" : "bg-muted-foreground",
-                ].join(" ")}
-              />
-            </span>
-            {streamConnected ? "Online · streaming" : "Reconnecting…"}
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Trading methodology · live market context
           </p>
         </div>
       </div>
 
-      {quota ? (
-        quota.isUnlimited ? (
-          <p className="font-mono text-[11px] uppercase tracking-wider text-emerald">
-            Unlimited
-          </p>
+      <div className="flex flex-col items-end gap-1.5">
+        <span
+          className={[
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider",
+            streamConnected
+              ? "border-emerald/35 bg-emerald/[0.08] text-emerald"
+              : "border-border bg-surface text-muted-foreground",
+          ].join(" ")}
+        >
+          <span aria-hidden className="relative inline-flex size-1.5">
+            {streamConnected && (
+              <span
+                className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+                style={{ animationDuration: "2s" }}
+              />
+            )}
+            <span
+              className={[
+                "relative inline-flex size-1.5 rounded-full",
+                streamConnected ? "bg-emerald" : "bg-muted-foreground",
+              ].join(" ")}
+            />
+          </span>
+          {streamConnected ? "Online" : "Reconnecting…"}
+        </span>
+
+        {quota ? (
+          quota.isUnlimited ? (
+            <p className="font-mono text-[10px] uppercase tracking-wider text-emerald/80">
+              Unlimited
+            </p>
+          ) : (
+            <QuotaPill quota={quota} />
+          )
         ) : (
-          <QuotaPill quota={quota} />
-        )
-      ) : (
-        <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          {messageCount} {messageCount === 1 ? "message" : "messages"}
-        </p>
-      )}
+          <p className="hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:block">
+            {messageCount} {messageCount === 1 ? "message" : "messages"}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Educational suggestion strip — clickable starter prompts. Auto-fades after
+// the first three user messages; a small "?" button restores them on demand.
+// Lives in component-state only (no localStorage), so a fresh tab gives a
+// fresh hint surface, but in-session dismissal is respected.
+// ---------------------------------------------------------------------------
+
+const STARTER_SUGGESTIONS: ReadonlyArray<{ label: string; prompt: string }> = [
+  { label: "How's BTC right now?", prompt: "How's BTC right now?" },
+  {
+    label: "Explain Fib retracements",
+    prompt: "Explain Fibonacci retracements in Paul's method.",
+  },
+  {
+    label: "What's a good setup today?",
+    prompt: "What's a good setup today based on the live market?",
+  },
+];
+
+function SuggestionStrip({
+  userMessageCount,
+  onPick,
+}: {
+  userMessageCount: number;
+  onPick: (text: string) => void;
+}) {
+  const [dismissed, setDismissed] = useState(false);
+  const autoVisible = userMessageCount < 3;
+  const visible = autoVisible && !dismissed;
+
+  if (!visible) {
+    // Compact "?" affordance once hints have faded — keeps the pattern
+    // discoverable without re-cluttering the header.
+    return (
+      <div className="flex justify-end border-b border-emerald/10 bg-surface/30 px-6 py-2 sm:px-8">
+        <button
+          type="button"
+          onClick={() => setDismissed(false)}
+          aria-label="Show starter suggestions"
+          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground transition-colors hover:border-emerald/40 hover:text-emerald"
+        >
+          <IconHelp size={11} stroke={1.75} aria-hidden />
+          Suggestions
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-emerald/10 bg-surface/30 px-6 py-3 sm:px-8">
+      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+        Try
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {STARTER_SUGGESTIONS.map((s) => (
+          <button
+            key={s.prompt}
+            type="button"
+            onClick={() => onPick(s.prompt)}
+            className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.06] px-3 py-1 text-[12px] text-foreground transition-colors hover:border-emerald/60 hover:bg-emerald/[0.12]"
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        aria-label="Hide suggestions"
+        className="ml-auto inline-flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+      >
+        <IconX size={12} stroke={1.75} aria-hidden />
+      </button>
     </div>
   );
 }

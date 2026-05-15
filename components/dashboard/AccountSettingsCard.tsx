@@ -12,6 +12,7 @@ import {
   submitErrorClasses,
   submitSuccessClasses,
 } from "@/lib/ui";
+import { SettingsCardHeader } from "./SettingsCardHeader";
 
 interface Props {
   email: string;
@@ -80,11 +81,13 @@ export function AccountSettingsCard({ email, displayName }: Props) {
 
   return (
     <section className={cardClasses}>
-      <h2 className="text-lg font-semibold tracking-tight text-foreground">
-        Account
-      </h2>
+      <SettingsCardHeader
+        eyebrow="Profile · Account"
+        title="Account"
+        description="Your sign-in email and the name Aven uses to address you."
+      />
 
-      <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+      <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-xs uppercase tracking-wider text-muted-foreground">
             Email

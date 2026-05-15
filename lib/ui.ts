@@ -20,7 +20,7 @@ export const buttonGhostClasses =
   "inline-flex h-10 items-center justify-center rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald";
 
 export const cardClasses =
-  "rounded-2xl border border-border bg-surface p-6 sm:p-8";
+  "rounded-2xl border border-border bg-surface p-6 shadow-[0_4px_24px_-12px_rgba(0,0,0,0.4)] sm:p-8";
 
 export const cardElevatedClasses =
   "rounded-2xl border border-border bg-surface-elevated p-6 sm:p-8";

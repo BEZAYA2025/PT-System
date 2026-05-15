@@ -8,6 +8,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { TierBadge } from "./TierBadge";
+import { SettingsCardHeader } from "./SettingsCardHeader";
 
 function formatStatus(s: SubscriptionStatus): string {
   if (!s) return "—";
@@ -144,25 +145,22 @@ export function SubscriptionCard({
   const dateRel = relativeDays(periodEnd);
 
   return (
-    <section className={`${cardClasses} relative`}>
-      {/* Status badge — top-right corner per Paul's spec */}
-      {status && (
-        <span
-          className={`absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tone.border} ${tone.bg} ${tone.text}`}
-        >
-          <span aria-hidden className={`size-1.5 rounded-full ${tone.dot}`} />
-          {formatStatus(status)}
-        </span>
-      )}
-
-      <div className="pr-28">
-        <h2 className="text-lg font-semibold tracking-tight text-foreground">
-          Subscription
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage payment method, change tier, or cancel.
-        </p>
-      </div>
+    <section className={cardClasses}>
+      <SettingsCardHeader
+        eyebrow="Billing · Subscription"
+        title="Subscription"
+        description="Manage payment method, change tier, or cancel."
+        right={
+          status ? (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tone.border} ${tone.bg} ${tone.text}`}
+            >
+              <span aria-hidden className={`size-1.5 rounded-full ${tone.dot}`} />
+              {formatStatus(status)}
+            </span>
+          ) : null
+        }
+      />
 
       <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
         <div>
