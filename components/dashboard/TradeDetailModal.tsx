@@ -3,7 +3,12 @@
 import { IconBulb, IconClock } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { timeAgo } from "@/lib/format";
-import type { AnyTrade } from "@/lib/trades";
+import {
+  pctDistanceFromMark,
+  pnlAtPrice,
+  type AnyTrade,
+  type YourTrade,
+} from "@/lib/trades";
 
 function fmtPrice(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
@@ -82,10 +87,12 @@ export function TradeDetailModal({
       size="lg"
     >
       <div className="space-y-5">
-        {/* Headline KPIs */}
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Headline KPIs — Round-15 hierarchy: % is the headline,
+            $ amount drops to a subtler secondary line so the
+            same-coloured percent isn't competing with itself. */}
+        <div className="flex flex-wrap items-baseline gap-3">
           <span
-            className={`inline-flex items-center rounded-md px-2 py-0.5 font-mono text-[11px] uppercase ${sideTone}`}
+            className={`inline-flex items-center self-center rounded-md px-2 py-0.5 font-mono text-[11px] uppercase ${sideTone}`}
           >
             {trade.side}
           </span>
@@ -99,7 +106,7 @@ export function TradeDetailModal({
               </span>
             ) : null
           ) : (
-            <span className={`font-mono text-sm ${tone}`}>
+            <span className={`font-mono text-base ${tone} opacity-80`}>
               {fmtSignedUsd(trade.pnlUsd)}
             </span>
           )}
@@ -109,7 +116,8 @@ export function TradeDetailModal({
          *  Paul's, so members see the holding-period at a glance. */}
         <TradeTimeline trade={trade} />
 
-        {/* Price grid */}
+        {/* Price grid — SL + TP cards now carry the $ outcome below
+            the price so the member sees risk/reward at a glance. */}
         <div className="grid gap-3 sm:grid-cols-4">
           <DetailField label="Entry" value={fmtPrice(trade.entry)} />
           <DetailField
@@ -124,32 +132,54 @@ export function TradeDetailModal({
             label="Stop loss"
             value={fmtPrice(trade.slPrice)}
             tone="text-red-300"
+            footer={
+              !isPaul && trade.status === "open"
+                ? formatExposure(pnlAtPrice(trade as YourTrade, trade.slPrice))
+                : null
+            }
+            footerTone="text-red-300"
           />
           <DetailField
             label="Take profit"
             value={fmtPrice(trade.tpPrice)}
             tone="text-emerald"
+            footer={
+              !isPaul && trade.status === "open"
+                ? formatExposure(pnlAtPrice(trade as YourTrade, trade.tpPrice))
+                : null
+            }
+            footerTone="text-emerald"
           />
         </div>
 
-        {/* Distance grid (open trades only — duration is in TradeTimeline) */}
+        {/* Distance grid (open trades only — duration is in TradeTimeline).
+            Round-15: when the shaper's slDistancePct comes through as
+            null (older mark missing, etc.) recompute from the modal
+            side so the row never falls back to "—" with full data
+            available. */}
         {trade.status === "open" && (
           <div className="grid gap-3 sm:grid-cols-2">
             <DetailField
               label="SL distance"
               value={
-                trade.slDistancePct !== null
-                  ? `${trade.slDistancePct.toFixed(2)}%`
-                  : "—"
+                formatDistance(
+                  trade.slDistancePct ??
+                    (isPaul
+                      ? null
+                      : pctDistanceFromMark(trade as YourTrade, trade.slPrice)),
+                )
               }
               tone="text-red-300"
             />
             <DetailField
               label="TP distance"
               value={
-                trade.tpDistancePct !== null
-                  ? `${trade.tpDistancePct.toFixed(2)}%`
-                  : "—"
+                formatDistance(
+                  trade.tpDistancePct ??
+                    (isPaul
+                      ? null
+                      : pctDistanceFromMark(trade as YourTrade, trade.tpPrice)),
+                )
               }
               tone="text-emerald"
             />
@@ -178,21 +208,56 @@ function DetailField({
   label,
   value,
   tone,
+  footer,
+  footerTone,
 }: {
   label: string;
   value: string;
   tone?: string;
+  /** Round-15: optional small line under the value (e.g. "+$205.00"
+   *  on a Take-profit card showing the $ outcome if TP hits). */
+  footer?: string | null;
+  footerTone?: string;
 }) {
   return (
     <div className="rounded-lg border border-border bg-surface p-3">
       <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
-      <p className={`mt-1 font-mono text-sm font-semibold ${tone ?? "text-foreground"}`}>
+      <p
+        className={`mt-1 font-mono text-sm font-semibold ${tone ?? "text-foreground"}`}
+      >
         {value}
       </p>
+      {footer && (
+        <p
+          className={`mt-0.5 font-mono text-[11px] ${footerTone ?? "text-muted-foreground"} opacity-90`}
+        >
+          {footer}
+        </p>
+      )}
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Tiny formatters — Round-15 SL/TP exposure + distance display.
+// ---------------------------------------------------------------------------
+
+/** Format the SL/TP $ outcome line. Null → empty (caller hides). */
+function formatExposure(n: number | null): string | null {
+  if (n === null || !Number.isFinite(n)) return null;
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return `${sign}$${v}`;
+}
+
+/** SL / TP distance display. Renders "—" only when both the shaped
+ *  field and the recomputed value were null. */
+function formatDistance(pct: number | null): string {
+  if (pct === null || !Number.isFinite(pct)) return "—";
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return `${sign}${Math.abs(pct).toFixed(2)}%`;
 }
 
 function TradeTimeline({ trade }: { trade: AnyTrade }) {
@@ -218,7 +283,7 @@ function TradeTimeline({ trade }: { trade: AnyTrade }) {
             {isOpen ? "Status" : "Closed"}
           </p>
           <p className="mt-1 font-mono text-sm text-foreground">
-            {isOpen ? "Still open" : fmtIsoUtc(trade.closedAt)}
+            {isOpen ? "Active" : fmtIsoUtc(trade.closedAt)}
           </p>
         </div>
       </div>

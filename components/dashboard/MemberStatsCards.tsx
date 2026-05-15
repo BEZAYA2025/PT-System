@@ -2,8 +2,11 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
+  aggregateExposure,
   buildTradesView,
+  pnlAtPrice,
   type TradesStats,
+  type YourTrade,
   type YourTradesMeta,
 } from "@/lib/trades";
 import {
@@ -98,7 +101,7 @@ export function MemberStatsCards({
   const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
   const [stats, setStats] = useState<TradesStats>(initialStats);
   const [meta, setMeta] = useState<YourTradesMeta | undefined>(initialMeta);
-  const [openCount, setOpenCount] = useState<number>(0);
+  const [openTrades, setOpenTrades] = useState<YourTrade[]>([]);
   const inFlight = useRef(false);
 
   // Round-14c (verified): VPS now mirrors `credential_status` on
@@ -127,7 +130,7 @@ export function MemberStatsCards({
         // half so pass null for paul (it doesn't affect your.stats).
         const view = buildTradesView(myRaw, null, Date.now());
         setStats(view.your.stats);
-        setOpenCount(view.your.active.length);
+        setOpenTrades(view.your.active);
         if (view.yourMeta) setMeta(view.yourMeta);
       }
     } catch {
@@ -181,7 +184,7 @@ export function MemberStatsCards({
         <UnrealizedPnlBody
           credentialStatus={credentialStatus}
           connected={connected}
-          openCount={openCount}
+          openTrades={openTrades}
           unrealized={unrealized}
           unrealizedPct={unrealizedPct}
         />
@@ -283,13 +286,13 @@ function LiveDot() {
 function UnrealizedPnlBody({
   credentialStatus,
   connected,
-  openCount,
+  openTrades,
   unrealized,
   unrealizedPct,
 }: {
   credentialStatus: CredentialStatus | undefined;
   connected: boolean;
-  openCount: number;
+  openTrades: YourTrade[];
   unrealized: number | null;
   unrealizedPct: number | null;
 }) {
@@ -323,6 +326,7 @@ function UnrealizedPnlBody({
       </>
     );
   }
+  const openCount = openTrades.length;
   if (openCount === 0) {
     return (
       <>
@@ -347,6 +351,90 @@ function UnrealizedPnlBody({
           across {openCount} open position{openCount === 1 ? "" : "s"}
         </span>
       </SubLine>
+      <SlTpExposureLine openTrades={openTrades} />
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// SL/TP exposure — compact line under the Unrealized PnL value.
+//
+// Single open trade  → "SL 80,010 (-$125) · TP 82,100 (+$205)"
+// Multiple trades    → "SL exposure -$X · TP target +$Y"  (aggregate $)
+// If qty is missing for every open trade → row hides entirely.
+// ---------------------------------------------------------------------------
+
+function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
+  const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
+  if (slLossUsd === null && tpGainUsd === null) return null;
+
+  // Single-trade form shows the actual SL/TP prices so the member
+  // can read the line as a contract: "if 80,010 hits → -$125".
+  if (openTrades.length === 1) {
+    const t = openTrades[0];
+    const slPnl = pnlAtPrice(t, t.slPrice);
+    const tpPnl = pnlAtPrice(t, t.tpPrice);
+    return (
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
+        {t.slPrice !== null && (
+          <span className="text-red-300">
+            SL {fmtPrice(t.slPrice)}
+            {slPnl !== null && (
+              <span className="ml-1 opacity-80">({fmtSignedUsd(slPnl)})</span>
+            )}
+          </span>
+        )}
+        {t.slPrice !== null && t.tpPrice !== null && (
+          <span aria-hidden className="text-muted-foreground">
+            ·
+          </span>
+        )}
+        {t.tpPrice !== null && (
+          <span className="text-emerald">
+            TP {fmtPrice(t.tpPrice)}
+            {tpPnl !== null && (
+              <span className="ml-1 opacity-80">({fmtSignedUsd(tpPnl)})</span>
+            )}
+          </span>
+        )}
+      </p>
+    );
+  }
+
+  // Multi-trade form drops the per-trade prices (each row has a
+  // different SL/TP) and just surfaces the aggregate exposure.
+  return (
+    <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
+      {slLossUsd !== null && (
+        <span className="text-red-300">
+          SL exposure {fmtSignedUsd(slLossUsd)}
+        </span>
+      )}
+      {slLossUsd !== null && tpGainUsd !== null && (
+        <span aria-hidden className="text-muted-foreground">
+          ·
+        </span>
+      )}
+      {tpGainUsd !== null && (
+        <span className="text-emerald">
+          TP target {fmtSignedUsd(tpGainUsd)}
+        </span>
+      )}
+    </p>
+  );
+}
+
+// Round-15: shared formatter helpers used by the SL/TP exposure line.
+function fmtPrice(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return "—";
+  if (n >= 1000)
+    return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (n >= 1) return n.toFixed(2);
+  return n.toFixed(4);
+}
+
+function fmtSignedUsd(n: number): string {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return `${sign}$${v}`;
 }

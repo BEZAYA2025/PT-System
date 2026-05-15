@@ -35,6 +35,10 @@ export interface YourTrade extends CommonTrade {
    *  Used to compute Unrealized PnL %. Null when backend doesn't ship it
    *  — the % display gracefully hides in that case. */
   marginUsd?: number | null;
+  /** Position size in base-asset units. Round-15: drives the SL$ /
+   *  TP$ "would-lose / would-gain" math in the Top-Card and modal.
+   *  Picker reads qty / quantity / size / position_size (snake + camel). */
+  qty?: number | null;
   leverage?: number | null;
   tradeNumber?: number | null;
 }
@@ -96,6 +100,72 @@ export interface TradesView {
   };
   yourMeta?: YourTradesMeta;
   fetchedAt: number;
+}
+
+// ---------------------------------------------------------------------------
+// SL/TP exposure math — Round-15.
+//
+// Member-visible signal: "if SL hits → you'd lose $X, if TP hits → you'd
+// gain $Y". Computed from (price - entry) * qty * sideSign so the sign
+// is correct for both long and short.
+//
+// Returns null when qty is missing (backend didn't ship it AND notional
+// fallback didn't fire) so the consumer can degrade gracefully instead
+// of rendering a confidently-wrong "$0" value.
+// ---------------------------------------------------------------------------
+
+/** $ outcome if `target` price hits, signed against the trade side. */
+export function pnlAtPrice(
+  trade: YourTrade,
+  target: number | null,
+): number | null {
+  if (target === null || trade.qty === null || trade.qty === undefined) {
+    return null;
+  }
+  const sideSign = trade.side === "long" ? 1 : -1;
+  return (target - trade.entry) * trade.qty * sideSign;
+}
+
+/** % distance from the live mark to `target`. Signed against side so the
+ *  output reads naturally: SL distance comes out negative (you have to
+ *  drop to lose), TP distance positive (you have to rise to win). */
+export function pctDistanceFromMark(
+  trade: YourTrade,
+  target: number | null,
+): number | null {
+  if (target === null || trade.mark === null || trade.mark <= 0) {
+    return null;
+  }
+  const sideSign = trade.side === "long" ? 1 : -1;
+  return ((target - trade.mark) / trade.mark) * 100 * sideSign;
+}
+
+/** Aggregate SL/TP exposure across all open trades. Used by the
+ *  Top-Card to show a single line summary without per-trade rendering. */
+export function aggregateExposure(open: YourTrade[]): {
+  slLossUsd: number | null;
+  tpGainUsd: number | null;
+} {
+  let slLoss = 0;
+  let tpGain = 0;
+  let slHasAny = false;
+  let tpHasAny = false;
+  for (const t of open) {
+    const sl = pnlAtPrice(t, t.slPrice);
+    if (sl !== null) {
+      slLoss += sl;
+      slHasAny = true;
+    }
+    const tp = pnlAtPrice(t, t.tpPrice);
+    if (tp !== null) {
+      tpGain += tp;
+      tpHasAny = true;
+    }
+  }
+  return {
+    slLossUsd: slHasAny ? slLoss : null,
+    tpGainUsd: tpHasAny ? tpGain : null,
+  };
 }
 
 const num = (v: unknown): number | null =>
@@ -439,6 +509,23 @@ function shapeMyEndpointOne(
       return null;
     })();
 
+  // Round-15: position size in base-asset units (e.g. BTC qty, not
+  // USD). Powers the SL/TP $ math. Same defensive pattern as the
+  // other pickers — backend field can be qty / quantity / size /
+  // position_size; if missing, derive from notional / entry; if that
+  // also fails, leave null and the $ math degrades gracefully.
+  const qty =
+    num(t.qty) ??
+    num(t.quantity) ??
+    num(t.size) ??
+    num(t.position_size) ??
+    num(t.positionSize) ??
+    (() => {
+      const notional = num(t.notional) ?? num(t.position_size_usd);
+      if (notional !== null && entry > 0) return notional / entry;
+      return null;
+    })();
+
   const referencePrice = status === "open" ? mark : exit;
 
   const idRaw = t.id ?? t.trade_id;
@@ -460,6 +547,7 @@ function shapeMyEndpointOne(
     exit: status === "closed" ? exit : null,
     pnlUsd,
     marginUsd,
+    qty,
     // Round-14c (verified): `unrealized_pnl_pct` is the VPS-confirmed
     // per-trade field for open positions. Closed trades typically
     // expose `roi_pct` / `realized_pnl_pct` instead — picker stacks
