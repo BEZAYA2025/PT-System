@@ -19,14 +19,17 @@ interface Props {
 }
 
 export function AvenAvatar({
-  size = 28,
+  size = 24,
   online = true,
   breath = false,
 }: Props) {
-  // Ring sits ~1.2× the avatar diameter. The soft-pulse keyframe scales
-  // it up to 1.5 while fading out, so the maximum visual reach is
-  // ≈ 1.8× the avatar — soft aura, not a notification ping.
-  const ringSize = Math.round(size * 1.2);
+  // Round-14c: ring tightened from 1.2× to 1.1× the avatar diameter.
+  // Combined with the soft-pulse peak at scale 1.5 the maximum reach
+  // is ≈ 1.65× the avatar — close enough that the pulse reads as a
+  // heartbeat aura, not a notification badge. Default size is also
+  // dropped 28→24 (tailwind size-6) so the avatar stays quiet next
+  // to the "AI Mentor / Aven" two-line text in the Aven bar.
+  const ringSize = Math.round(size * 1.1);
   const isTriangle = AVEN_VARIANT === "triangle";
 
   return (

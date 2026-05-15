@@ -93,12 +93,21 @@ export function MemberStatsCards({
   btcPrice: initialBtcPrice,
   stats: initialStats,
   meta: initialMeta,
-  credentialStatus,
+  credentialStatus: ssrCredentialStatus,
 }: Props) {
   const [btcPrice, setBtcPrice] = useState<number | null>(initialBtcPrice);
   const [stats, setStats] = useState<TradesStats>(initialStats);
   const [meta, setMeta] = useState<YourTradesMeta | undefined>(initialMeta);
+  const [openCount, setOpenCount] = useState<number>(0);
   const inFlight = useRef(false);
+
+  // Round-14c (verified): VPS now mirrors `credential_status` on
+  // `/api/cockpit/my-trades` too. The 5s polling refresh below picks
+  // that up via meta.credentialStatus, which means we react to a
+  // freshly-connected (or revoked) key within one tick — without
+  // waiting for a full router.refresh + /api/auth/me round-trip.
+  // SSR prop stays as the cold-start value before the first poll.
+  const credentialStatus = meta?.credentialStatus ?? ssrCredentialStatus;
 
   const refresh = useCallback(async () => {
     if (inFlight.current) return;
@@ -118,6 +127,7 @@ export function MemberStatsCards({
         // half so pass null for paul (it doesn't affect your.stats).
         const view = buildTradesView(myRaw, null, Date.now());
         setStats(view.your.stats);
+        setOpenCount(view.your.active.length);
         if (view.yourMeta) setMeta(view.yourMeta);
       }
     } catch {
@@ -151,30 +161,30 @@ export function MemberStatsCards({
         </SubLine>
       </Card>
 
-      {/* Card 2 — Unrealized PnL */}
+      {/* Card 2 — Unrealized PnL
+       *
+       * Round-14c: explicit 4-state machine per Paul's spec. The
+       * previous boolean `connected ? activeState : emptyState`
+       * collapsed two real states ("missing" and "invalid_please_
+       * relink") into one CTA, and crashed against the production
+       * desync case where credential_status said "ok" but my-trades
+       * lagged so `connected` flipped false → false-negative empty
+       * state on top of a real open position.
+       *
+       *   credential_status "missing"               → Connect CTA
+       *   credential_status "invalid_please_relink" → Re-link CTA
+       *   connected + open.length === 0             → Stats unlock copy
+       *   connected + open.length > 0               → live PnL + %
+       */}
       <Card>
         <Caption>Unrealized PnL</Caption>
-        {connected ? (
-          <>
-            <BigValue tone={toneFor(unrealized)}>
-              {fmtBigUsd(unrealized)}
-            </BigValue>
-            <SubLine muted>
-              {unrealizedPct !== null ? (
-                <span className={toneFor(unrealizedPct)}>
-                  {fmtSignedPct(unrealizedPct)}
-                </span>
-              ) : null}
-              {unrealizedPct !== null && <span aria-hidden>·</span>}
-              <span>across open positions</span>
-            </SubLine>
-          </>
-        ) : (
-          <>
-            <BigValue muted>—</BigValue>
-            <SubLine muted>Connect exchange in Settings</SubLine>
-          </>
-        )}
+        <UnrealizedPnlBody
+          credentialStatus={credentialStatus}
+          connected={connected}
+          openCount={openCount}
+          unrealized={unrealized}
+          unrealizedPct={unrealizedPct}
+        />
       </Card>
 
       {/* Card 3 — Realized PnL */}
@@ -263,5 +273,80 @@ function LiveDot() {
       />
       <span className="relative inline-flex size-1.5 rounded-full bg-emerald" />
     </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Unrealized-PnL body — 4-state render per Paul's spec.
+// ---------------------------------------------------------------------------
+
+function UnrealizedPnlBody({
+  credentialStatus,
+  connected,
+  openCount,
+  unrealized,
+  unrealizedPct,
+}: {
+  credentialStatus: CredentialStatus | undefined;
+  connected: boolean;
+  openCount: number;
+  unrealized: number | null;
+  unrealizedPct: number | null;
+}) {
+  if (credentialStatus === "missing") {
+    return (
+      <>
+        <BigValue muted>—</BigValue>
+        <SubLine muted>Connect exchange in Settings</SubLine>
+      </>
+    );
+  }
+  if (credentialStatus === "invalid_please_relink") {
+    return (
+      <>
+        <BigValue muted>—</BigValue>
+        <SubLine muted>
+          <span className="text-amber-300">Re-link your exchange</span>
+        </SubLine>
+      </>
+    );
+  }
+  // credential_status "ok" / "founder_env" / undefined → use the
+  // `connected` resolver. If we're still not connected here it means
+  // the legacy fallback (my-trades has_exchange) also said false, so
+  // surface the same Connect CTA.
+  if (!connected) {
+    return (
+      <>
+        <BigValue muted>—</BigValue>
+        <SubLine muted>Connect exchange in Settings</SubLine>
+      </>
+    );
+  }
+  if (openCount === 0) {
+    return (
+      <>
+        <BigValue muted>$0</BigValue>
+        <SubLine muted>No open positions right now</SubLine>
+      </>
+    );
+  }
+  return (
+    <>
+      <BigValue tone={toneFor(unrealized)}>
+        {fmtBigUsd(unrealized)}
+      </BigValue>
+      <SubLine muted>
+        {unrealizedPct !== null ? (
+          <span className={toneFor(unrealizedPct)}>
+            {fmtSignedPct(unrealizedPct)}
+          </span>
+        ) : null}
+        {unrealizedPct !== null && <span aria-hidden>·</span>}
+        <span>
+          across {openCount} open position{openCount === 1 ? "" : "s"}
+        </span>
+      </SubLine>
+    </>
   );
 }
