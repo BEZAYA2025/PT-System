@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import {
   getInitialAvenHistory,
+  getInitialMyTrades,
   getInitialPaulTrades,
   getRawSnapshot,
   requireUser,
@@ -37,8 +38,9 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const [raw, paulRaw, history] = await Promise.all([
+  const [raw, myRaw, paulRaw, history] = await Promise.all([
     getRawSnapshot(),
+    getInitialMyTrades(),
     getInitialPaulTrades(),
     getInitialAvenHistory(50),
   ]);
@@ -47,7 +49,7 @@ export default async function DashboardPage() {
     ? buildMarketPulseView(raw as RawSnapshotMetrics, fetchedAt)
     : null;
   const initialBrief = raw ? shapeBrief(raw as RawBriefShape) : null;
-  const initialTrades = buildTradesView(raw, paulRaw, fetchedAt);
+  const initialTrades = buildTradesView(myRaw, paulRaw, fetchedAt);
 
   const showTour = user.first_login_completed === false;
 

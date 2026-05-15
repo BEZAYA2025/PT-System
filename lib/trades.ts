@@ -51,9 +51,16 @@ export interface PaulsTrade extends CommonTrade {
 
 export type AnyTrade = YourTrade | PaulsTrade;
 
+/** Member-side metadata for the empty-state copy. */
+export interface YourTradesMeta {
+  hasExchange: boolean;
+  exchangeType: string | null;
+}
+
 export interface TradesView {
   your: { active: YourTrade[]; recent: YourTrade[] };
   pauls: { active: PaulsTrade[]; recent: PaulsTrade[] };
+  yourMeta?: YourTradesMeta;
   fetchedAt: number;
 }
 
@@ -283,6 +290,132 @@ function shapePaulEndpointOne(
   };
 }
 
+/**
+ * Shape a single entry from the dedicated /api/cockpit/my-trades feed.
+ * Mirrors shapePaulEndpointOne but preserves USD PnL (member sees their
+ * own absolute money).
+ */
+function shapeMyEndpointOne(
+  raw: unknown,
+  fallbackId: string,
+): YourTrade | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown>;
+
+  const symbol = str(t.symbol);
+  if (!symbol) return null;
+
+  const entry = num(t.entry) ?? num(t.entry_price);
+  if (entry === null) return null;
+
+  const status: TradeStatus =
+    str(t.status)?.toLowerCase() === "closed" ? "closed" : "open";
+  const exit = num(t.exit) ?? num(t.exit_price);
+  const sl = num(t.sl) ?? num(t.stop_loss);
+  const tp = num(t.tp) ?? num(t.take_profit);
+  const mark = num(t.mark) ?? num(t.mark_price) ?? num(t.current_price);
+  const openedAt = str(t.opened_at) ?? "";
+  const durationSec = num(t.duration_seconds);
+
+  const closedAt =
+    status === "closed" && openedAt && durationSec !== null
+      ? (() => {
+          try {
+            const startMs = new Date(openedAt).getTime();
+            if (!Number.isFinite(startMs)) return null;
+            return new Date(startMs + durationSec * 1000).toISOString();
+          } catch {
+            return null;
+          }
+        })()
+      : null;
+
+  const durationLabel =
+    durationSec !== null && durationSec > 0
+      ? durationFromSeconds(durationSec)
+      : durationFromOpened(openedAt, closedAt);
+
+  const pnlUsd =
+    num(t.pnl_usd) ??
+    num(t.realized_pnl_usd) ??
+    num(t.unrealized_pnl_usd) ??
+    num(t.pnl) ??
+    0;
+
+  const referencePrice = status === "open" ? mark : exit;
+
+  const idRaw = t.id ?? t.trade_id;
+  const id =
+    typeof idRaw === "number"
+      ? String(idRaw)
+      : typeof idRaw === "string"
+        ? idRaw
+        : fallbackId;
+
+  return {
+    id,
+    owner: "self",
+    symbol,
+    side: lowerSide(t.side),
+    status,
+    entry,
+    mark: status === "open" ? mark : null,
+    exit: status === "closed" ? exit : null,
+    pnlUsd,
+    pnlPct: num(t.roi_pct) ?? num(t.realized_pnl_pct) ?? 0,
+    slPrice: sl,
+    tpPrice: tp,
+    slDistancePct:
+      status === "open" ? computeDistancePct(referencePrice, sl) : null,
+    tpDistancePct:
+      status === "open" ? computeDistancePct(referencePrice, tp) : null,
+    openedAt,
+    closedAt,
+    durationLabel,
+  };
+}
+
+/**
+ * Shape the dedicated /api/cockpit/my-trades response. Empty + has_exchange=false
+ * is the cold-start state for unconnected members.
+ */
+export function shapeMyTrades(raw: unknown): {
+  active: YourTrade[];
+  recent: YourTrade[];
+  hasExchange: boolean;
+  exchangeType: string | null;
+} {
+  if (!raw || typeof raw !== "object") {
+    return {
+      active: [],
+      recent: [],
+      hasExchange: false,
+      exchangeType: null,
+    };
+  }
+  const t = raw as Record<string, unknown>;
+  const open = Array.isArray(t.open) ? t.open : [];
+  const closed = Array.isArray(t.closed) ? t.closed : [];
+
+  const active = open
+    .map((x, i) => shapeMyEndpointOne(x, `my-open-${i}`))
+    .filter((x): x is YourTrade => x !== null);
+  const recent = closed
+    .map((x, i) => shapeMyEndpointOne(x, `my-closed-${i}`))
+    .filter((x): x is YourTrade => x !== null)
+    .slice(0, 5);
+
+  return {
+    active,
+    recent,
+    hasExchange: t.has_exchange === true,
+    exchangeType:
+      typeof t.exchange_type === "string" && t.exchange_type.length > 0
+        ? t.exchange_type
+        : null,
+  };
+}
+
 /** Shape the dedicated /api/cockpit/paul-trades response. */
 export function shapePaulTrades(raw: unknown): {
   active: PaulsTrade[];
@@ -347,18 +480,23 @@ export function shapeOwnTrades(snapshotRaw: unknown): {
 }
 
 /**
- * Combine snapshot (own) + dedicated paul-trades endpoint into a single
+ * Combine the dedicated my-trades + paul-trades feeds into a single
  * TradesView. Either raw may be null/missing — caller will see empty
  * sections, not a crash.
  */
 export function buildTradesView(
-  snapshotRaw: unknown,
+  myRaw: unknown,
   paulRaw: unknown,
   fetchedAt: number,
 ): TradesView {
+  const my = shapeMyTrades(myRaw);
   return {
-    your: shapeOwnTrades(snapshotRaw),
+    your: { active: my.active, recent: my.recent },
     pauls: shapePaulTrades(paulRaw),
+    yourMeta: {
+      hasExchange: my.hasExchange,
+      exchangeType: my.exchangeType,
+    },
     fetchedAt,
   };
 }

@@ -64,21 +64,19 @@ export function TradesGrid({ initial }: Props) {
     inFlight.current = true;
     setRefreshing(true);
     try {
-      // Own trades still live on the snapshot. Paul's trades moved to a
-      // dedicated USD-stripped endpoint. Fire both in parallel.
-      const [snapRes, paulRes] = await Promise.all([
-        fetch("/api/proxy/snapshot", { cache: "no-store" }),
+      // Both feeds in parallel. Member-owned + Paul's trades each on their
+      // own dedicated endpoint (snapshot is no longer the trades source).
+      const [myRes, paulRes] = await Promise.all([
+        fetch("/api/proxy/cockpit/my-trades", { cache: "no-store" }),
         fetch("/api/proxy/cockpit/paul-trades", { cache: "no-store" }),
       ]);
-      if (!snapRes.ok && !paulRes.ok) {
-        setError(
-          `Snapshot ${snapRes.status} · Paul ${paulRes.status}`,
-        );
+      if (!myRes.ok && !paulRes.ok) {
+        setError(`My ${myRes.status} · Paul ${paulRes.status}`);
         return;
       }
-      const snapRaw = snapRes.ok ? await snapRes.json().catch(() => null) : null;
+      const myRaw = myRes.ok ? await myRes.json().catch(() => null) : null;
       const paulRaw = paulRes.ok ? await paulRes.json().catch(() => null) : null;
-      setView(buildTradesView(snapRaw, paulRaw, Date.now()));
+      setView(buildTradesView(myRaw, paulRaw, Date.now()));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -149,6 +147,7 @@ export function TradesGrid({ initial }: Props) {
           <YourTradesSection
             active={view?.your.active ?? []}
             recent={view?.your.recent ?? []}
+            meta={view?.yourMeta}
             onSelect={setDetail}
             isFresh={isFresh}
           />
@@ -182,17 +181,40 @@ function LiveDot() {
   );
 }
 
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function YourTradesSection({
   active,
   recent,
+  meta,
   onSelect,
   isFresh,
 }: {
   active: import("@/lib/trades").YourTrade[];
   recent: import("@/lib/trades").YourTrade[];
+  meta?: import("@/lib/trades").YourTradesMeta;
   onSelect: (t: AnyTrade) => void;
   isFresh: boolean;
 }) {
+  const empty = active.length === 0 && recent.length === 0;
+
+  // Single big empty-state when there's literally nothing — message is
+  // exchange-aware so the member knows what to do next.
+  if (empty && meta) {
+    return (
+      <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Your trades
+          </h2>
+        </div>
+        <YourTradesEmpty meta={meta} />
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
       <div className="flex items-center justify-between gap-3">
@@ -213,10 +235,7 @@ function YourTradesSection({
 
       <RecentBlock title="Recent — last 5 closed">
         {recent.length === 0 ? (
-          <EmptyRow
-            icon="plug"
-            message="No trades yet — connect your exchange in Settings to start tracking."
-          />
+          <EmptyRow message="No closed positions yet." />
         ) : (
           recent.map((t) => (
             <YourTradeRow key={t.id} trade={t} onClick={() => onSelect(t)} />
@@ -224,6 +243,73 @@ function YourTradesSection({
         )}
       </RecentBlock>
     </section>
+  );
+}
+
+function YourTradesEmpty({
+  meta,
+}: {
+  meta: import("@/lib/trades").YourTradesMeta;
+}) {
+  // Case 1: no exchange linked yet
+  if (!meta.hasExchange) {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-background px-6 py-10 text-center">
+        <span className="inline-flex size-12 items-center justify-center rounded-full bg-emerald/[0.08] text-emerald">
+          <IconPlugConnected size={22} stroke={1.5} aria-hidden />
+        </span>
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Connect your exchange
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Open Settings → Exchange API and link a read-only key to track
+            your positions here.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const ex = meta.exchangeType?.toLowerCase() ?? null;
+
+  // Case 3: exchange linked but Bitunix isn't supported yet
+  if (ex === "bitunix") {
+    return (
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-amber-500/30 bg-amber-500/[0.04] px-6 py-10 text-center">
+        <span className="inline-flex size-12 items-center justify-center rounded-full bg-amber-500/[0.12] text-amber-300">
+          <IconChartCandle size={22} stroke={1.5} aria-hidden />
+        </span>
+        <div>
+          <p className="text-sm font-medium text-foreground">
+            Bitunix tracking coming soon
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Multi-exchange support is in development — your Bitunix
+            positions will appear here once it lands.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Case 2: exchange linked, no trades yet (any other exchange)
+  const exchangeLabel = ex ? capitalize(ex) : "your exchange";
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-background px-6 py-10 text-center">
+      <span className="inline-flex size-12 items-center justify-center rounded-full bg-emerald/[0.08] text-emerald">
+        <IconChartCandle size={22} stroke={1.5} aria-hidden />
+      </span>
+      <div>
+        <p className="text-sm font-medium text-foreground">
+          No positions yet
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Start trading on {exchangeLabel} — your live PnL appears here as
+          soon as a position opens.
+        </p>
+      </div>
+    </div>
   );
 }
 
