@@ -512,14 +512,19 @@ function shapeMyEndpointOne(
   // Round-15: position size in base-asset units (e.g. BTC qty, not
   // USD). Powers the SL/TP $ math. Same defensive pattern as the
   // other pickers — backend field can be qty / quantity / size /
-  // position_size; if missing, derive from notional / entry; if that
-  // also fails, leave null and the $ math degrades gracefully.
+  // position_size / entry_qty (Round-18 alias spotted in production).
+  // If none match, derive from notional / entry; if that also fails,
+  // leave null and the $ math degrades gracefully.
   const qty =
     num(t.qty) ??
     num(t.quantity) ??
     num(t.size) ??
     num(t.position_size) ??
+    num(t.entry_qty) ??
+    num(t.contract_size) ??
     num(t.positionSize) ??
+    num(t.entryQty) ??
+    num(t.contractSize) ??
     (() => {
       const notional = num(t.notional) ?? num(t.position_size_usd);
       if (notional !== null && entry > 0) return notional / entry;

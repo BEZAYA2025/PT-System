@@ -116,9 +116,12 @@ export function TradeDetailModal({
          *  Paul's, so members see the holding-period at a glance. */}
         <TradeTimeline trade={trade} />
 
-        {/* Price grid — SL + TP cards now carry the $ outcome below
-            the price so the member sees risk/reward at a glance. */}
-        <div className="grid gap-3 sm:grid-cols-4">
+        {/* Price grid — SL + TP cards carry the $ outcome below the
+            price so the member sees risk/reward at a glance.
+            Round-18 mobile: 2×2 on narrow viewports instead of 4
+            stacked rows so the modal stays a reasonable height on
+            phone screens. */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <DetailField label="Entry" value={fmtPrice(trade.entry)} />
           <DetailField
             label={trade.status === "open" ? "Mark" : "Exit"}
@@ -131,7 +134,6 @@ export function TradeDetailModal({
           <DetailField
             label="Stop loss"
             value={fmtPrice(trade.slPrice)}
-            tone="text-red-300"
             footer={
               !isPaul && trade.status === "open"
                 ? formatExposure(pnlAtPrice(trade as YourTrade, trade.slPrice))
@@ -142,7 +144,6 @@ export function TradeDetailModal({
           <DetailField
             label="Take profit"
             value={fmtPrice(trade.tpPrice)}
-            tone="text-emerald"
             footer={
               !isPaul && trade.status === "open"
                 ? formatExposure(pnlAtPrice(trade as YourTrade, trade.tpPrice))
@@ -156,7 +157,11 @@ export function TradeDetailModal({
             Round-15: when the shaper's slDistancePct comes through as
             null (older mark missing, etc.) recompute from the modal
             side so the row never falls back to "—" with full data
-            available. */}
+            available.
+            Round-18: each Distance card now also shows the absolute
+            price delta ("-1,051$") under the % so members see both
+            "how far in %" and "how far in $". Value tones flip per
+            Paul's rule — only the numeric value carries the colour. */}
         {trade.status === "open" && (
           <div className="grid gap-3 sm:grid-cols-2">
             <DetailField
@@ -170,6 +175,8 @@ export function TradeDetailModal({
                 )
               }
               tone="text-red-300"
+              footer={formatPriceDelta(trade.mark, trade.slPrice)}
+              footerTone="text-red-300"
             />
             <DetailField
               label="TP distance"
@@ -182,6 +189,8 @@ export function TradeDetailModal({
                 )
               }
               tone="text-emerald"
+              footer={formatPriceDelta(trade.tpPrice, trade.mark)}
+              footerTone="text-emerald"
             />
           </div>
         )}
@@ -244,12 +253,14 @@ function DetailField({
 // Tiny formatters — Round-15 SL/TP exposure + distance display.
 // ---------------------------------------------------------------------------
 
-/** Format the SL/TP $ outcome line. Null → empty (caller hides). */
+/** Format the SL/TP $ outcome line as "(-267$)" / "(+235$)" per
+ *  Round-18 spec: number-then-$-suffix, wrapped in brackets. Caller
+ *  decides which span is coloured. */
 function formatExposure(n: number | null): string | null {
   if (n === null || !Number.isFinite(n)) return null;
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
-  return `${sign}$${v}`;
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return `(${sign}${v}$)`;
 }
 
 /** SL / TP distance display. Renders "—" only when both the shaped
@@ -258,6 +269,30 @@ function formatDistance(pct: number | null): string {
   if (pct === null || !Number.isFinite(pct)) return "—";
   const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
   return `${sign}${Math.abs(pct).toFixed(2)}%`;
+}
+
+/** Round-18: absolute price delta from `from` to `to`, signed and
+ *  $-suffixed ("-1,051$"). Null when either side is missing. Used by
+ *  the Distance cards to surface the $-delta below the %. */
+function formatPriceDelta(
+  to: number | null,
+  from: number | null,
+): string | null {
+  if (
+    to === null ||
+    from === null ||
+    !Number.isFinite(to) ||
+    !Number.isFinite(from)
+  ) {
+    return null;
+  }
+  const delta = to - from;
+  if (!Number.isFinite(delta)) return null;
+  const sign = delta > 0 ? "+" : delta < 0 ? "−" : "";
+  const v = Math.abs(delta).toLocaleString("en-US", {
+    maximumFractionDigits: 0,
+  });
+  return `${sign}${v}$`;
 }
 
 function TradeTimeline({ trade }: { trade: AnyTrade }) {
