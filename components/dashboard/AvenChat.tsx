@@ -17,6 +17,7 @@ import {
 } from "@tabler/icons-react";
 import { AvenAvatar } from "./AvenAvatar";
 import { useAvenChat } from "./use-aven-chat";
+import { useAvenObservations } from "./use-aven-observations";
 import type { ChatMessage, QuotaState } from "@/lib/aven";
 
 interface Props {
@@ -225,18 +226,33 @@ function AvenLiveBar({
   const [paused, setPaused] = useState(false);
   const reduce = useReducedMotion();
 
+  // Round-19: subscribe to the live observations stream. The hook
+  // returns real observations when the VPS SSE is producing data;
+  // falls back to LIVE_OBSERVATIONS when not connected so the bar
+  // is never empty during a network blip or before the backend has
+  // shipped the endpoint to a particular member.
+  const { observations } = useAvenObservations(LIVE_OBSERVATIONS);
+
+  // Reset the rotator index whenever the source array shrinks below
+  // our cursor (e.g. SSE → fallback transition with fewer items, or a
+  // dedupe that trimmed the buffer). Without this the rotator could
+  // briefly render `undefined`.
+  useEffect(() => {
+    setIdx((i) => (observations.length > 0 ? i % observations.length : 0));
+  }, [observations.length]);
+
   // Hovering the bar freezes rotation so a member can finish reading the
   // current observation. Reduced-motion users get a longer dwell.
   useEffect(() => {
-    if (paused) return;
+    if (paused || observations.length === 0) return;
     const dwell = reduce ? 11000 : 9000;
     const id = setInterval(() => {
-      setIdx((i) => (i + 1) % LIVE_OBSERVATIONS.length);
+      setIdx((i) => (i + 1) % observations.length);
     }, dwell);
     return () => clearInterval(id);
-  }, [paused, reduce]);
+  }, [paused, reduce, observations.length]);
 
-  const obs = LIVE_OBSERVATIONS[idx];
+  const obs = observations[idx] ?? "";
 
   return (
     <div

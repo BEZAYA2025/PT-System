@@ -23,6 +23,7 @@ import {
   IconAlertCircle,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
+import { Toast, type ToastState } from "@/components/Toast";
 import { timeAgo } from "@/lib/format";
 import {
   shapeNotification,
@@ -229,6 +230,7 @@ export function NotificationCenter({ initial }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pulseToken, setPulseToken] = useState(0);
+  const [criticalToast, setCriticalToast] = useState<ToastState | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -282,11 +284,24 @@ export function NotificationCenter({ initial }: Props) {
       const ce = ev as CustomEvent<unknown>;
       const shaped = shapeNotification(ce.detail);
       if (!shaped) return;
+      let inserted = false;
       setList((prev) => {
         if (prev.some((n) => n.id === shaped.id)) return prev;
+        inserted = true;
         return [shaped, ...prev];
       });
       setPulseToken((t) => t + 1);
+      // Round-19: pop a toast for critical-severity alerts so the
+      // member can't miss them while looking at another part of the
+      // dashboard. Only fire on fresh inserts — re-receiving the
+      // same notification (e.g. SSE redelivery on reconnect) doesn't
+      // re-toast.
+      if (inserted && shaped.severity === "critical") {
+        setCriticalToast({
+          message: shaped.title || "Critical alert from Aven",
+          tone: "error",
+        });
+      }
     };
     window.addEventListener("pt-system:notification", handler);
     return () =>
@@ -436,6 +451,11 @@ export function NotificationCenter({ initial }: Props) {
           />
         </Modal>
       )}
+
+      <Toast
+        value={criticalToast}
+        onDismiss={() => setCriticalToast(null)}
+      />
     </>
   );
 }
