@@ -52,6 +52,10 @@ export default async function SettingsPage() {
         <ExchangeSettingsCard
           connected={user.binance_api_key_connected}
           addedAt={user.binance_api_key_added_at}
+          credentialStatus={user.credential_status}
+          exchangeType={user.exchange_type ?? null}
+          hasExchangeConnection={user.has_exchange_connection}
+          invalidSince={user.exchange_credentials_invalid_since ?? null}
         />
 
         <AccountSettingsCard

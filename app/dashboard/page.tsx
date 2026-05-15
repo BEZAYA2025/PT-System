@@ -21,6 +21,7 @@ import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import { MemberStatsCards } from "@/components/dashboard/MemberStatsCards";
 import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
 import { MotionSection } from "@/components/dashboard/MotionSection";
+import { CredentialDesyncCheck } from "@/components/dashboard/CredentialDesyncCheck";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -87,6 +88,25 @@ export default async function DashboardPage() {
       </MotionSection>
 
       {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
+
+      {/* Round-13b: production hit a false-positive where /api/auth/me
+          reported `binance_api_key_connected: true` for a user with no
+          row in the keys table while /api/cockpit/my-trades correctly
+          said `has_exchange: false`. This null-rendering component logs
+          a console.warn whenever the two disagree so any future drift
+          is caught in dev-tools instead of via user reports. */}
+      <CredentialDesyncCheck
+        meSnapshot={{
+          binance_api_key_connected: user.binance_api_key_connected,
+          credential_status: user.credential_status,
+          has_exchange_connection: user.has_exchange_connection,
+          exchange_type: user.exchange_type ?? null,
+        }}
+        myTradesSnapshot={{
+          hasExchange: initialTrades.yourMeta?.hasExchange ?? false,
+          exchangeType: initialTrades.yourMeta?.exchangeType ?? null,
+        }}
+      />
     </main>
   );
 }

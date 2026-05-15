@@ -81,14 +81,25 @@ export function ConnectExchangeModal({
           exchange_type: DEFAULT_EXCHANGE_TYPE,
         }),
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
       if (!res.ok) {
-        setSubmitError(
+        // Round-13b: include the HTTP status code in every error path so
+        // production-test failures are diagnosable without opening the
+        // network tab (matches the pattern in ExchangeSettingsCard's
+        // handleDisconnect).
+        const backendMsg =
           typeof data?.message === "string"
             ? data.message
             : typeof data?.error === "string"
               ? data.error
-              : "Couldn’t save that — please try again.",
+              : null;
+        setSubmitError(
+          backendMsg
+            ? `${backendMsg} (${res.status})`
+            : `Couldn’t save that — backend returned ${res.status}.`,
         );
         return;
       }
