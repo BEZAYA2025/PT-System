@@ -107,7 +107,7 @@ export function AvenChat({
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-surface">
+    <section className="overflow-hidden rounded-2xl border border-emerald/25 bg-gradient-to-br from-surface via-surface to-emerald/[0.04] shadow-[0_0_60px_-20px_rgba(16,185,129,0.3),0_8px_32px_-12px_rgba(0,0,0,0.4)]">
       <ChatHeader
         quota={chat.quota}
         streamConnected={chat.streamConnected}
@@ -184,9 +184,9 @@ function ChatHeader({
   messageCount: number;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 sm:px-8">
+    <div className="flex items-center justify-between gap-3 border-b border-emerald/15 px-6 py-5 sm:px-8">
       <div className="flex items-center gap-3">
-        <AvenAvatar size={36} online={streamConnected} />
+        <AvenAvatar size={40} online={streamConnected} breath />
         <div>
           <p className="text-base font-semibold tracking-tight text-foreground">
             Aven

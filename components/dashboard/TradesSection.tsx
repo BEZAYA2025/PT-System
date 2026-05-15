@@ -10,9 +10,7 @@ import {
 import { timeAgo } from "@/lib/format";
 import type {
   AnyTrade,
-  PaulsTrade,
   TradesStats,
-  YourTrade,
   YourTradesMeta,
 } from "@/lib/trades";
 
@@ -93,133 +91,9 @@ function SideBadge({
 // Top cards (3 horizontal: Symbol+Price · Unrealized · Realized)
 // ---------------------------------------------------------------------------
 
-interface TopCardsProps {
-  symbolLabel: string;
-  livePrice: number | null;
-  liveSource: string;
-  unrealizedUsd: number | null;
-  unrealizedPct: number | null;
-  realizedUsd: number | null;
-  winRatePct: number | null;
-  closedCount: number | null;
-  /** Hides the USD numbers (Paul's view). */
-  hideUsd?: boolean;
-}
-
-function TopCards({
-  symbolLabel,
-  livePrice,
-  liveSource,
-  unrealizedUsd,
-  unrealizedPct,
-  realizedUsd,
-  winRatePct,
-  closedCount,
-  hideUsd = false,
-}: TopCardsProps) {
-  return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {/* Card 1 — Symbol + Live Price */}
-      <div className="rounded-xl border border-border bg-background px-4 py-3">
-        <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-          {symbolLabel}
-        </p>
-        <p className="mt-1 font-mono text-xl font-semibold text-foreground">
-          {fmtCompactPrice(livePrice)}
-        </p>
-        <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          <span aria-hidden className="relative flex size-1.5">
-            <span
-              className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-              style={{ animationDuration: "2s" }}
-            />
-            <span className="relative inline-flex size-1.5 rounded-full bg-emerald" />
-          </span>
-          Live · {liveSource}
-        </p>
-      </div>
-
-      {/* Card 2 — Unrealized PnL */}
-      <PnlCard
-        label="Unrealized PnL"
-        usdValue={unrealizedUsd}
-        roiValue={unrealizedPct}
-        hideUsd={hideUsd}
-        sub={
-          unrealizedPct !== null
-            ? `ROI ${fmtSignedPct(unrealizedPct)}`
-            : "ROI —"
-        }
-      />
-
-      {/* Card 3 — Realized PnL */}
-      <PnlCard
-        label="Realized PnL"
-        usdValue={realizedUsd}
-        roiValue={null}
-        hideUsd={hideUsd}
-        sub={
-          winRatePct !== null && closedCount !== null
-            ? `Win-Rate ${winRatePct.toFixed(0)}% · ${closedCount} closed`
-            : closedCount !== null
-              ? `${closedCount} closed`
-              : "—"
-        }
-      />
-    </div>
-  );
-}
-
-function PnlCard({
-  label,
-  usdValue,
-  roiValue,
-  sub,
-  hideUsd,
-}: {
-  label: string;
-  usdValue: number | null;
-  roiValue: number | null;
-  sub: string;
-  hideUsd?: boolean;
-}) {
-  // Tone preference: USD value first, then ROI, then neutral.
-  const numForTone = usdValue ?? roiValue;
-  const tone =
-    numForTone === null
-      ? "text-foreground"
-      : numForTone > 0
-        ? "text-emerald"
-        : numForTone < 0
-          ? "text-red-300"
-          : "text-foreground";
-
-  let display: string;
-  if (hideUsd) {
-    display = roiValue !== null ? fmtSignedPct(roiValue) : "—";
-  } else if (usdValue !== null) {
-    display = fmtBigUsd(usdValue);
-  } else if (roiValue !== null) {
-    display = fmtSignedPct(roiValue);
-  } else {
-    display = "—";
-  }
-
-  return (
-    <div className="rounded-xl border border-border bg-background px-4 py-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.1em] text-muted-foreground">
-        {label}
-      </p>
-      <p className={`mt-1 font-mono text-xl font-semibold ${tone}`}>
-        {display}
-      </p>
-      <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Open trades panel — list of cards (or empty)
+// (Top-Cards moved to dashboard-level MemberStatsCards in round-8.)
 // ---------------------------------------------------------------------------
 
 function OpenTradesPanel({
@@ -608,27 +482,16 @@ interface CommonProps {
   recent: AnyTrade[];
   stats: TradesStats;
   onSelect: (t: AnyTrade) => void;
-  /** Live BTC price for Card 1 — same source for both sections. */
-  btcPrice: number | null;
 }
 
 export function MyTradesSection({
   active,
   recent,
-  stats,
   meta,
   onSelect,
-  btcPrice,
 }: CommonProps & { meta?: YourTradesMeta }) {
   const empty = active.length === 0 && recent.length === 0;
   const showColdStart = empty && meta !== undefined;
-
-  // Unrealized USD comes from the backend stats envelope (sum across all
-  // open positions). ROI caption still uses the first open trade's roi_pct
-  // since stats doesn't aggregate that.
-  const firstOpen = active[0] as YourTrade | undefined;
-  const unrealizedUsd = stats.unrealizedPnlSum ?? firstOpen?.pnlUsd ?? null;
-  const unrealizedPct = firstOpen?.pnlPct ?? null;
 
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
@@ -637,17 +500,6 @@ export function MyTradesSection({
           Your trades
         </h2>
       </header>
-
-      <TopCards
-        symbolLabel="BTC.USDT.P"
-        livePrice={btcPrice}
-        liveSource="Binance Perpetual"
-        unrealizedUsd={unrealizedUsd}
-        unrealizedPct={unrealizedPct}
-        realizedUsd={stats.realizedPnlSum}
-        winRatePct={stats.winRatePct}
-        closedCount={stats.closedCount}
-      />
 
       {showColdStart ? (
         <YourTradesColdStart meta={meta} />
@@ -674,34 +526,32 @@ export function PaulsTradesSection({
   recent,
   stats,
   onSelect,
-  btcPrice,
 }: CommonProps) {
-  const firstOpen = active[0] as PaulsTrade | undefined;
-  const unrealizedPct = firstOpen?.pnlPct ?? null;
+  const winRate = stats.winRatePct;
+  const closed = stats.closedCount;
+  const headerStats =
+    winRate !== null && closed !== null
+      ? `Win-Rate ${winRate.toFixed(0)}% · ${closed} closed`
+      : null;
 
   return (
     <section className="space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
-      <header className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">
-          Paul&apos;s trades
-        </h2>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Paul&apos;s trades
+          </h2>
+          {headerStats && (
+            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+              {headerStats}
+            </p>
+          )}
+        </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
           <IconUserCheck size={12} stroke={2} />
           Following Paul
         </span>
       </header>
-
-      <TopCards
-        symbolLabel="BTC.USDT.P"
-        livePrice={btcPrice}
-        liveSource="Binance Perpetual"
-        unrealizedUsd={null}
-        unrealizedPct={unrealizedPct}
-        realizedUsd={null}
-        winRatePct={stats.winRatePct}
-        closedCount={stats.closedCount}
-        hideUsd
-      />
 
       {active.length === 0 && recent.length === 0 ? (
         <ColdStart

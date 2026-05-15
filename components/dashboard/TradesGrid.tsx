@@ -23,12 +23,9 @@ const STALE_TICK_MS = 15_000;
 
 interface Props {
   initial: TradesView | null;
-  /** SSR-fetched BTC price (from layout's getRawSnapshot). Top cards use
-   *  it as their live-price reference until the in-section poll catches up. */
-  initialBtcPrice: number | null;
 }
 
-export function TradesGrid({ initial, initialBtcPrice }: Props) {
+export function TradesGrid({ initial }: Props) {
   const [view, setView] = useState<TradesView | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(initial === null);
@@ -132,7 +129,6 @@ export function TradesGrid({ initial, initialBtcPrice }: Props) {
             }
             meta={view?.yourMeta}
             onSelect={setDetail}
-            btcPrice={initialBtcPrice}
           />
           <PaulsTradesSection
             active={view?.pauls.active ?? []}
@@ -146,7 +142,6 @@ export function TradesGrid({ initial, initialBtcPrice }: Props) {
               }
             }
             onSelect={setDetail}
-            btcPrice={initialBtcPrice}
           />
         </div>
       </div>
