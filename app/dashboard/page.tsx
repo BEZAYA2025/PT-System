@@ -65,6 +65,7 @@ export default async function DashboardPage() {
           btcPrice={initialBtcPrice}
           stats={initialTrades.your.stats}
           meta={initialTrades.yourMeta}
+          credentialStatus={user.credential_status}
         />
       </MotionSection>
 
