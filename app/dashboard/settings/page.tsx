@@ -6,6 +6,8 @@ import { SubscriptionCard } from "@/components/dashboard/SubscriptionCard";
 import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCard";
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
 import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
+import { PrivacyDataCard } from "@/components/dashboard/PrivacyDataCard";
+import { HelpSupportCard } from "@/components/dashboard/HelpSupportCard";
 
 export const metadata: Metadata = {
   title: "Settings · PT System",
@@ -62,6 +64,10 @@ export default async function SettingsPage() {
           email={user.email}
           displayName={user.display_name}
         />
+
+        <PrivacyDataCard />
+
+        <HelpSupportCard />
       </div>
     </main>
   );
