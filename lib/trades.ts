@@ -31,6 +31,8 @@ interface CommonTrade {
 export interface YourTrade extends CommonTrade {
   owner: "self";
   pnlUsd: number;
+  leverage?: number | null;
+  tradeNumber?: number | null;
 }
 
 export interface PaulsTrade extends CommonTrade {
@@ -57,9 +59,26 @@ export interface YourTradesMeta {
   exchangeType: string | null;
 }
 
+/** Cumulative stats for the section header / top-cards. Backend may
+ *  expose them under `stats.*`; falls back to derive-from-recent when
+ *  the field is absent. */
+export interface TradesStats {
+  realizedPnlSum: number | null;
+  winRatePct: number | null;
+  closedCount: number | null;
+}
+
 export interface TradesView {
-  your: { active: YourTrade[]; recent: YourTrade[] };
-  pauls: { active: PaulsTrade[]; recent: PaulsTrade[] };
+  your: {
+    active: YourTrade[];
+    recent: YourTrade[];
+    stats: TradesStats;
+  };
+  pauls: {
+    active: PaulsTrade[];
+    recent: PaulsTrade[];
+    stats: TradesStats;
+  };
   yourMeta?: YourTradesMeta;
   fetchedAt: number;
 }
@@ -372,6 +391,50 @@ function shapeMyEndpointOne(
     openedAt,
     closedAt,
     durationLabel,
+    leverage: num(t.leverage),
+    tradeNumber: num(t.trade_number),
+  };
+}
+
+/**
+ * Pull cumulative stats from a feed response. Reads backend's `stats`
+ * envelope first; falls back to deriving from the supplied recent array
+ * (which is capped at 5 → realizedPnlSum / closedCount may understate
+ * when backend doesn't expose the totals).
+ */
+function extractStats(
+  raw: Record<string, unknown> | null,
+  recent: Array<{ pnlPct: number; pnlUsd?: number }>,
+): TradesStats {
+  const fromStatsEnvelope =
+    raw && typeof raw.stats === "object" && raw.stats !== null
+      ? (raw.stats as Record<string, unknown>)
+      : null;
+  if (fromStatsEnvelope) {
+    const rawWin = num(fromStatsEnvelope.win_rate);
+    return {
+      realizedPnlSum:
+        num(fromStatsEnvelope.realized_pnl_sum) ??
+        num(fromStatsEnvelope.realized_pnl_usd) ??
+        null,
+      winRatePct:
+        rawWin === null ? null : rawWin <= 1.5 ? rawWin * 100 : rawWin,
+      closedCount:
+        num(fromStatsEnvelope.closed_count) ??
+        num(fromStatsEnvelope.total_closed) ??
+        null,
+    };
+  }
+  if (recent.length === 0) {
+    return { realizedPnlSum: null, winRatePct: null, closedCount: null };
+  }
+  const wins = recent.filter((t) => t.pnlPct > 0).length;
+  const usdTotal = recent.reduce((a, t) => a + (t.pnlUsd ?? 0), 0);
+  const hasUsd = recent.some((t) => typeof t.pnlUsd === "number");
+  return {
+    realizedPnlSum: hasUsd ? usdTotal : null,
+    winRatePct: (wins / recent.length) * 100,
+    closedCount: recent.length,
   };
 }
 
@@ -382,6 +445,7 @@ function shapeMyEndpointOne(
 export function shapeMyTrades(raw: unknown): {
   active: YourTrade[];
   recent: YourTrade[];
+  stats: TradesStats;
   hasExchange: boolean;
   exchangeType: string | null;
 } {
@@ -389,6 +453,7 @@ export function shapeMyTrades(raw: unknown): {
     return {
       active: [],
       recent: [],
+      stats: { realizedPnlSum: null, winRatePct: null, closedCount: null },
       hasExchange: false,
       exchangeType: null,
     };
@@ -405,9 +470,12 @@ export function shapeMyTrades(raw: unknown): {
     .filter((x): x is YourTrade => x !== null)
     .slice(0, 5);
 
+  const stats = extractStats(t, recent);
+
   return {
     active,
     recent,
+    stats,
     hasExchange: t.has_exchange === true,
     exchangeType:
       typeof t.exchange_type === "string" && t.exchange_type.length > 0
@@ -420,9 +488,14 @@ export function shapeMyTrades(raw: unknown): {
 export function shapePaulTrades(raw: unknown): {
   active: PaulsTrade[];
   recent: PaulsTrade[];
+  stats: TradesStats;
 } {
   if (!raw || typeof raw !== "object") {
-    return { active: [], recent: [] };
+    return {
+      active: [],
+      recent: [],
+      stats: { realizedPnlSum: null, winRatePct: null, closedCount: null },
+    };
   }
   const t = raw as Record<string, unknown>;
   const open = Array.isArray(t.open) ? t.open : [];
@@ -436,7 +509,11 @@ export function shapePaulTrades(raw: unknown): {
     .filter((x): x is PaulsTrade => x !== null)
     .slice(0, 5);
 
-  return { active, recent };
+  // Paul's response strips USD server-side, so realizedPnlSum will end up
+  // null in the fallback path — UI already accounts for that.
+  const stats = extractStats(t, recent);
+
+  return { active, recent, stats };
 }
 
 const OWN_ACTIVE_PATHS: string[][] = [
@@ -490,9 +567,10 @@ export function buildTradesView(
   fetchedAt: number,
 ): TradesView {
   const my = shapeMyTrades(myRaw);
+  const pauls = shapePaulTrades(paulRaw);
   return {
-    your: { active: my.active, recent: my.recent },
-    pauls: shapePaulTrades(paulRaw),
+    your: { active: my.active, recent: my.recent, stats: my.stats },
+    pauls,
     yourMeta: {
       hasExchange: my.hasExchange,
       exchangeType: my.exchangeType,
@@ -523,9 +601,14 @@ export function shapeTrades(raw: unknown, fetchedAt: number): TradesView {
     .filter((t): t is PaulsTrade => t !== null)
     .slice(0, 5);
 
+  const emptyStats: TradesStats = {
+    realizedPnlSum: null,
+    winRatePct: null,
+    closedCount: null,
+  };
   return {
-    your: { active: ownActive, recent: ownRecent },
-    pauls: { active: paulActive, recent: paulRecent },
+    your: { active: ownActive, recent: ownRecent, stats: emptyStats },
+    pauls: { active: paulActive, recent: paulRecent, stats: emptyStats },
     fetchedAt,
   };
 }
