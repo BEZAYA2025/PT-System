@@ -1,10 +1,11 @@
-// Aven brand avatar — Round 11 identity-consolidation: the avatar is
-// now the same emerald triangle as the BrandLogo (no dark background
-// circle), wrapped in concentric pulse-rings + a soft halo so it reads
-// as "alive". Single visual language: the PT triangle ↔ Aven mark.
+// Aven brand avatar — Round 12 sizing pass.
 //
-// The eye / monogram / crystal variants from Round 10 are parked below
-// — flip AVEN_VARIANT to revisit them. Default ships as "triangle".
+// The Round 11 avatar was loud: 36px glyph in a 46px ring with two
+// overlapping `animate-ping` rings reaching ~92px at peak. Reads as a
+// notification badge, not an identity. Round 12 shrinks the default to
+// 28px, tightens the halo to ~1.2× the avatar, and replaces the dual
+// ping with a single "heartbeat" keyframe (lub-dub-pause) so the avatar
+// reads as alive without being aggressive.
 
 type AvenVariant = "triangle" | "eye" | "monogram" | "crystal";
 
@@ -18,11 +19,14 @@ interface Props {
 }
 
 export function AvenAvatar({
-  size = 36,
+  size = 28,
   online = true,
   breath = false,
 }: Props) {
-  const ringSize = size + 10;
+  // Ring sits ~1.2× the avatar diameter. Combined with a heartbeat that
+  // peaks at scale 1.22 this keeps the maximum visual reach ≈ 1.45× the
+  // avatar — a contained aura, not a sweeping ping.
+  const ringSize = Math.round(size * 1.2);
   const isTriangle = AVEN_VARIANT === "triangle";
 
   return (
@@ -30,21 +34,15 @@ export function AvenAvatar({
       className="relative inline-flex shrink-0 items-center justify-center"
       style={{ width: ringSize, height: ringSize }}
     >
-      {/* Halo + pulse rings — drawn around the bounding box. For the
-          triangle variant the rings sit on transparent space (the
-          triangle floats inside them); for the parked legacy variants
-          they hug the dark disc as before. */}
       {online && (
         <>
           <span
             aria-hidden
-            className="absolute inset-0 animate-ping rounded-full bg-emerald/30"
-            style={{ animationDuration: "2.6s" }}
-          />
-          <span
-            aria-hidden
-            className="absolute inset-1 animate-ping rounded-full bg-emerald/20"
-            style={{ animationDuration: "3.6s", animationDelay: "0.6s" }}
+            className="absolute inset-0 rounded-full bg-emerald/25"
+            style={{
+              animation: "avenHeartbeat 2.4s ease-out infinite",
+              transformOrigin: "center",
+            }}
           />
           {isTriangle && (
             <span
@@ -74,14 +72,21 @@ export function AvenAvatar({
         {AVEN_VARIANT === "crystal" && <FullDiscGlyph size={size}><CrystalGlyph /></FullDiscGlyph>}
       </span>
 
-      {breath && (
-        <style>{`
-          @keyframes avenBreath {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.06); }
-          }
-        `}</style>
-      )}
+      {/* Shared keyframes — defined once per render but the rules dedupe
+          via the browser's CSSOM so repeated AvenAvatar mounts are free. */}
+      <style>{`
+        @keyframes avenHeartbeat {
+          0% { transform: scale(1); opacity: 0.32; }
+          12% { transform: scale(1.18); opacity: 0.18; }
+          22% { transform: scale(1.05); opacity: 0.26; }
+          34% { transform: scale(1.22); opacity: 0.08; }
+          48%, 100% { transform: scale(1); opacity: 0; }
+        }
+        @keyframes avenBreath {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.04); }
+        }
+      `}</style>
     </span>
   );
 }
