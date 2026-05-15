@@ -21,7 +21,7 @@ export default async function SettingsPage() {
 
   return (
     <main id="main" className="px-2 py-8 sm:px-4 sm:py-10">
-      <div className="mx-auto max-w-3xl space-y-8">
+      <div className="mx-auto max-w-3xl space-y-10 sm:space-y-12">
         <header className="space-y-3">
           {/* Prominent back button — large hit target so it's easy to find
               on mobile. Sits above the title rather than as a tiny corner

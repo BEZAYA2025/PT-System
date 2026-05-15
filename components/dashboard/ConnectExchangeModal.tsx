@@ -69,6 +69,9 @@ interface Props {
   /** Currently-connected exchange id (from credential_status response).
    *  If present in update mode, the wizard pre-selects this exchange. */
   currentExchangeId?: ExchangeId | null;
+  /** Called once the backend confirms a successful save, passing the
+   *  human-readable exchange label so the parent can show a toast. */
+  onConnectSuccess?: (label: string) => void;
 }
 
 export function ConnectExchangeModal({
@@ -76,6 +79,7 @@ export function ConnectExchangeModal({
   onClose,
   isUpdate = false,
   currentExchangeId = null,
+  onConnectSuccess,
 }: Props) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -152,6 +156,7 @@ export function ConnectExchangeModal({
           onChangeExchange={handleChange}
           onSuccess={() => {
             setStep("success");
+            onConnectSuccess?.(selected.label);
             router.refresh();
             setTimeout(() => {
               setStep(initialStep);

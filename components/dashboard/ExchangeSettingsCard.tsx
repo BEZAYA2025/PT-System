@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   IconAlertTriangle,
+  IconBuildingBank,
   IconCheck,
   IconCircleDashed,
   IconInfoCircle,
   IconLink,
   IconUnlink,
 } from "@tabler/icons-react";
+import { Toast, type ToastState } from "@/components/Toast";
 import {
   buttonSecondaryClasses,
   cardClasses,
@@ -85,6 +87,7 @@ export function ExchangeSettingsCard({
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
   const [highlight, setHighlight] = useState(false);
 
@@ -148,6 +151,10 @@ export function ExchangeSettingsCard({
         return;
       }
       setConfirming(false);
+      setToast({
+        message: "Exchange key removed.",
+        tone: "success",
+      });
       router.refresh();
     } catch {
       setError("Connection issue. Please try again.");
@@ -173,6 +180,7 @@ export function ExchangeSettingsCard({
           eyebrow="Exchange · API"
           title="Exchange API"
           description="Read-only key — Binance, Bybit, OKX, or any major exchange. Locked to our server via IP restriction."
+          icon={<IconBuildingBank size={18} stroke={1.75} aria-hidden />}
           right={<StatusBadge status={status} exchangeLabel={exchangeLabel} />}
         />
 
@@ -228,7 +236,15 @@ export function ExchangeSettingsCard({
         onClose={() => setModalOpen(false)}
         isUpdate={status === "ok" || status === "invalid_please_relink"}
         currentExchangeId={currentExchangeId}
+        onConnectSuccess={(label) =>
+          setToast({
+            message: `Connected to ${label}.`,
+            tone: "success",
+          })
+        }
       />
+
+      <Toast value={toast} onDismiss={() => setToast(null)} />
     </>
   );
 }

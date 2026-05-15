@@ -1,4 +1,4 @@
-import { IconDownload, IconTrash } from "@tabler/icons-react";
+import { IconDownload, IconShieldLock, IconTrash } from "@tabler/icons-react";
 import { cardClasses } from "@/lib/ui";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
@@ -16,6 +16,7 @@ export function PrivacyDataCard() {
         eyebrow="Privacy · Data"
         title="Your data"
         description="Under GDPR / DSGVO you can request an export of everything we store on you, or have your account deleted permanently."
+        icon={<IconShieldLock size={18} stroke={1.75} aria-hidden />}
       />
 
       <div className="mt-6 grid gap-3 sm:grid-cols-2">

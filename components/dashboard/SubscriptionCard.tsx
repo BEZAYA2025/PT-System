@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconCreditCard } from "@tabler/icons-react";
 import type { SubscriptionStatus, Tier } from "@/lib/dal";
 import {
   buttonSecondaryClasses,
@@ -150,6 +151,7 @@ export function SubscriptionCard({
         eyebrow="Billing · Subscription"
         title="Subscription"
         description="Manage payment method, change tier, or cancel."
+        icon={<IconCreditCard size={18} stroke={1.75} aria-hidden />}
         right={
           status ? (
             <span

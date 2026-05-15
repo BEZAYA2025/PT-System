@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconCheck, IconPencil, IconX } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconPencil,
+  IconUserCircle,
+  IconX,
+} from "@tabler/icons-react";
 import { SignOutButton } from "./SignOutButton";
 import {
   buttonPrimaryClasses,
@@ -10,8 +15,8 @@ import {
   cardClasses,
   inputClasses,
   submitErrorClasses,
-  submitSuccessClasses,
 } from "@/lib/ui";
+import { Toast, type ToastState } from "@/components/Toast";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
 interface Props {
@@ -25,12 +30,11 @@ export function AccountSettingsCard({ email, displayName }: Props) {
   const [value, setValue] = useState(displayName ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
 
   const startEdit = () => {
     setValue(displayName ?? "");
     setError(null);
-    setSuccess(null);
     setEditing(true);
   };
 
@@ -51,7 +55,6 @@ export function AccountSettingsCard({ email, displayName }: Props) {
     }
     setSaving(true);
     setError(null);
-    setSuccess(null);
     try {
       const res = await fetch("/api/proxy/auth/update-profile", {
         method: "POST",
@@ -69,7 +72,7 @@ export function AccountSettingsCard({ email, displayName }: Props) {
         setError(msg);
         return;
       }
-      setSuccess("Saved.");
+      setToast({ message: "Display name saved.", tone: "success" });
       setEditing(false);
       router.refresh();
     } catch {
@@ -85,6 +88,7 @@ export function AccountSettingsCard({ email, displayName }: Props) {
         eyebrow="Profile · Account"
         title="Account"
         description="Your sign-in email and the name Aven uses to address you."
+        icon={<IconUserCircle size={18} stroke={1.75} aria-hidden />}
       />
 
       <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
@@ -163,15 +167,12 @@ export function AccountSettingsCard({ email, displayName }: Props) {
           {error}
         </p>
       )}
-      {success && (
-        <p role="status" className={`${submitSuccessClasses} mt-4`}>
-          {success}
-        </p>
-      )}
 
       <div className="mt-6">
         <SignOutButton className={buttonSecondaryClasses} />
       </div>
+
+      <Toast value={toast} onDismiss={() => setToast(null)} />
     </section>
   );
 }

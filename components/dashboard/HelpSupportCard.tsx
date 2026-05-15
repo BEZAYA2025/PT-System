@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   IconExternalLink,
   IconFileText,
+  IconLifebuoy,
   IconMailbox,
   IconShieldCheck,
 } from "@tabler/icons-react";
@@ -19,6 +20,7 @@ export function HelpSupportCard() {
         eyebrow="Help · Support"
         title="Help & legal"
         description="The legal pages, plus the inbox to reach Paul + the team."
+        icon={<IconLifebuoy size={18} stroke={1.75} aria-hidden />}
       />
 
       <ul className="mt-6 grid gap-2 sm:grid-cols-2">
