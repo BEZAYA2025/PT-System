@@ -592,7 +592,11 @@ function shapeMyEndpointOne(
 function extractStats(
   raw: Record<string, unknown> | null,
   recent: Array<{ pnlPct: number; pnlUsd?: number }>,
-  open: Array<{ pnlUsd?: number; marginUsd?: number | null }> = [],
+  open: Array<{
+    pnlUsd?: number;
+    pnlPct?: number;
+    marginUsd?: number | null;
+  }> = [],
 ): TradesStats {
   const fromStatsEnvelope =
     raw && typeof raw.stats === "object" && raw.stats !== null
@@ -661,12 +665,28 @@ function extractStats(
   const unrealizedPnlSum =
     envUnrealized ?? (hasUnrealizedUsd ? usdUnrealizedTrades : null);
 
-  // % = aggregate unrealized / aggregate posted margin. Only meaningful
-  // when we actually have margin data on the open trades.
-  const unrealizedPnlPct =
-    unrealizedPnlSum !== null && hasMarginUsd && usdMarginTrades > 0
-      ? (unrealizedPnlSum / usdMarginTrades) * 100
-      : null;
+  // % = aggregate unrealized / aggregate posted margin. This is the
+  // margin-weighted ROI of the whole open book — most meaningful when
+  // backend ships margin per trade.
+  // Round-17 fallback: when no trade carries margin, average the
+  // per-trade pnlPct. Less accurate for unevenly-sized positions but
+  // better than rendering "—" when the backend at least exposes the
+  // per-trade unrealized_pnl_pct.
+  let unrealizedPnlPct: number | null = null;
+  if (
+    unrealizedPnlSum !== null &&
+    hasMarginUsd &&
+    usdMarginTrades > 0
+  ) {
+    unrealizedPnlPct = (unrealizedPnlSum / usdMarginTrades) * 100;
+  } else if (open.length > 0) {
+    const pcts = open
+      .map((t) => t.pnlPct)
+      .filter((p): p is number => typeof p === "number" && Number.isFinite(p));
+    if (pcts.length > 0) {
+      unrealizedPnlPct = pcts.reduce((a, p) => a + p, 0) / pcts.length;
+    }
+  }
 
   return {
     unrealizedPnlSum,

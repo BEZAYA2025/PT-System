@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import {
   aggregateExposure,
   buildTradesView,
+  pctDistanceFromMark,
   pnlAtPrice,
   type TradesStats,
   type YourTrade,
@@ -335,106 +336,150 @@ function UnrealizedPnlBody({
       </>
     );
   }
+  // Round-17 layout: $ value on the left, ROI % on the right of the
+  // same row. Same tone driven by the sign of each value independently
+  // (they almost always agree, but display the % tone per its own
+  // sign so a $0 + +2% mark-shift still reads correctly).
   return (
     <>
-      <BigValue tone={toneFor(unrealized)}>
-        {fmtBigUsd(unrealized)}
-      </BigValue>
-      <SubLine muted>
-        {unrealizedPct !== null ? (
-          <span className={toneFor(unrealizedPct)}>
+      <div className="mt-1 flex items-baseline justify-between gap-2">
+        <p
+          className={`font-mono text-2xl font-semibold ${toneFor(unrealized)}`}
+        >
+          {fmtBigUsd(unrealized)}
+        </p>
+        {unrealizedPct !== null && (
+          <p
+            className={`font-mono text-xl font-semibold ${toneFor(unrealizedPct)}`}
+          >
             {fmtSignedPct(unrealizedPct)}
-          </span>
-        ) : null}
-        {unrealizedPct !== null && <span aria-hidden>·</span>}
-        <span>
-          across {openCount} open position{openCount === 1 ? "" : "s"}
-        </span>
-      </SubLine>
+          </p>
+        )}
+      </div>
       <SlTpExposureLine openTrades={openTrades} />
     </>
   );
 }
 
 // ---------------------------------------------------------------------------
-// SL/TP exposure — compact line under the Unrealized PnL value.
+// SL/TP exposure — Round 17.
 //
-// Single open trade  → "SL 80,010 (-$125) · TP 82,100 (+$205)"
-// Multiple trades    → "SL exposure -$X · TP target +$Y"  (aggregate $)
-// If qty is missing for every open trade → row hides entirely.
+// Per-trade rows under the headline, separated from the headline by a
+// horizontal divider. Each row carries price + $ outcome + % distance
+// to the live mark:
+//
+//   SL 80,010 (-$125) -1.3%  ·  TP 82,100 (+$257) +2.0%
+//
+// Single open trade → one row. Multiple trades → one row per trade,
+// each prefixed with the symbol so members can match positions. If a
+// trade has neither SL nor TP and no qty data, the row is skipped.
+// Generic: reads everything from YourTrade fields shaped by the
+// adapter chain — no exchange-specific assumptions.
 // ---------------------------------------------------------------------------
 
 function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
-  const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
-  if (slLossUsd === null && tpGainUsd === null) return null;
-
-  // Single-trade form shows the actual SL/TP prices so the member
-  // can read the line as a contract: "if 80,010 hits → -$125".
-  if (openTrades.length === 1) {
-    const t = openTrades[0];
-    const slPnl = pnlAtPrice(t, t.slPrice);
-    const tpPnl = pnlAtPrice(t, t.tpPrice);
+  // Filter out trades that have nothing useful to surface.
+  const rows = openTrades.filter(
+    (t) => t.slPrice !== null || t.tpPrice !== null,
+  );
+  if (rows.length === 0) {
+    // Last-resort aggregate (no per-trade SL/TP) — still try the $-only
+    // summary so the card isn't completely empty for backends that
+    // omit SL/TP entirely.
+    const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
+    if (slLossUsd === null && tpGainUsd === null) return null;
     return (
       <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
-        {t.slPrice !== null && (
+        {slLossUsd !== null && (
           <span className="text-red-300">
-            SL {fmtPrice(t.slPrice)}
-            {slPnl !== null && (
-              <span className="ml-1 opacity-80">({fmtSignedUsd(slPnl)})</span>
-            )}
+            SL exposure {fmtSignedUsd(slLossUsd)}
           </span>
         )}
-        {t.slPrice !== null && t.tpPrice !== null && (
-          <span aria-hidden className="text-muted-foreground">
-            ·
-          </span>
+        {slLossUsd !== null && tpGainUsd !== null && (
+          <span aria-hidden className="text-muted-foreground">·</span>
         )}
-        {t.tpPrice !== null && (
+        {tpGainUsd !== null && (
           <span className="text-emerald">
-            TP {fmtPrice(t.tpPrice)}
-            {tpPnl !== null && (
-              <span className="ml-1 opacity-80">({fmtSignedUsd(tpPnl)})</span>
-            )}
+            TP target {fmtSignedUsd(tpGainUsd)}
           </span>
         )}
       </p>
     );
   }
 
-  // Multi-trade form drops the per-trade prices (each row has a
-  // different SL/TP) and just surfaces the aggregate exposure.
+  const showSymbol = rows.length > 1;
   return (
-    <p className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
-      {slLossUsd !== null && (
+    <div className="mt-2 space-y-1 border-t border-border/60 pt-2">
+      {rows.map((t) => (
+        <TradeExposureRow
+          key={t.id}
+          trade={t}
+          showSymbol={showSymbol}
+        />
+      ))}
+    </div>
+  );
+}
+
+function TradeExposureRow({
+  trade,
+  showSymbol,
+}: {
+  trade: YourTrade;
+  showSymbol: boolean;
+}) {
+  const slPnl = pnlAtPrice(trade, trade.slPrice);
+  const slDist = pctDistanceFromMark(trade, trade.slPrice);
+  const tpPnl = pnlAtPrice(trade, trade.tpPrice);
+  const tpDist = pctDistanceFromMark(trade, trade.tpPrice);
+
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1 font-mono text-[11px]">
+      {showSymbol && (
+        <span className="text-muted-foreground">{trade.symbol}</span>
+      )}
+      {trade.slPrice !== null && (
         <span className="text-red-300">
-          SL exposure {fmtSignedUsd(slLossUsd)}
+          SL {fmtPriceCompact(trade.slPrice)}
+          {slPnl !== null && (
+            <span className="ml-1 opacity-80">({fmtSignedUsd(slPnl)})</span>
+          )}
+          {slDist !== null && (
+            <span className="ml-1 opacity-80">{fmtSignedPct(slDist)}</span>
+          )}
         </span>
       )}
-      {slLossUsd !== null && tpGainUsd !== null && (
-        <span aria-hidden className="text-muted-foreground">
-          ·
-        </span>
+      {trade.slPrice !== null && trade.tpPrice !== null && (
+        <span aria-hidden className="text-muted-foreground">·</span>
       )}
-      {tpGainUsd !== null && (
+      {trade.tpPrice !== null && (
         <span className="text-emerald">
-          TP target {fmtSignedUsd(tpGainUsd)}
+          TP {fmtPriceCompact(trade.tpPrice)}
+          {tpPnl !== null && (
+            <span className="ml-1 opacity-80">({fmtSignedUsd(tpPnl)})</span>
+          )}
+          {tpDist !== null && (
+            <span className="ml-1 opacity-80">{fmtSignedPct(tpDist)}</span>
+          )}
         </span>
       )}
     </p>
   );
 }
 
-// Round-15: shared formatter helpers used by the SL/TP exposure line.
-function fmtPrice(n: number | null): string {
+// Round-17: compact price formatter for the SL/TP row — drops the
+// fractional part on values ≥ 1000 so "80,010.40" reads as "80,010"
+// (the cents don't earn the row's tight horizontal budget).
+function fmtPriceCompact(n: number | null): string {
   if (n === null || !Number.isFinite(n)) return "—";
   if (n >= 1000)
-    return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+    return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
   if (n >= 1) return n.toFixed(2);
   return n.toFixed(4);
 }
 
 function fmtSignedUsd(n: number): string {
   const sign = n > 0 ? "+" : n < 0 ? "−" : "";
-  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+  const v = Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 });
   return `${sign}$${v}`;
 }
