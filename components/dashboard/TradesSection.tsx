@@ -11,6 +11,7 @@ import {
   IconUserCheck,
 } from "@tabler/icons-react";
 import { timeAgo } from "@/lib/format";
+import { pnlAtPrice } from "@/lib/trades";
 import type {
   AnyTrade,
   TradesStats,
@@ -57,6 +58,31 @@ function fmtCompactPrice(n: number | null): string {
   if (n >= 1000)
     return `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
   return `$${n.toFixed(2)}`;
+}
+
+// Price formatter for the SL/TP cluster — drops decimals for round
+// values ≥1000 so "75,000" reads tightly next to its $-exposure
+// bracket. Distinct from fmtPrice (always 2 decimals — used for the
+// execution-precise Entry value) and fmtCompactPrice ($-prefixed,
+// decimals kept).
+function fmtPriceTight(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return "—";
+  if (n >= 1000)
+    return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  if (n >= 1) return n.toFixed(2);
+  return n.toFixed(4);
+}
+
+// $-suffix sign format — "−267$" / "+235$" with the Unicode minus.
+// Brackets are added by the caller so the value-span itself is exactly
+// what gets coloured. Mirrors fmtUsdSuffix in MemberStatsCards so the
+// OpenTradeCard SL/TP line reads identically to the top-card line.
+function fmtUsdSuffix(n: number): string {
+  const sign = n > 0 ? "+" : n < 0 ? "−" : "";
+  const v = Math.abs(n).toLocaleString("en-US", {
+    maximumFractionDigits: 0,
+  });
+  return `${sign}${v}$`;
 }
 
 function capitalize(s: string): string {
@@ -162,9 +188,18 @@ function OpenTradeCard({
   const tone = positive ? "text-emerald" : "text-red-300";
   const leverage = trade.leverage;
 
-  // Round-21: compacted padding (p-4 → p-3) and gap (mt-3/mt-4 → mt-2)
-  // and dropped the "Tap for details" footer. Net: ~30-40px shorter so
-  // the mobile carousel doesn't squeeze the chat below it.
+  // Round-24: $-outcome at the SL/TP price, same compute path as the
+  // top-card SlTpExposureLine. Only own positions surface USD — Paul's
+  // trades strip USD server-side, hideUsd gates accordingly.
+  const slPnl =
+    !hideUsd && trade.owner === "self"
+      ? pnlAtPrice(trade, trade.slPrice)
+      : null;
+  const tpPnl =
+    !hideUsd && trade.owner === "self"
+      ? pnlAtPrice(trade, trade.tpPrice)
+      : null;
+
   return (
     <button
       type="button"
@@ -195,22 +230,36 @@ function OpenTradeCard({
         )}
       </div>
 
-      <dl className="mt-2 grid grid-cols-3 gap-2 font-mono text-[11px]">
-        <div>
+      {/* Round-24: replaced the equal-spaced 3-col grid with a flex row
+          that puts Entry on its own and clusters SL + TP with a
+          tighter gap, mirroring the top-card SL/TP exposure line.
+          Each SL/TP leg also carries its $-outcome in coloured
+          parens. */}
+      <dl className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[11px]">
+        <div className="inline-flex items-baseline gap-1 whitespace-nowrap">
           <dt className="text-muted-foreground">Entry</dt>
-          <dd className="mt-0.5 text-foreground">{fmtPrice(trade.entry)}</dd>
+          <dd className="text-foreground">{fmtPrice(trade.entry)}</dd>
         </div>
-        <div>
-          <dt className="text-muted-foreground">SL</dt>
-          <dd className="mt-0.5 text-foreground">
-            {trade.slPrice !== null ? fmtPrice(trade.slPrice) : "—"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground">TP</dt>
-          <dd className="mt-0.5 text-foreground">
-            {trade.tpPrice !== null ? fmtPrice(trade.tpPrice) : "—"}
-          </dd>
+
+        <div className="inline-flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+          <div className="inline-flex items-baseline gap-1 whitespace-nowrap">
+            <dt className="text-muted-foreground">SL</dt>
+            <dd className="text-foreground">{fmtPriceTight(trade.slPrice)}</dd>
+            {slPnl !== null && (
+              <span className="text-muted-foreground">
+                (<span className="text-red-300">{fmtUsdSuffix(slPnl)}</span>)
+              </span>
+            )}
+          </div>
+          <div className="inline-flex items-baseline gap-1 whitespace-nowrap">
+            <dt className="text-muted-foreground">TP</dt>
+            <dd className="text-foreground">{fmtPriceTight(trade.tpPrice)}</dd>
+            {tpPnl !== null && (
+              <span className="text-muted-foreground">
+                (<span className="text-emerald">{fmtUsdSuffix(tpPnl)}</span>)
+              </span>
+            )}
+          </div>
         </div>
       </dl>
     </button>
@@ -530,11 +579,15 @@ function LastTradeRow({
         {fmtPrice(trade.exit)}
       </td>
       {!hideUsd && (
-        <td className={`px-3 py-2 text-right font-mono text-sm ${tone}`}>
+        <td
+          className={`whitespace-nowrap px-3 py-2 text-right font-mono text-sm ${tone}`}
+        >
           {trade.owner === "self" ? fmtSignedUsd(trade.pnlUsd) : "—"}
         </td>
       )}
-      <td className={`px-3 py-2 text-right font-mono text-sm ${tone}`}>
+      <td
+        className={`whitespace-nowrap px-3 py-2 text-right font-mono text-sm ${tone}`}
+      >
         {fmtSignedPct(trade.pnlPct)}
       </td>
       <td
@@ -596,11 +649,13 @@ function LastTradeCard({
       </p>
       <div className="mt-2 flex items-center justify-end gap-3">
         {!hideUsd && trade.owner === "self" && (
-          <span className={`font-mono text-sm ${tone}`}>
+          <span className={`whitespace-nowrap font-mono text-sm ${tone}`}>
             {fmtSignedUsd(trade.pnlUsd)}
           </span>
         )}
-        <span className={`font-mono text-sm font-semibold ${tone}`}>
+        <span
+          className={`whitespace-nowrap font-mono text-sm font-semibold ${tone}`}
+        >
           {fmtSignedPct(trade.pnlPct)}
         </span>
       </div>
