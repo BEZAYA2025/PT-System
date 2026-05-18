@@ -20,8 +20,16 @@ export function SettingsCardHeader({
   icon,
 }: Props) {
   return (
-    <header className="flex items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+    // Round-27 mobile-fix: the `right` slot (status badge etc.) used
+    // to sit on the same flex row as the title block via
+    // `justify-between`. On a 360px viewport the badge plus the title
+    // fought for the same ~300px of horizontal space and the title
+    // either truncated awkwardly or pushed the badge off-screen. Now
+    // the header is `flex-col` on mobile — the badge wraps to its own
+    // row below the title block — and only collapses back to
+    // side-by-side at `sm` where there's room.
+    <header className="flex flex-col items-start gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3 sm:flex-1 sm:gap-4">
         {icon && (
           <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-lg bg-emerald/[0.08] text-emerald ring-1 ring-emerald/20">
             {icon}

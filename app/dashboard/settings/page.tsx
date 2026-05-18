@@ -22,8 +22,8 @@ export default async function SettingsPage() {
   const user = await requireUser();
 
   return (
-    <main id="main" className="px-2 py-8 sm:px-4 sm:py-10">
-      <div className="mx-auto max-w-3xl space-y-10 sm:space-y-12">
+    <main id="main" className="px-4 py-8 sm:px-6 sm:py-10">
+      <div className="mx-auto max-w-3xl space-y-8 sm:space-y-12">
         <header className="space-y-3">
           {/* Prominent back button — large hit target so it's easy to find
               on mobile. Sits above the title rather than as a tiny corner

@@ -270,7 +270,10 @@ function NotificationRow({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2.5">
+      {/* Channel controls. Mobile: spread between left and right edge so
+          the row stays visually balanced under the description. Desktop:
+          natural width on the right of the title block (sm:shrink-0). */}
+      <div className="flex items-center justify-between gap-3 sm:shrink-0 sm:justify-end">
         <DashboardChip />
         <TelegramSwitch
           on={telegramOn}
@@ -284,8 +287,15 @@ function NotificationRow({
 }
 
 function DashboardChip() {
+  // Trimmed to icon + label only. The "always on" semantic lives in
+  // the section header's description ("Dashboard always shows
+  // everything"); repeating it on every row was load-bearing for
+  // earlier copy but now just eats horizontal budget on mobile.
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald/20 bg-emerald/[0.05] px-2.5 py-1">
+    <span
+      title="Dashboard always shows every notification"
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald/20 bg-emerald/[0.05] px-2.5 py-1"
+    >
       <IconDeviceDesktop
         size={11}
         stroke={1.75}
@@ -294,15 +304,6 @@ function DashboardChip() {
       />
       <span className="font-mono text-[10px] font-medium uppercase tracking-wider text-emerald/85">
         Dashboard
-      </span>
-      <span
-        aria-hidden
-        className="text-emerald/40"
-      >
-        ·
-      </span>
-      <span className="font-mono text-[10px] text-muted-foreground">
-        always on
       </span>
     </span>
   );
