@@ -1,7 +1,7 @@
 import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Hero } from "@/components/sections/Hero";
 import { WhatIs } from "@/components/sections/WhatIs";
-import { MeetAven } from "@/components/sections/MeetAven";
+import { DashboardShowcase } from "@/components/sections/DashboardShowcase";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WaveRidingMethod } from "@/components/sections/WaveRidingMethod";
 import { Status } from "@/components/sections/Status";
@@ -21,7 +21,7 @@ export default async function Home() {
       <main id="main" className="flex-1">
         <Hero isAuthed={isAuthed} />
         <WhatIs />
-        <MeetAven />
+        <DashboardShowcase />
         <HowItWorks />
         <WaveRidingMethod />
         <Status isAuthed={isAuthed} />
