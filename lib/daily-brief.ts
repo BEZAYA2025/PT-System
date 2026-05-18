@@ -2,6 +2,8 @@
 // confirmed yet. Reads several plausible paths and falls back to null when
 // no usable content is found.
 
+import { parseBriefing, type ParsedBriefing } from "./briefing-parser";
+
 export interface RawBriefShape {
   generated_at?: string;
   language?: string;
@@ -41,6 +43,10 @@ export interface DailyBriefView {
   summary: string;
   fullContent: string;
   isStale: boolean;
+  // Structured view of the briefing body. `null` when the content didn't
+  // contain any recognised sections (timeframes or setup) — the card then
+  // falls back to plain-text rendering.
+  parsed: ParsedBriefing | null;
 }
 
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000;
@@ -100,10 +106,15 @@ export function shapeBrief(raw: RawBriefShape | null): DailyBriefView | null {
     isStale = false;
   }
 
+  const parsed = parseBriefing(content);
+  const hasStructure =
+    parsed.timeframes.length > 0 || parsed.setup !== null;
+
   return {
     generatedAt,
     summary,
     fullContent: content,
     isStale,
+    parsed: hasStructure ? parsed : null,
   };
 }
