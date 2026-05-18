@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/dal";
 import { SignOutButton } from "@/components/dashboard/SignOutButton";
+import { BrandLogo } from "@/components/dashboard/BrandLogo";
 
 export async function SiteHeader() {
   const user = await getCurrentUser();
@@ -11,9 +12,11 @@ export async function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6 sm:h-16">
         <Link
           href="/"
-          className="text-base font-semibold tracking-tight text-foreground transition-colors hover:text-emerald sm:text-lg"
+          aria-label="PT System — home"
+          className="inline-flex items-center gap-2 text-base font-semibold tracking-tight text-foreground transition-colors hover:text-emerald sm:text-lg"
         >
-          PT System
+          <BrandLogo size={20} />
+          <span>PT System</span>
         </Link>
 
         <nav
