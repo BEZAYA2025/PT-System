@@ -8,6 +8,15 @@ export interface RawBriefShape {
   content_en?: string;
   summary_en?: string;
 
+  // Current backend shape (2026-05): top-level `briefing` field.
+  briefing?: {
+    id?: number;
+    asset?: string;
+    content?: string;
+    generated_at?: string;
+    author?: string;
+  } | null;
+
   // Nested under different parent keys observed during build.
   brief?: {
     generated_at?: string;
@@ -42,6 +51,7 @@ const str = (v: unknown): string | null =>
 
 function pickGeneratedAt(raw: RawBriefShape | null): string | null {
   return (
+    str(raw?.briefing?.generated_at) ??
     str(raw?.generated_at) ??
     str(raw?.brief?.generated_at) ??
     str(raw?.daily_brief?.generated_at) ??
@@ -52,6 +62,7 @@ function pickGeneratedAt(raw: RawBriefShape | null): string | null {
 
 function pickContent(raw: RawBriefShape | null): string | null {
   return (
+    str(raw?.briefing?.content) ??
     str(raw?.content_en) ??
     str(raw?.brief?.content_en) ??
     str(raw?.daily_brief?.content) ??
