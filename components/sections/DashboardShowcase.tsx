@@ -72,14 +72,12 @@ export function DashboardShowcase() {
           <AnimatedShowcase />
         </Reveal>
 
-        <Reveal delay={0.1} className="mt-10 sm:mt-12">
-          <CaptionBullets />
+        <Reveal delay={0.1} className="mt-12 sm:mt-16">
+          <FeatureCards />
         </Reveal>
 
-        <Reveal delay={0.15} className="mt-10 sm:mt-12">
-          <p className="text-center text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Everything you see is real. Built and used every day by Paul.
-          </p>
+        <Reveal delay={0.15} className="mt-14 sm:mt-20">
+          <FinalCaption />
         </Reveal>
       </div>
     </section>
@@ -1294,49 +1292,149 @@ function PhaseDots({
 }
 
 // ---------------------------------------------------------------------------
-// Caption bullets.
+// Feature cards — replaces the emoji bullet strip. Three mini-cards
+// with clean line-art SVG icons, surface-tone background, emerald
+// accent on hover. Grid-3 on desktop, stacked on mobile.
 // ---------------------------------------------------------------------------
 
-function CaptionBullets() {
+function FeatureCards() {
   return (
-    <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-center sm:gap-5">
-      <CaptionBullet emoji="🌅">
-        Daily briefings, analyzed across five timeframes
-      </CaptionBullet>
-      <Separator />
-      <CaptionBullet emoji="💬">
-        Setup scores with confluence reasoning + annotated charts
-      </CaptionBullet>
-      <Separator />
-      <CaptionBullet emoji="🎯">
-        Mid-trade discipline reminders, in your trader&apos;s voice
-      </CaptionBullet>
+    <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3 sm:gap-5">
+      <FeatureCard
+        icon={<SunRisingIcon />}
+        title="Daily Briefings"
+        body="Analyzed across five timeframes — from 15m to weekly. Two minutes of reading. Full clarity on the day."
+      />
+      <FeatureCard
+        icon={<SetupScoreIcon />}
+        title="Setup Scoring"
+        body="Confluence reasoning, scored 1–10. Annotated charts sent in conversation. No more guessing if a setup holds."
+      />
+      <FeatureCard
+        icon={<DisciplineShieldIcon />}
+        title="Discipline Coaching"
+        body="When emotions hit, Aven brings you back to the framework. A mentor, not a yes-man — in your trader's voice."
+      />
     </div>
   );
 }
 
-function CaptionBullet({
-  emoji,
-  children,
+function FeatureCard({
+  icon,
+  title,
+  body,
 }: {
-  emoji: string;
-  children: React.ReactNode;
+  icon: React.ReactNode;
+  title: string;
+  body: string;
 }) {
   return (
-    <p className="inline-flex items-center gap-2 text-sm leading-relaxed text-muted-foreground sm:max-w-[18ch] sm:text-[15px]">
-      <span aria-hidden className="text-base">
-        {emoji}
+    <div className="mx-auto w-full max-w-[280px] rounded-2xl border border-border bg-surface p-6 transition-colors hover:border-emerald/30 sm:max-w-none">
+      <span className="inline-flex size-11 items-center justify-center rounded-lg bg-emerald/[0.08] text-emerald ring-1 ring-emerald/20">
+        {icon}
       </span>
-      <span>{children}</span>
-    </p>
+      <h3 className="mt-4 text-base font-semibold tracking-tight text-foreground">
+        {title}
+      </h3>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+        {body}
+      </p>
+    </div>
   );
 }
 
-function Separator() {
+// Clean line-art icons — single-stroke, emerald-tinted, ~22px inside
+// the 44px rounded square. No emojis, no double-meaning glyphs.
+
+function SunRisingIcon() {
   return (
-    <span aria-hidden className="hidden text-muted-foreground/40 sm:inline">
-      ·
-    </span>
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {/* Horizon */}
+      <line x1="2" y1="20" x2="22" y2="20" />
+      {/* Half-sun rising above the horizon */}
+      <path d="M6 20a6 6 0 0 1 12 0" />
+      {/* Rays — top, top-left, top-right, sides */}
+      <line x1="12" y1="9" x2="12" y2="6" />
+      <line x1="17.5" y1="11" x2="19.5" y2="9" />
+      <line x1="6.5" y1="11" x2="4.5" y2="9" />
+      <line x1="19.5" y1="15" x2="22" y2="15" />
+      <line x1="4.5" y1="15" x2="2" y2="15" />
+    </svg>
+  );
+}
+
+function SetupScoreIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {/* Chat bubble outline */}
+      <path d="M21 12a8 8 0 0 1-12.5 6.6L3 20l1.4-5.5A8 8 0 1 1 21 12z" />
+      {/* Checkmark inside — "this setup checks out" */}
+      <polyline points="8.5,12 11,14.5 15.5,9.5" />
+    </svg>
+  );
+}
+
+function DisciplineShieldIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="22"
+      height="22"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      {/* Shield outline */}
+      <path d="M12 2 4 5v6c0 5 3.5 9.5 8 11 4.5-1.5 8-6 8-11V5l-8-3z" />
+      {/* Check inside */}
+      <polyline points="9,12 11,14 15,10" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Final caption — bigger now, with an emerald hairline above and the
+// word "real" emphasised in emerald. Reads as a closing statement
+// rather than a footnote.
+// ---------------------------------------------------------------------------
+
+function FinalCaption() {
+  return (
+    <div className="text-center">
+      <span
+        aria-hidden
+        className="mx-auto block h-px w-16 bg-emerald/40"
+      />
+      <p className="mt-6 text-xl font-medium leading-[1.5] text-foreground sm:text-2xl">
+        Everything you see is{" "}
+        <span className="text-emerald">real</span>.
+        <br />
+        Built and used every day by Paul.
+      </p>
+    </div>
   );
 }
 
