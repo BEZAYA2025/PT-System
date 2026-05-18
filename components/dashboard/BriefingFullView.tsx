@@ -208,7 +208,7 @@ export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
             <TimeframeAccordion
               key={`${tf.name}-${i}`}
               tf={tf}
-              defaultOpen={i === 0}
+              defaultOpen={false}
             />
           ))}
         </div>

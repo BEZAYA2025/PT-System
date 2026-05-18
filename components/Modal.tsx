@@ -92,19 +92,34 @@ export function Modal({
   };
 
   return createPortal(
+    // The outer container IS the backdrop — no separate sibling div.
+    // Previous structure had `<div absolute inset-0 bg-…>` as a child,
+    // so a click on the visible "outside" area landed on the backdrop
+    // child, not on this container. `e.target === e.currentTarget`
+    // therefore never matched and backdrop-click-to-close silently
+    // failed in production.
+    //
+    // Mobile: `items-start` anchors the modal to the top of the visible
+    // viewport so the sticky header (with the X button) is always in
+    // reach when the modal opens. On iOS Safari `vh` units count
+    // against the LARGE viewport that hides under the URL bar, so we
+    // size with `svh` to stay inside the area that's actually visible.
+    // Safe-area-inset padding handles notch / Dynamic Island devices.
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-background/80 backdrop-blur-sm sm:items-center"
+      style={{
+        paddingTop: "max(env(safe-area-inset-top), 1rem)",
+        paddingBottom: "max(env(safe-area-inset-bottom), 1rem)",
+        paddingLeft: "max(env(safe-area-inset-left), 1rem)",
+        paddingRight: "max(env(safe-area-inset-right), 1rem)",
+      }}
       onPointerDown={onBackdropPointerDown}
     >
       <div
-        aria-hidden
-        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
-      />
-      <div
-        className={`relative flex max-h-[90vh] w-full ${SIZE[size]} flex-col overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-2xl`}
+        className={`relative flex max-h-[90svh] w-full ${SIZE[size]} flex-col overflow-hidden rounded-2xl border border-border bg-surface-elevated shadow-2xl`}
         style={{
           transform: dragOffset > 0 ? `translateY(${dragOffset}px)` : undefined,
           transition: dragOffset > 0 ? "none" : "transform 200ms ease-out",
