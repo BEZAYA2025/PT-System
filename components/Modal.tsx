@@ -7,7 +7,10 @@ import { IconX } from "@tabler/icons-react";
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title: string;
+  // ReactNode (not just string) so consumers can compose richer headings
+  // — e.g. the DailyBrief modal puts the asset pill + relative time
+  // inline with the title. Plain strings continue to work unchanged.
+  title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg";

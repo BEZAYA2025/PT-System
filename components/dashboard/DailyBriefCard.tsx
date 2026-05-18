@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { IconBook2, IconClockHour4 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { BriefAvatar } from "./BriefAvatar";
@@ -9,14 +9,40 @@ import { timeAgo } from "@/lib/format";
 import type { DailyBriefView } from "@/lib/daily-brief";
 import type { BiasTone } from "@/lib/briefing-parser";
 
-// Quote accent matches the bias tone so members get an at-a-glance read
-// on the daily direction before they even read the words.
 const BIAS_QUOTE: Record<BiasTone, string> = {
   bullish: "border-emerald-500/40 bg-emerald-500/[0.04]",
   bearish: "border-rose-500/40 bg-rose-500/[0.04]",
   mixed: "border-amber-500/40 bg-amber-500/[0.04]",
   neutral: "border-border bg-surface/40",
 };
+
+function AssetPill({ asset }: { asset: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-200">
+      {asset}
+    </span>
+  );
+}
+
+function BriefHeading({ asset }: { asset: string | null }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      {asset && <AssetPill asset={asset} />}
+      <span>Morning Briefing</span>
+    </span>
+  );
+}
+
+function AuthorByline({ generatedAt }: { generatedAt: string }) {
+  return (
+    <span
+      className="font-mono text-[11px] font-normal uppercase tracking-wider text-muted-foreground"
+      suppressHydrationWarning
+    >
+      created by Aven · {timeAgo(generatedAt)}
+    </span>
+  );
+}
 
 export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
   const [open, setOpen] = useState(false);
@@ -40,50 +66,37 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
   }
 
   const parsed = brief.parsed;
+  const asset = parsed?.header?.asset ?? null;
   const bias = parsed?.primaryBias ?? null;
   const setup = parsed?.setup ?? null;
 
+  const openModal = () => setOpen(true);
+  const onCardKey = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      openModal();
+    }
+  };
+
   return (
     <>
-      <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 sm:p-8">
+      <section
+        role="button"
+        tabIndex={0}
+        aria-label="Open today's briefing"
+        onClick={openModal}
+        onKeyDown={onCardKey}
+        className="cursor-pointer rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 transition-colors hover:border-amber-500/30 hover:to-amber-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:p-8"
+      >
         <div className="flex items-start gap-4">
           <BriefAvatar size={36} />
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
-              <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
-                {parsed?.header?.asset && (
-                  <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-200">
-                    {parsed.header.asset}
-                  </span>
-                )}
-                <span>Morning Briefing</span>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                <BriefHeading asset={asset} />
               </h2>
-              <p
-                className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
-                suppressHydrationWarning
-              >
-                Aven · {timeAgo(brief.generatedAt)}
-              </p>
+              <AuthorByline generatedAt={brief.generatedAt} />
             </div>
-
-            {parsed?.header &&
-              (parsed.header.date || parsed.header.spot) && (
-                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  {parsed.header.date && (
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      {parsed.header.date}
-                    </span>
-                  )}
-                  {parsed.header.spot && (
-                    <span className="font-mono text-[11px] text-muted-foreground">
-                      Spot{" "}
-                      <span className="text-foreground">
-                        ${parsed.header.spot}
-                      </span>
-                    </span>
-                  )}
-                </div>
-              )}
 
             {brief.isStale && (
               <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-200">
@@ -142,14 +155,12 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
               </p>
             )}
 
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-emerald transition-colors hover:text-emerald-hover"
-            >
-              <IconBook2 size={14} stroke={1.75} />
+            {/* Visual affordance — the whole card is the click target,
+                this just signals to members what the click does. */}
+            <p className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-emerald">
+              <IconBook2 size={14} stroke={1.75} aria-hidden />
               Read full brief
-            </button>
+            </p>
           </div>
         </div>
       </section>
@@ -157,8 +168,12 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
       <Modal
         open={open}
         onClose={() => setOpen(false)}
-        title="Today's Brief"
-        description={modalDescription(brief)}
+        title={
+          <span className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <BriefHeading asset={asset} />
+            <AuthorByline generatedAt={brief.generatedAt} />
+          </span>
+        }
         size="lg"
       >
         {parsed ? (
@@ -171,14 +186,4 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
       </Modal>
     </>
   );
-}
-
-function modalDescription(brief: DailyBriefView): string {
-  const h = brief.parsed?.header;
-  const parts: string[] = [];
-  if (h?.asset) parts.push(h.asset);
-  if (h?.date) parts.push(h.date);
-  if (h?.spot) parts.push(`Spot $${h.spot}`);
-  if (parts.length === 0) return `Aven · ${timeAgo(brief.generatedAt)}`;
-  return parts.join(" · ");
 }

@@ -152,27 +152,6 @@ function TimeframeAccordion({
 export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
   return (
     <div className="space-y-5">
-      {parsed.header && (
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-          {parsed.header.asset && (
-            <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-200">
-              {parsed.header.asset}
-            </span>
-          )}
-          {parsed.header.date && (
-            <span className="font-mono text-[11px] text-muted-foreground">
-              {parsed.header.date}
-            </span>
-          )}
-          {parsed.header.spot && (
-            <span className="font-mono text-[11px] text-muted-foreground">
-              · Spot{" "}
-              <span className="text-foreground">${parsed.header.spot}</span>
-            </span>
-          )}
-        </div>
-      )}
-
       {parsed.setup && (
         <section className="rounded-xl border border-emerald-500/25 bg-gradient-to-br from-surface via-surface to-emerald-500/[0.04] p-5">
           <div className="mb-4 flex items-center gap-2">
@@ -198,9 +177,9 @@ export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
               {parsed.setup.items.map((item) => (
                 <div
                   key={item.label}
-                  className="border-l-2 border-foreground/15 pl-3.5 sm:pl-4"
+                  className="border-l-2 border-emerald-500/30 pl-3.5 sm:pl-4"
                 >
-                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
                     {item.label}
                   </p>
                   <div className="mt-1.5">
