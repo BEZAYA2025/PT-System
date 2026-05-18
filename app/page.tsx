@@ -4,7 +4,6 @@ import { WhatIs } from "@/components/sections/WhatIs";
 import { DashboardShowcase } from "@/components/sections/DashboardShowcase";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { WaveRidingMethod } from "@/components/sections/WaveRidingMethod";
-import { Status } from "@/components/sections/Status";
 import { Founder } from "@/components/sections/Founder";
 import { Footer } from "@/components/sections/Footer";
 import { getCurrentUser } from "@/lib/dal";
@@ -24,7 +23,6 @@ export default async function Home() {
         <DashboardShowcase />
         <HowItWorks />
         <WaveRidingMethod />
-        <Status isAuthed={isAuthed} />
         <Founder />
       </main>
       <Footer />
