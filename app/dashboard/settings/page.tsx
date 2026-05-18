@@ -8,6 +8,7 @@ import { NotificationPrefsCard } from "@/components/dashboard/NotificationPrefsC
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
 import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
 import { PrivacyDataCard } from "@/components/dashboard/PrivacyDataCard";
+import { PrivacyLegalCard } from "@/components/dashboard/PrivacyLegalCard";
 import { HelpSupportCard } from "@/components/dashboard/HelpSupportCard";
 
 export const metadata: Metadata = {
@@ -70,7 +71,19 @@ export default async function SettingsPage() {
 
         <PrivacyDataCard />
 
+        <PrivacyLegalCard />
+
         <HelpSupportCard />
+
+        {/* Footer line — Fortex Media Ltd. is the company behind PT
+            System. Kept deliberately small and without an email so
+            members reach for the Help & Support card (which uses the
+            ptsystem.ai address) rather than the legal/company inbox. */}
+        <footer className="border-t border-border pt-6 text-center">
+          <p className="font-mono text-[11px] text-muted-foreground">
+            PT System is a product of Fortex Media Ltd. · London, UK
+          </p>
+        </footer>
       </div>
     </main>
   );
