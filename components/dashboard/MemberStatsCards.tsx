@@ -152,7 +152,13 @@ export function MemberStatsCards({
   return (
     <section
       aria-label="Member stats"
-      className="grid gap-3 sm:grid-cols-3"
+      // `auto-rows-fr` equalises every implicit row to one shared
+      // height — on mobile (1 column, 3 rows) all three cards stretch
+      // to match the tallest one's content, so the Unrealized-PnL card
+      // with its SL/TP row no longer makes the other two look short.
+      // On desktop the section is a single row (sm:grid-cols-3), so
+      // the rule is a no-op there but harmless.
+      className="grid auto-rows-fr gap-3 sm:grid-cols-3"
     >
       {/* Card 1 — BTC live price */}
       <Card>
@@ -335,10 +341,10 @@ function UnrealizedPnlBody({
       </>
     );
   }
-  // Round-18 colour rule: only the value strings carry tone; the
-  // "ROI" word, the brackets, the labels ("SL", "TP"), the prices,
-  // and the separators stay neutral. Centralised in each render
-  // block below by wrapping just the value span in a coloured class.
+  // Round-25 spec: top-card headline now reads "$ %" with the same
+  // hierarchy the OpenTradeCard uses in the body — $-value large,
+  // % smaller next to it, no parens, no "ROI" word. Both values
+  // carry their own tone now (no surrounding neutral wrapper).
   return (
     <>
       <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-1">
@@ -346,12 +352,10 @@ function UnrealizedPnlBody({
           {fmtBigUsd(unrealized)}
         </p>
         {unrealizedPct !== null && (
-          <p className="font-mono text-base font-semibold text-muted-foreground">
-            (
-            <span className={toneFor(unrealizedPct)}>
-              {fmtSignedPct(unrealizedPct)}
-            </span>
-            <span className="ml-1">ROI</span>)
+          <p
+            className={`font-mono text-base font-semibold ${toneFor(unrealizedPct)}`}
+          >
+            {fmtSignedPct(unrealizedPct)}
           </p>
         )}
       </div>
@@ -398,7 +402,7 @@ function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
     const { slLossUsd, tpGainUsd } = aggregateExposure(openTrades);
     if (slLossUsd === null && tpGainUsd === null) return null;
     return (
-      <p className="mt-2 flex flex-col gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px] sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-2.5 gap-y-1 border-t border-border/60 pt-2 font-mono text-[11px]">
         {slLossUsd !== null && (
           <span className="inline-flex items-baseline gap-1">
             <span className="text-muted-foreground">SL exposure</span>
@@ -406,10 +410,7 @@ function SlTpExposureLine({ openTrades }: { openTrades: YourTrade[] }) {
           </span>
         )}
         {slLossUsd !== null && tpGainUsd !== null && (
-          <span
-            aria-hidden
-            className="hidden text-muted-foreground sm:inline"
-          >
+          <span aria-hidden className="text-muted-foreground">
             ·
           </span>
         )}
@@ -490,12 +491,13 @@ function TradeExposureRow({ trade }: { trade: YourTrade }) {
   const slPnl = pnlAtPrice(trade, trade.slPrice);
   const tpPnl = pnlAtPrice(trade, trade.tpPrice);
 
-  // Round-18 mobile: SL and TP sides stack on narrow viewports
-  // (flex-col), sit on one line at sm+ (flex-row). The "·" separator
-  // is only rendered for the sm+ horizontal layout — it would float
-  // awkwardly between stacked rows.
+  // Round-25: SL and TP now share one row on every viewport. The
+  // previous mobile-stack made the Unrealized-PnL card taller than
+  // the other two top-cards; collapsing onto a single flex-wrap row
+  // keeps it level with them (and is still readable since each leg
+  // fits in ~12 characters of monospaced text).
   return (
-    <p className="flex flex-col gap-y-1 font-mono text-[11px] sm:flex-row sm:flex-wrap sm:items-baseline sm:gap-x-2.5">
+    <p className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1 font-mono text-[11px]">
       {trade.slPrice !== null && (
         <ExposureLeg
           label="SL"
@@ -505,10 +507,7 @@ function TradeExposureRow({ trade }: { trade: YourTrade }) {
         />
       )}
       {trade.slPrice !== null && trade.tpPrice !== null && (
-        <span
-          aria-hidden
-          className="hidden text-muted-foreground sm:inline"
-        >
+        <span aria-hidden className="text-muted-foreground">
           ·
         </span>
       )}
