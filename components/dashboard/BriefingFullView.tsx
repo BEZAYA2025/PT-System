@@ -180,7 +180,7 @@ export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
               {parsed.setup.emoji}
             </span>
             <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-300">
-              {parsed.setup.title || "Gesamtbild & Setup"}
+              {parsed.setup.title || "Overall Picture & Setup"}
             </h3>
           </div>
 

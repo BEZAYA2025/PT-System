@@ -56,22 +56,39 @@ const TIMEFRAME_EMOJIS: Record<string, string> = {
 const SETUP_EMOJI = "\u{1F3AF}"; // 🎯
 const HEADER_EMOJI = "\u{1F305}"; // 🌅
 
-// Canonical sub-labels. Restricting to a whitelist prevents misreading a
-// sentence like "Hinweis: ..." inside body prose as a new section.
+// Canonical sub-labels. Bilingual — briefings 1..1182 were authored in
+// German, briefing 1183+ in English. We accept both label sets so the
+// same parser works across the whole back catalogue. Restricting to a
+// whitelist also prevents misreading a sentence like "Hinweis: ..."
+// inside body prose as a new section.
 const TF_LABELS = new Set([
+  // German
   "Trendstruktur",
   "Bias",
   "Fibonacci",
   "Trendlinie/Ray",
   "EMA-Lage",
   "Divergenz",
+  // English (Bias and Fibonacci are spelled the same in both)
+  "Trend Structure",
+  "Trendlines/Rays",
+  "EMAs",
+  "Divergence",
 ]);
 
-// Sub-labels recognised inside the 🎯 GESAMTBILD & SETUP section.
+// Sub-labels recognised inside the 🎯 setup section. Section title is
+// "GESAMTBILD & SETUP" in DE briefings and "OVERALL PICTURE & SETUP" in
+// EN briefings — the emoji-based detection picks up both without
+// special-casing.
 const SETUP_LABELS = new Set([
+  // German
   "Übergeordneter Trend",
   "Wellenreiten aktiv",
   "Stärkstes Signal",
+  // English
+  "Higher Trend",
+  "Active Wave",
+  "Strongest Signal",
 ]);
 
 function isSeparator(line: string): boolean {
@@ -108,7 +125,9 @@ function deriveBias(text: string): BiasTone {
   const lc = text.toLowerCase();
   if (/\b(gemischt|mixed)\b/.test(lc)) return "mixed";
   if (/\b(bullisch|bullish)\b/.test(lc)) return "bullish";
-  if (/\b(bearisch|bearish)\b/.test(lc)) return "bearish";
+  // "bärisch" (with umlaut) is the more formal German spelling, "bearisch"
+  // is the common anglicism — accept both, plus the English "bearish".
+  if (/\b(bärisch|bearisch|bearish)\b/.test(lc)) return "bearish";
   return "neutral";
 }
 

@@ -110,7 +110,7 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
             {setup && (setup.items.length > 0 || setup.body) && (
               <div className="mt-5">
                 <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
-                  🎯 Gesamtbild &amp; Setup
+                  🎯 {setup.title || "Overall Picture & Setup"}
                 </p>
                 {setup.items.length > 0 ? (
                   <div className="mt-2 space-y-3">
