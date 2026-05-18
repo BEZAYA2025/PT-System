@@ -269,7 +269,13 @@ function AvenLiveBar({
       //   [Avatar]  [AI Mentor]
       //             [Aven      ]
       //   [Live observation — col-span-2, centred horizontally]
-      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:gap-x-4 sm:gap-y-2.5 sm:px-8 sm:pb-3 sm:pt-4"
+      // Mobile: keeps the round-15 2x2 grid (avatar + title on row one,
+      // observation on row two, col-spanning) so the bar reads cleanly
+      // on a narrow viewport. Desktop: switches to a single flex row
+      // with `items-center` so the AI-Mentor/Aven title and the live
+      // ticker share the same vertical mid-line, and tighter sm:py-2
+      // pulls the whole bar closer to the chat thread below.
+      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:flex sm:items-center sm:gap-4 sm:px-8 sm:py-2"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -291,7 +297,7 @@ function AvenLiveBar({
         </p>
       </div>
 
-      <div className="col-span-2 flex justify-center">
+      <div className="col-span-2 flex min-w-0 justify-center sm:flex-1 sm:justify-start">
         <LiveObservation
           text={obs}
           reduce={!!reduce}
@@ -344,16 +350,11 @@ function LiveObservation({
       key={text}
       aria-live="off"
       className={[
-        // Round-14a: dropped `overflow-hidden` so the StatusDot's
-        // animate-ping isn't clipped on the left (the pulse extends
-        // ~5px past the dot edge).
-        // Round-14b: switched to `inline-flex` so the row sizes to
-        // content; combined with the parent's `flex justify-center`
-        // this actually centres the row. `max-w-md` caps overly-long
-        // observations so they ellipsis-clip inside the bar rather
-        // than pushing layout. The truncate span carries its own
-        // overflow-hidden so the dot's pulse stays visible.
-        "inline-flex max-w-full items-center gap-2.5 text-[13px] leading-snug sm:max-w-md",
+        // `w-full` (not just `max-w-full`) so the inner overflow-hidden
+        // viewport for the desktop marquee has a definite width to clip
+        // against; without it the marquee track would size to its
+        // longest content and bleed past the chatbox edge.
+        "inline-flex w-full max-w-full items-center gap-2.5 text-[13px] leading-snug sm:max-w-md",
         reduce ? "" : "aven-obs-in",
       ].join(" ")}
     >
@@ -361,17 +362,38 @@ function LiveObservation({
       <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/75">
         Live
       </span>
-      <span
-        // `min-w-0` lets this child shrink below its content width
-        // inside the inline-flex row so `truncate` can actually engage
-        // when the bar narrows.
-        className={[
-          "min-w-0 truncate italic",
-          reduce ? "text-foreground/85" : "aven-obs-shimmer",
-        ].join(" ")}
-      >
-        &ldquo;{text}&rdquo;
-      </span>
+
+      {/* The text viewport. On mobile (and for reduced-motion users on
+          any size) we render a single truncated copy — long thoughts
+          ellipsis-clip the same way they did before. On desktop with
+          motion allowed, we render two copies inside an overflow-hidden
+          window and slide the track from 0 → -50%, so the second copy
+          arrives in the first copy's slot at loop end. The result is a
+          seamless ticker that lets members read the whole thought
+          without it being cut off. Hovering the track pauses the loop
+          while the cursor stays on it. */}
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <span
+          className={[
+            "block truncate italic",
+            reduce ? "text-foreground/85" : "aven-obs-shimmer",
+            reduce ? "" : "sm:hidden",
+          ].join(" ")}
+        >
+          &ldquo;{text}&rdquo;
+        </span>
+        {!reduce && (
+          <div className="hidden whitespace-nowrap aven-ticker sm:flex">
+            <span className="aven-obs-shimmer pr-16 italic">
+              &ldquo;{text}&rdquo;
+            </span>
+            <span aria-hidden className="aven-obs-shimmer pr-16 italic">
+              &ldquo;{text}&rdquo;
+            </span>
+          </div>
+        )}
+      </div>
+
       <style>{`
         @keyframes aven-obs-in {
           0% { opacity: 0; transform: translateX(8px); }
@@ -399,12 +421,25 @@ function LiveObservation({
           animation: aven-obs-shimmer 1.6s ease-out 1;
           animation-fill-mode: forwards;
         }
+        @keyframes aven-ticker {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+        .aven-ticker {
+          animation: aven-ticker 35s linear infinite;
+        }
+        .aven-ticker:hover {
+          animation-play-state: paused;
+        }
         @media (prefers-reduced-motion: reduce) {
           .aven-obs-shimmer {
             animation: none;
             background: none;
             -webkit-text-fill-color: rgba(243, 244, 246, 0.85);
             color: rgba(243, 244, 246, 0.85);
+          }
+          .aven-ticker {
+            animation: none;
           }
         }
       `}</style>
