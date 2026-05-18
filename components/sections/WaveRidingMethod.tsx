@@ -22,7 +22,7 @@ const tools: Tool[] = [
   },
   {
     number: "02",
-    title: "Trendlines (Rays)",
+    title: "Trendlines & Rays",
     body:
       "From swing points, projected forward. Resistance and support that adapts with structure.",
     visual: <TrendlineViz />,
@@ -31,7 +31,7 @@ const tools: Tool[] = [
     number: "03",
     title: "Indicators",
     body:
-      "RSI, MACD, EMA cluster, VMC Cipher. Confirmation only — never the entry signal alone.",
+      "RSI, MACD, EMAs, Market Cipher + more. Confirmation only — never the entry signal alone.",
     visual: <IndicatorWaveViz />,
   },
 ];

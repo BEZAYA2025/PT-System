@@ -56,7 +56,7 @@ export function Founder() {
         <div className="mx-auto mt-20 max-w-2xl text-center sm:mt-24">
           <Reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground/80">
-              Why he&apos;s building it — in his own words
+              In Paul&apos;s own words
             </p>
           </Reveal>
 

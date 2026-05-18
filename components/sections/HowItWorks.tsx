@@ -111,21 +111,31 @@ const stages: Stage[] = [
     number: "01",
     title: "Your Exchange, Connected",
     description:
-      "Read-only API key from Binance, Bybit, OKX, or any major exchange. 30 seconds setup. PT System sees your trades. It never trades for you.",
+      "Quick setup with a read-only API key. Your funds stay where they are. PT System sees your trades but never trades for you.",
     Icon: Plug,
     position: "left",
     visual: (
       <Chips
-        items={["Binance", "Bybit", "OKX", "+more"]}
+        items={[
+          "Binance",
+          "Bybit",
+          "OKX",
+          "Bitget",
+          "Kucoin",
+          "MEXC",
+          "Gate.io",
+          "Bitunix",
+          "Hyperliquid",
+        ]}
         badge="Read-Only"
       />
     ),
   },
   {
     number: "02",
-    title: "Multi-Timeframe Analysis",
+    title: "Full Market Context",
     description:
-      "Every fill, every position synced live. The backend analyzes timeframes from 15m to weekly, plus liquidity, funding, and macro context.",
+      "Aven sees your trades on every timeframe — from 15m to weekly — plus liquidity, funding, and macro context. Full picture, every time.",
     Icon: Activity,
     position: "right",
     visual: <TimeframeMiniViz />,
@@ -141,7 +151,7 @@ const stages: Stage[] = [
   },
   {
     number: "04",
-    title: "Get Guidance",
+    title: "Trade with Clarity",
     description:
       "Receive insights via Telegram chat or web dashboard. Morning briefings, setup checks, mid-trade questions, post-trade reviews.",
     Icon: MessageCircle,

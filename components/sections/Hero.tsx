@@ -37,15 +37,15 @@ export function Hero({ isAuthed = false }: { isAuthed?: boolean }) {
           {...fade(0.2)}
           className="mt-6 text-2xl font-normal text-muted-foreground sm:text-3xl md:text-4xl"
         >
-          Paul&apos;s AI trading mentor.
+          Your AI trading mentor.
         </motion.p>
 
         <motion.p
           {...fade(0.35)}
           className="mt-8 max-w-2xl text-base leading-relaxed text-muted-foreground sm:text-lg sm:leading-[1.7]"
         >
-          Trained on the Wave Riding Method. Aware of your trades in real time.
-          Available 24/7. Backed by transparent, live results.
+          Trained on Paul&apos;s Wave Riding Method. Knows your trades in real time.
+          Coaches you 24/7. Backed by transparent, live results.
         </motion.p>
 
         <motion.div
@@ -83,7 +83,7 @@ export function Hero({ isAuthed = false }: { isAuthed?: boolean }) {
             href="#what-is"
             className="text-sm font-medium text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"
           >
-            Read what Aven is →
+            See how Aven works →
           </Link>
         </motion.div>
       </div>

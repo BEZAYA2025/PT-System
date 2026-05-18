@@ -27,7 +27,7 @@ const negatives: Negative[] = [
     why: "You stay dependent. You never develop your own judgment. When the leader makes mistakes, you make them too.",
   },
   {
-    title: "Generic AI Coaches",
+    title: "Generic AI Assistants",
     what: "ChatGPT-style assistants without a method.",
     why: "They don't know your trades. They don't know your strategy. Advice without context is just noise.",
   },
@@ -53,7 +53,7 @@ const benefits: Benefit[] = [
     Icon: Eye,
   },
   {
-    title: "Teaches You to Trade",
+    title: "Coaches You to Think Like a Trader",
     body:
       "Every conversation is a lesson. Setup scores explain why a trade is 7/10 or 9/10. Post-trade reviews show what worked.",
     Icon: GraduationCap,
@@ -81,9 +81,8 @@ export function WhatIs() {
 
         <Reveal delay={0.1}>
           <p className="mt-8 max-w-3xl text-base leading-[1.8] text-muted-foreground sm:text-lg">
-            Trading tools today come in three flavors. None of them actually
-            teach you to trade. They either replace you (bots), make you
-            dependent (copy trading), or give generic advice (AI coaches).
+            Trading tools today either trade for you, copy someone else, or
+            hand out generic advice. None of them teach you anything.
           </p>
         </Reveal>
 

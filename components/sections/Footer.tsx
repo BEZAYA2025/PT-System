@@ -20,7 +20,7 @@ export async function Footer() {
                 aria-hidden="true"
                 className="size-1.5 rounded-full bg-emerald"
               />
-              Phase 1 deployed · Phase 2 building
+              Built in public
             </span>
           </div>
 
@@ -76,7 +76,14 @@ export async function Footer() {
           </nav>
         </div>
 
-        <p className="text-xs text-muted-foreground">© 2026 PT System</p>
+        {/* Round-30: legal entity attribution above the copyright line.
+            Email intentionally absent — for company correspondence
+            members reach Fortex via the Impressum in Settings →
+            Privacy & Legal. */}
+        <div className="space-y-1.5 text-xs text-muted-foreground">
+          <p>PT System is a product of Fortex Media Ltd. · London, UK</p>
+          <p>© 2026 PT System</p>
+        </div>
       </div>
     </footer>
   );
