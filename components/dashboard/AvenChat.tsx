@@ -360,7 +360,7 @@ function LiveTicker({
         {reduce ? (
           /* Reduced-motion fallback: just the most recent item,
              truncated with ellipsis. No animation, no scroll. */
-          <span className="block truncate italic text-foreground/85">
+          <span className="block truncate italic text-emerald-300/80">
             &ldquo;{items[items.length - 1] ?? ""}&rdquo;
           </span>
         ) : (
@@ -415,7 +415,11 @@ function TickerItem({
       aria-hidden={ariaHidden || undefined}
       className="inline-flex shrink-0 items-baseline"
     >
-      <span className="italic text-foreground/85">&ldquo;{text}&rdquo;</span>
+      {/* Subtle emerald — matches the colour the previous shimmer-
+          gradient text settled into. Distinguishes the live thought
+          stream from neutral foreground text without competing with
+          the LIVE pill's brighter emerald. */}
+      <span className="italic text-emerald-300/80">&ldquo;{text}&rdquo;</span>
       <span aria-hidden className="px-3 text-muted-foreground/50">
         ·
       </span>
