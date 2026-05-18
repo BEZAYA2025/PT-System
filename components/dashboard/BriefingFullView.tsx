@@ -124,13 +124,16 @@ function TimeframeAccordion({
         />
       </button>
       {open && (
-        <div className="space-y-3.5 border-t border-border px-4 py-4">
+        <div className="space-y-4 border-t border-border px-4 py-4">
           {tf.items.map((item) => (
-            <div key={item.label}>
-              <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+            <div
+              key={item.label}
+              className="border-l-2 border-emerald-500/25 pl-3.5 sm:pl-4"
+            >
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
                 {item.label}
               </p>
-              <div className="mt-1">
+              <div className="mt-1.5">
                 <ProseText text={item.body} />
               </div>
             </div>
@@ -172,7 +175,7 @@ export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
 
       {parsed.setup && (
         <section className="rounded-xl border border-emerald-500/25 bg-gradient-to-br from-surface via-surface to-emerald-500/[0.04] p-5">
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-4 flex items-center gap-2">
             <span className="text-base leading-none" aria-hidden>
               {parsed.setup.emoji}
             </span>
@@ -180,10 +183,43 @@ export function BriefingFullView({ parsed }: { parsed: ParsedBriefing }) {
               {parsed.setup.title || "Gesamtbild & Setup"}
             </h3>
           </div>
-          <ProseText
-            text={parsed.setup.body}
-            className="text-[14.5px] text-foreground"
-          />
+
+          {parsed.setup.preamble && (
+            <div className="mb-4">
+              <ProseText
+                text={parsed.setup.preamble}
+                className="text-[14.5px] text-foreground"
+              />
+            </div>
+          )}
+
+          {parsed.setup.items.length > 0 ? (
+            <div className="space-y-4">
+              {parsed.setup.items.map((item) => (
+                <div
+                  key={item.label}
+                  className="border-l-2 border-foreground/15 pl-3.5 sm:pl-4"
+                >
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-foreground/80">
+                    {item.label}
+                  </p>
+                  <div className="mt-1.5">
+                    <ProseText
+                      text={item.body}
+                      className="text-[14.5px] text-foreground"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            !parsed.setup.preamble && (
+              <ProseText
+                text={parsed.setup.body}
+                className="text-[14.5px] text-foreground"
+              />
+            )
+          )}
         </section>
       )}
 

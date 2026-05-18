@@ -27,13 +27,10 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
         <div className="flex items-start gap-4">
           <BriefAvatar size={36} />
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-amber-300/80">
-              Today&apos;s Brief
-            </p>
-            <h2 className="mt-1 text-lg font-semibold tracking-tight text-foreground">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
               Today&apos;s brief is being prepared…
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1.5 text-sm text-muted-foreground">
               Aven posts daily around 06:00 UTC.
             </p>
           </div>
@@ -44,7 +41,7 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
 
   const parsed = brief.parsed;
   const bias = parsed?.primaryBias ?? null;
-  const setupTeaser = parsed?.setup?.body ?? null;
+  const setup = parsed?.setup ?? null;
 
   return (
     <>
@@ -52,15 +49,15 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
         <div className="flex items-start gap-4">
           <BriefAvatar size={36} />
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-amber-300/80">
-                  Today&apos;s Brief
-                </p>
-                <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-foreground">
-                  Morning briefing
-                </h2>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+              <h2 className="flex flex-wrap items-center gap-2 text-lg font-semibold tracking-tight text-foreground">
+                {parsed?.header?.asset && (
+                  <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-200">
+                    {parsed.header.asset}
+                  </span>
+                )}
+                <span>Morning Briefing</span>
+              </h2>
               <p
                 className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground"
                 suppressHydrationWarning
@@ -69,28 +66,24 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
               </p>
             </div>
 
-            {parsed?.header && (
-              <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                {parsed.header.asset && (
-                  <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2.5 py-0.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-amber-200">
-                    {parsed.header.asset}
-                  </span>
-                )}
-                {parsed.header.date && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    {parsed.header.date}
-                  </span>
-                )}
-                {parsed.header.spot && (
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    · Spot{" "}
-                    <span className="text-foreground">
-                      ${parsed.header.spot}
+            {parsed?.header &&
+              (parsed.header.date || parsed.header.spot) && (
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                  {parsed.header.date && (
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {parsed.header.date}
                     </span>
-                  </span>
-                )}
-              </div>
-            )}
+                  )}
+                  {parsed.header.spot && (
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      Spot{" "}
+                      <span className="text-foreground">
+                        ${parsed.header.spot}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              )}
 
             {brief.isStale && (
               <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-200">
@@ -114,14 +107,32 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
               </figure>
             )}
 
-            {setupTeaser && (
-              <div className="mt-4">
-                <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-emerald-300/80">
+            {setup && (setup.items.length > 0 || setup.body) && (
+              <div className="mt-5">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
                   🎯 Gesamtbild &amp; Setup
                 </p>
-                <p className="mt-1 line-clamp-3 whitespace-pre-line text-[14px] leading-relaxed text-foreground/90">
-                  {setupTeaser}
-                </p>
+                {setup.items.length > 0 ? (
+                  <div className="mt-2 space-y-3">
+                    {setup.items.map((item) => (
+                      <div
+                        key={item.label}
+                        className="border-l-2 border-emerald-500/25 pl-3"
+                      >
+                        <p className="font-mono text-[10.5px] font-semibold uppercase tracking-[0.18em] text-emerald-300/70">
+                          {item.label}
+                        </p>
+                        <p className="mt-1 line-clamp-2 whitespace-pre-line text-[14px] leading-relaxed text-foreground/90">
+                          {item.body}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2 line-clamp-3 whitespace-pre-line text-[14px] leading-relaxed text-foreground/90">
+                    {setup.body}
+                  </p>
+                )}
               </div>
             )}
 

@@ -23,6 +23,12 @@ export interface BriefingTimeframe {
 export interface BriefingSetup {
   emoji: string;
   title: string;
+  // Free-text content before the first recognised sub-label (often empty).
+  preamble: string;
+  // Sub-sections inside the setup block, parsed against SETUP_LABELS.
+  items: BriefingItem[];
+  // Raw body kept as a fallback for renderers when no sub-labels were
+  // recognised (older / non-canonical briefings).
   body: string;
 }
 
@@ -59,6 +65,13 @@ const TF_LABELS = new Set([
   "Trendlinie/Ray",
   "EMA-Lage",
   "Divergenz",
+]);
+
+// Sub-labels recognised inside the 🎯 GESAMTBILD & SETUP section.
+const SETUP_LABELS = new Set([
+  "Übergeordneter Trend",
+  "Wellenreiten aktiv",
+  "Stärkstes Signal",
 ]);
 
 function isSeparator(line: string): boolean {
@@ -99,14 +112,21 @@ function deriveBias(text: string): BiasTone {
   return "neutral";
 }
 
-function parseLabel(line: string): { label: string; rest: string } | null {
+// Allow spaces inside the label token so multi-word labels like
+// "Wellenreiten aktiv" or "Übergeordneter Trend" are matched. The caller
+// passes the whitelist set that's valid for the current section.
+function parseLabel(
+  line: string,
+  labels: Set<string>,
+): { label: string; rest: string } | null {
   const trimmed = line.trim();
   const m = trimmed.match(
-    /^([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9/.\-]{1,40}):\s*(.*)$/,
+    /^([A-Za-zÄÖÜäöüß][A-Za-zÄÖÜäöüß0-9 /.\-]{1,40}):\s*(.*)$/,
   );
   if (!m) return null;
-  if (!TF_LABELS.has(m[1])) return null;
-  return { label: m[1], rest: m[2] };
+  const label = m[1].trim();
+  if (!labels.has(label)) return null;
+  return { label, rest: m[2] };
 }
 
 export function parseBriefing(content: string): ParsedBriefing {
@@ -118,9 +138,16 @@ export function parseBriefing(content: string): ParsedBriefing {
 
   let currentTf: BriefingTimeframe | null = null;
   let currentSetup:
-    | { emoji: string; title: string; bodyLines: string[] }
+    | {
+        emoji: string;
+        title: string;
+        preambleLines: string[];
+        items: BriefingItem[];
+        bodyLines: string[];
+      }
     | null = null;
   let currentItem: { label: string; bodyLines: string[] } | null = null;
+  let currentSetupItem: { label: string; bodyLines: string[] } | null = null;
 
   const flushItem = () => {
     if (currentItem && currentTf) {
@@ -145,11 +172,23 @@ export function parseBriefing(content: string): ParsedBriefing {
     }
     currentTf = null;
   };
+  const flushSetupItem = () => {
+    if (currentSetupItem && currentSetup) {
+      currentSetup.items.push({
+        label: currentSetupItem.label,
+        body: currentSetupItem.bodyLines.join("\n").trim(),
+      });
+    }
+    currentSetupItem = null;
+  };
   const flushSetup = () => {
+    flushSetupItem();
     if (currentSetup) {
       setup = {
         emoji: currentSetup.emoji,
         title: currentSetup.title,
+        preamble: currentSetup.preambleLines.join("\n").trim(),
+        items: currentSetup.items,
         body: currentSetup.bodyLines.join("\n").trim(),
       };
     }
@@ -172,7 +211,13 @@ export function parseBriefing(content: string): ParsedBriefing {
       flushSetup();
       if (emoji === SETUP_EMOJI) {
         const titleRest = trimmed.slice(emoji.length).trim();
-        currentSetup = { emoji, title: titleRest, bodyLines: [] };
+        currentSetup = {
+          emoji,
+          title: titleRest,
+          preambleLines: [],
+          items: [],
+          bodyLines: [],
+        };
       } else {
         currentTf = {
           emoji,
@@ -186,7 +231,7 @@ export function parseBriefing(content: string): ParsedBriefing {
     }
 
     if (currentTf) {
-      const lbl = parseLabel(line);
+      const lbl = parseLabel(line, TF_LABELS);
       if (lbl) {
         flushItem();
         currentItem = {
@@ -204,7 +249,23 @@ export function parseBriefing(content: string): ParsedBriefing {
     }
 
     if (currentSetup) {
+      // Keep the raw line on bodyLines so renderers can fall back to the
+      // unparsed body when no sub-labels matched.
       currentSetup.bodyLines.push(line);
+      const lbl = parseLabel(line, SETUP_LABELS);
+      if (lbl) {
+        flushSetupItem();
+        currentSetupItem = {
+          label: lbl.label,
+          bodyLines: lbl.rest ? [lbl.rest] : [],
+        };
+        continue;
+      }
+      if (currentSetupItem) {
+        currentSetupItem.bodyLines.push(line.trim());
+      } else {
+        currentSetup.preambleLines.push(line);
+      }
       continue;
     }
   }
