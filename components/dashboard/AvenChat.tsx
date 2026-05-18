@@ -271,33 +271,40 @@ function AvenLiveBar({
       //   [Live observation — col-span-2, centred horizontally]
       // Mobile: keeps the round-15 2x2 grid (avatar + title on row one,
       // observation on row two, col-spanning) so the bar reads cleanly
-      // on a narrow viewport. Desktop: switches to a single flex row
-      // with `items-center` so the AI-Mentor/Aven title and the live
-      // ticker share the same vertical mid-line, and tighter sm:py-2
-      // pulls the whole bar closer to the chat thread below.
-      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:flex sm:items-center sm:gap-4 sm:px-8 sm:py-2"
+      // on a narrow viewport. Desktop: stays a grid but switches to a
+      // 1fr/auto/1fr three-column layout so the live ticker lands
+      // exactly at the visual centre of the whole bar (not just the
+      // remaining width after the title). The 1fr columns absorb the
+      // overhang equally on each side — title flush left, ticker dead
+      // centre, balancing whitespace on the right.
+      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4 sm:px-8 sm:py-2"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Round-18: avatar cell uses `place-items-center` so the avatar
-          dead-centres within the cell horizontally AND vertically.
-          The text cell uses `flex flex-col justify-center` with
-          tightened leading so its 2-line content has a clean
-          geometric centre — matches the avatar's centre with no
-          baseline / inline-flex quirks dragging the visual centre off. */}
-      <div className="grid place-items-center">
-        <AvenAvatar size={24} online={streamConnected} breath />
-      </div>
-      <div className="flex min-w-0 flex-col justify-center leading-tight">
-        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
-          AI Mentor
-        </p>
-        <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
-          Aven
-        </p>
+      {/* Avatar + title group. On mobile this wrapper is `display:
+          contents` — the avatar and title flow into the parent grid
+          as direct row-1 children (col 1 and col 2). On desktop the
+          wrapper becomes a flex container and occupies the single
+          1fr left column, freeing the centre auto-column for the
+          observation alone. The avatar cell still uses
+          `place-items-center` for its own internal centring; the
+          text cell uses `flex flex-col justify-center` so its
+          2-line content has a clean geometric centre. */}
+      <div className="contents sm:flex sm:items-center sm:gap-3">
+        <div className="grid place-items-center">
+          <AvenAvatar size={24} online={streamConnected} breath />
+        </div>
+        <div className="flex min-w-0 flex-col justify-center leading-tight">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
+            AI Mentor
+          </p>
+          <p className="mt-0.5 text-base font-semibold tracking-tight text-foreground sm:text-[17px]">
+            Aven
+          </p>
+        </div>
       </div>
 
-      <div className="col-span-2 flex min-w-0 justify-center sm:flex-1">
+      <div className="col-span-2 flex min-w-0 justify-center sm:col-span-1">
         <LiveObservation
           text={obs}
           reduce={!!reduce}

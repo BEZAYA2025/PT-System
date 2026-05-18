@@ -219,13 +219,23 @@ function OpenTradeCard({
         </span>
       </div>
 
+      {/* Round-25: classic trader hierarchy — absolute $ first and
+          large, % as secondary detail beside it. When USD is hidden
+          (Paul's trades / hideUsd) we fall back to % as the primary
+          value so the row isn't empty. */}
       <div className="mt-2 flex items-baseline gap-3">
-        <span className={`font-mono text-lg font-semibold ${tone}`}>
-          {fmtSignedPct(trade.pnlPct)}
-        </span>
-        {!hideUsd && trade.owner === "self" && (
-          <span className={`font-mono text-sm ${tone}`}>
-            {fmtSignedUsd(trade.pnlUsd)}
+        {!hideUsd && trade.owner === "self" ? (
+          <>
+            <span className={`font-mono text-lg font-semibold ${tone}`}>
+              {fmtSignedUsd(trade.pnlUsd)}
+            </span>
+            <span className={`font-mono text-sm ${tone}`}>
+              {fmtSignedPct(trade.pnlPct)}
+            </span>
+          </>
+        ) : (
+          <span className={`font-mono text-lg font-semibold ${tone}`}>
+            {fmtSignedPct(trade.pnlPct)}
           </span>
         )}
       </div>

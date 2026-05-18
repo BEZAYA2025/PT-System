@@ -86,7 +86,7 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
         aria-label="Open today's briefing"
         onClick={openModal}
         onKeyDown={onCardKey}
-        className="cursor-pointer rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 transition-colors hover:border-amber-500/30 hover:to-amber-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:p-8"
+        className="group cursor-pointer rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 transition-colors hover:border-amber-500/30 hover:to-amber-500/[0.06] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/40 sm:p-8"
       >
         <div className="flex items-start gap-4">
           <BriefAvatar size={36} />
@@ -155,12 +155,16 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
               </p>
             )}
 
-            {/* Visual affordance — the whole card is the click target,
-                this just signals to members what the click does. */}
-            <p className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-emerald">
+            {/* Visual affordance — the whole section is the click
+                target (role=button + onClick on <section>), this is
+                styled like a button so members get a clear "click
+                this" cue. The actual hover state is driven by the
+                parent section's `group` class so hovering anywhere
+                on the card lights up this button too. */}
+            <span className="mt-5 inline-flex items-center gap-1.5 rounded-md border border-emerald/30 bg-emerald/[0.10] px-3 py-1.5 text-sm font-medium text-emerald transition-colors group-hover:border-emerald/55 group-hover:bg-emerald/[0.16]">
               <IconBook2 size={14} stroke={1.75} aria-hidden />
               Read full brief
-            </p>
+            </span>
           </div>
         </div>
       </section>
