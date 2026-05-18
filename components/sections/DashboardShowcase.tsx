@@ -10,7 +10,9 @@ import {
   useTransform,
 } from "framer-motion";
 import { Reveal } from "@/components/Reveal";
+import { AvenAvatar } from "@/components/dashboard/AvenAvatar";
 import { BrandLogo } from "@/components/dashboard/BrandLogo";
+import { BriefAvatar } from "@/components/dashboard/BriefAvatar";
 
 // Landing-page Section #3 — "Dashboard + Aven Showcase". Round-28
 // iteration: fixed-size frame (no breathing between phases), TradingView-
@@ -22,14 +24,22 @@ type Phase = "idle" | "setup" | "discipline";
 
 const PHASE_ORDER: ReadonlyArray<Phase> = ["idle", "setup", "discipline"];
 
-// Slowed loop — was 5/16/11s, now 10/22/16s. With AnimatePresence's
-// 0.6s exit + 0.4s entry-delay pause between phases the total cycle
-// lands around 50-52s.
+// Round-29: tightened loop. Iter-2 ran ~52s and members felt the
+// conversation transitions dragged. Now: idle 6s · setup 16s ·
+// discipline 11s = ~33s total with the trimmed phase-transition
+// gap (0.3s exit + 0.2s pause + 0.3s enter ≈ 0.5s per swap).
 const PHASE_DURATION_MS: Record<Phase, number> = {
-  idle: 10000,
-  setup: 22000,
-  discipline: 16000,
+  idle: 6000,
+  setup: 16000,
+  discipline: 11000,
 };
+
+// Cross-fade durations between phases. Snappy enough that members
+// don't sit waiting for the next bubble; still smooth enough not to
+// feel jumpy.
+const PHASE_EXIT_S = 0.3;
+const PHASE_ENTER_S = 0.3;
+const PHASE_GAP_S = 0.2;
 
 const PHASE_LABELS: Record<Phase, string> = {
   idle: "Live dashboard",
@@ -319,7 +329,36 @@ function UnrealizedPnlCard({
           {pctLabel}
         </motion.span>
       </div>
-      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+
+      {/* SL/TP exposure line — matches the live dashboard's
+          SlTpExposureLine pattern (Entry · SL ($) · TP ($)). Shown in
+          both phases so the loss-context in `discipline` is visible
+          next to the negative PnL. */}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 border-t border-border/60 pt-2 font-mono text-[10px]">
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-muted-foreground">Entry</span>
+          <span className="text-foreground">$78,500</span>
+        </span>
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-muted-foreground">SL</span>
+          <span className="text-foreground">$74,500</span>
+          <span className="text-muted-foreground">
+            (<span className="text-red-300">−400$</span>)
+          </span>
+        </span>
+        <span aria-hidden className="text-muted-foreground">
+          ·
+        </span>
+        <span className="inline-flex items-baseline gap-1">
+          <span className="text-muted-foreground">TP</span>
+          <span className="text-foreground">$82,000</span>
+          <span className="text-muted-foreground">
+            (<span className="text-emerald">+350$</span>)
+          </span>
+        </span>
+      </div>
+
+      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
         1 open · BTCUSDT
       </p>
     </div>
@@ -375,39 +414,25 @@ function AnimatedAvenSection({
       <div className="relative h-[560px] overflow-hidden bg-background/40 lg:h-[640px]">
         <AnimatePresence mode="wait">
           {phase === "idle" && (
-            <motion.div
-              key="idle"
-              initial={{ opacity: 0 }}
-              animate={{
-                opacity: 1,
-                transition: { delay: 0.4, duration: 0.6, ease: EASE_IN_OUT },
-              }}
-              exit={{ opacity: 0, transition: { duration: 0.6, ease: EASE_IN_OUT } }}
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 py-6 text-center sm:px-5 sm:py-8"
-            >
-              <span className="inline-flex size-12 items-center justify-center rounded-full border border-emerald/25 bg-emerald/[0.06]">
-                <span className="size-2 rounded-full bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.7)]" />
-              </span>
-              <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                Aven is listening
-              </p>
-              <p className="max-w-sm text-sm text-muted-foreground/80">
-                Ask anything. Setup checks, mid-trade reviews, market
-                structure — Aven sees your trades and Paul&apos;s methodology.
-              </p>
-            </motion.div>
+            <PhaseFade key="idle" className="absolute inset-0 flex flex-col items-center justify-center px-4 py-5 sm:px-6 sm:py-7">
+              <IdlePrompts />
+            </PhaseFade>
           )}
 
           {phase === "setup" && (
-            <PhaseScroll key="setup">
-              <SetupConversation reduce={reduce} />
-            </PhaseScroll>
+            <PhaseFade key="setup" className="absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6">
+              <div className="space-y-3">
+                <SetupConversation reduce={reduce} />
+              </div>
+            </PhaseFade>
           )}
 
           {phase === "discipline" && (
-            <PhaseScroll key="discipline">
-              <DisciplineConversation />
-            </PhaseScroll>
+            <PhaseFade key="discipline" className="absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6">
+              <div className="space-y-3">
+                <DisciplineConversation />
+              </div>
+            </PhaseFade>
           )}
         </AnimatePresence>
       </div>
@@ -417,21 +442,85 @@ function AnimatedAvenSection({
   );
 }
 
-// Wrapper used by setup + discipline phases — handles the absolute
-// positioning, scroll behaviour, and shared enter/exit transition.
-function PhaseScroll({ children }: { children: React.ReactNode }) {
+// Shared phase wrapper — absolute positioning + cross-fade in/out.
+// Snappy 0.3s exit, 0.2s pause, 0.3s enter so the conversation moves
+// quickly between phases without reading as a hard cut.
+function PhaseFade({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{
         opacity: 1,
-        transition: { delay: 0.4, duration: 0.6, ease: EASE_IN_OUT },
+        transition: {
+          delay: PHASE_GAP_S,
+          duration: PHASE_ENTER_S,
+          ease: EASE_IN_OUT,
+        },
       }}
-      exit={{ opacity: 0, transition: { duration: 0.6, ease: EASE_IN_OUT } }}
-      className="absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5 sm:py-6"
+      exit={{
+        opacity: 0,
+        transition: { duration: PHASE_EXIT_S, ease: EASE_IN_OUT },
+      }}
+      className={className}
     >
-      <div className="space-y-3">{children}</div>
+      {children}
     </motion.div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Idle state — prompt suggestion pills. Shows members what they can
+// actually ask Aven, instead of a generic listening blurb.
+// ---------------------------------------------------------------------------
+
+interface PromptPill {
+  icon: string;
+  label: string;
+}
+
+const IDLE_PROMPTS: ReadonlyArray<PromptPill> = [
+  { icon: "📊", label: "Score this setup" },
+  { icon: "🎯", label: "Hold or cut?" },
+  { icon: "📈", label: "Market structure" },
+  { icon: "⚖️", label: "Risk check" },
+  { icon: "💬", label: "Why this trade?" },
+  { icon: "🧠", label: "Explain Paul's last trade" },
+];
+
+function IdlePrompts() {
+  return (
+    <div className="flex w-full max-w-xl flex-col items-center gap-5 text-center">
+      <div className="flex flex-col items-center gap-2">
+        <AvenAvatar size={32} online breath />
+        <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-emerald/85">
+          Aven is ready
+        </p>
+      </div>
+
+      <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2">
+        {IDLE_PROMPTS.map((p) => (
+          <span
+            key={p.label}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-1.5 text-left text-[13px] text-foreground/85 transition-colors hover:border-emerald/40 hover:bg-emerald/[0.05] hover:text-foreground"
+          >
+            <span aria-hidden className="text-[14px]">
+              {p.icon}
+            </span>
+            <span className="truncate">{p.label}</span>
+          </span>
+        ))}
+      </div>
+
+      <p className="max-w-md text-[13px] text-muted-foreground/85">
+        Ask anything — Aven sees your trades, knows Paul&apos;s method.
+      </p>
+    </div>
   );
 }
 
@@ -452,9 +541,7 @@ function AvenLiveBarMarquee({ reduce }: { reduce: boolean }) {
   return (
     <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-2 sm:px-5">
       <div className="flex items-center gap-3">
-        <span className="relative inline-flex size-6 items-center justify-center rounded-full bg-emerald/[0.18] ring-2 ring-emerald/40">
-          <span className="size-1.5 rounded-full bg-emerald shadow-[0_0_6px_rgba(16,185,129,0.65)]" />
-        </span>
+        <AvenAvatar size={22} online breath />
         <div className="leading-tight">
           <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/85">
             AI Mentor
@@ -568,14 +655,17 @@ function ChatInputBar() {
 // ---------------------------------------------------------------------------
 
 function SetupConversation({ reduce }: { reduce: boolean }) {
+  // Round-29 tightening — internal delays trimmed by ~30% to match
+  // the shorter 16s phase. Bubbles arrive sooner so members spend
+  // more of the phase reading rather than waiting.
   const d = reduce
     ? { memberTyping: 0, memberMsg: 0, avenThinking: 0, avenMsg: 0, chartIn: 0 }
     : {
-        memberTyping: 0.6,
-        memberMsg: 2.2,
-        avenThinking: 3.2,
-        avenMsg: 5.0,
-        chartIn: 6.8,
+        memberTyping: 0.4,
+        memberMsg: 1.6,
+        avenThinking: 2.6,
+        avenMsg: 4.0,
+        chartIn: 5.6,
       };
 
   return (
@@ -604,20 +694,21 @@ function SetupConversation({ reduce }: { reduce: boolean }) {
 }
 
 function DisciplineConversation() {
+  // Phase budget is 11s — same trim-pattern as the setup convo.
   return (
     <>
-      <FadingTypingDots align="right" delay={2.4} duration={1.2} />
+      <FadingTypingDots align="right" delay={1.8} duration={1.0} />
       <MemberBubble
         text="My long is down 2%, should I cut or hold?"
         ts="14:08"
-        delay={3.6}
+        delay={2.8}
       />
-      <FadingTypingDots align="left" delay={4.6} duration={1.6} />
+      <FadingTypingDots align="left" delay={3.8} duration={1.4} />
       <AvenBubble
         intro="Entry was solid — 8/10 setup. SL at $74,500 still valid (12% from current). RSI 1H at 32 — historical bounce zone."
         body="The thesis hasn't broken. Discipline check: are you reacting to price or to your plan?"
         ts="14:09"
-        delay={6.2}
+        delay={5.2}
       />
     </>
   );
@@ -670,8 +761,8 @@ function AvenBubble({
       transition={{ duration: 0.6, delay, ease: EASE_OUT }}
     >
       <div className="flex items-start gap-3">
-        <span className="mt-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald/[0.18] ring-2 ring-emerald/40">
-          <span className="size-1.5 rounded-full bg-emerald shadow-[0_0_6px_rgba(16,185,129,0.65)]" />
+        <span className="mt-1 inline-flex shrink-0">
+          <AvenAvatar size={22} online={false} />
         </span>
         <div className="max-w-[85%]">
           <div className="rounded-2xl rounded-tl-sm bg-surface-elevated px-4 py-3 text-[14px] leading-relaxed text-foreground">
@@ -727,8 +818,8 @@ function FadingTypingDots({
           }
         >
           {align === "left" && (
-            <span className="mt-1 inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-emerald/[0.18] ring-2 ring-emerald/40">
-              <span className="size-1.5 rounded-full bg-emerald" />
+            <span className="mt-1 inline-flex shrink-0">
+              <AvenAvatar size={22} online={false} />
             </span>
           )}
           <div
@@ -1259,11 +1350,7 @@ function MockBriefCard() {
   return (
     <div className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-4">
       <div className="flex items-start gap-3">
-        <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-full border-2 border-amber-500/30 bg-amber-500/[0.08]">
-          <span className="text-sm" aria-hidden>
-            🌅
-          </span>
-        </span>
+        <BriefAvatar size={28} />
         <div className="min-w-0 flex-1">
           <h3 className="flex flex-wrap items-center gap-2 text-base font-semibold tracking-tight text-foreground">
             <span className="inline-flex items-center rounded-full border border-amber-500/30 bg-amber-500/[0.08] px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-amber-200">
@@ -1313,6 +1400,14 @@ function MockBriefCard() {
             established. Long setup on Daily 0.618 pullback with SL
             below ascending TL.
           </p>
+
+          {/* Visual "Read full brief" CTA — matches the real
+              DailyBriefCard's button. Not a real button (the whole
+              showcase is a static replica) but reads as one. */}
+          <span className="mt-4 inline-flex items-center gap-1.5 rounded-md border border-emerald/30 bg-emerald/[0.10] px-3 py-1.5 text-[13px] font-medium text-emerald">
+            <span aria-hidden>📖</span>
+            Read full brief
+          </span>
         </div>
       </div>
     </div>
