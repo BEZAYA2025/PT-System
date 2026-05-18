@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   IconBrandTelegram,
@@ -203,17 +203,18 @@ export function AvenChat({
 
 // ---------------------------------------------------------------------------
 
-// Round 12: Aven bar is now a Live-Stream area rather than a chat-header.
-// Top row stays the identity strip (avatar · AI Mentor / Aven · status dot)
-// but the capability-icon cluster + "Try …" prompt rotator are gone. In
-// their place a rotating "▸ Live: …" observation feed surfaces what Aven
-// is currently watching — visceral aliveness that's distinct from the
-// chat thread below.
+// Round 12: Aven bar is a Live-Stream area rather than a chat-header.
+// Top row stays the identity strip (avatar · AI Mentor / Aven · status
+// dot); to its right runs the live observation feed — what Aven is
+// currently watching.
 //
-// Phase-1 ships frontend mock observations (the array below). Phase-2
-// will swap the rotator for an SSE-fed stream from the VPS once
-// /api/aven/observations exists. The UI contract — single rotating
-// string, rendered via <LiveObservation /> — stays the same.
+// Round-26: rewrote the feed from a one-at-a-time rotator into a
+// proper news-ticker (multiple observations queued, separated by · ,
+// continuously scrolling left). Observations arrive via SSE
+// (/api/aven/observations) into the useAvenObservations buffer; we
+// reverse to chronological order and cap at MAX_VISIBLE so the strip
+// width stays bounded. Mock observations below are the fallback when
+// the stream isn't producing.
 
 function AvenLiveBar({
   quota,
@@ -222,37 +223,22 @@ function AvenLiveBar({
   quota: QuotaState | null;
   streamConnected: boolean;
 }) {
-  const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
   const reduce = useReducedMotion();
 
-  // Round-19: subscribe to the live observations stream. The hook
-  // returns real observations when the VPS SSE is producing data;
-  // falls back to LIVE_OBSERVATIONS when not connected so the bar
-  // is never empty during a network blip or before the backend has
-  // shipped the endpoint to a particular member.
+  // Round-19: subscribe to the live observations stream. Returns real
+  // observations when the VPS SSE is producing data; falls back to
+  // LIVE_OBSERVATIONS during a network blip or before the endpoint is
+  // available to a member. Buffer is newest-first.
   const { observations } = useAvenObservations(LIVE_OBSERVATIONS);
 
-  // Reset the rotator index whenever the source array shrinks below
-  // our cursor (e.g. SSE → fallback transition with fewer items, or a
-  // dedupe that trimmed the buffer). Without this the rotator could
-  // briefly render `undefined`.
-  useEffect(() => {
-    setIdx((i) => (observations.length > 0 ? i % observations.length : 0));
-  }, [observations.length]);
-
-  // Hovering the bar freezes rotation so a member can finish reading the
-  // current observation. Reduced-motion users get a longer dwell.
-  useEffect(() => {
-    if (paused || observations.length === 0) return;
-    const dwell = reduce ? 11000 : 9000;
-    const id = setInterval(() => {
-      setIdx((i) => (i + 1) % observations.length);
-    }, dwell);
-    return () => clearInterval(id);
-  }, [paused, reduce, observations.length]);
-
-  const obs = observations[idx] ?? "";
+  // Round-26: news-ticker queue. Reverse to chronological (oldest →
+  // newest), cap at MAX_VISIBLE so the strip width stays bounded as
+  // new events keep arriving. New observations land at the END of the
+  // strip and scroll into view; oldest fall off the front.
+  const queue = useMemo(
+    () => [...observations].reverse().slice(-MAX_VISIBLE),
+    [observations],
+  );
 
   return (
     <div
@@ -278,8 +264,6 @@ function AvenLiveBar({
       // overhang equally on each side — title flush left, ticker dead
       // centre, balancing whitespace on the right.
       className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:grid-cols-[1fr_auto_1fr] sm:items-center sm:gap-4 sm:px-8 sm:py-2"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
     >
       {/* Avatar + title group. On mobile this wrapper is `display:
           contents` — the avatar and title flow into the parent grid
@@ -305,8 +289,8 @@ function AvenLiveBar({
       </div>
 
       <div className="col-span-2 flex min-w-0 justify-center sm:col-span-1">
-        <LiveObservation
-          text={obs}
+        <LiveTicker
+          items={queue}
           reduce={!!reduce}
           streamConnected={streamConnected}
           quota={quota}
@@ -328,6 +312,11 @@ function AvenLiveBar({
 // /api/aven/observations and the wizard switches to live data.
 // ---------------------------------------------------------------------------
 
+// News-ticker queue cap. Anything beyond this falls off the front of
+// the strip so the rendered DOM and the CSS marquee width stay
+// bounded as more SSE events keep arriving.
+const MAX_VISIBLE = 5;
+
 const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
   "Analyzing 4H market structure…",
   "Monitoring liquidity layers",
@@ -339,89 +328,61 @@ const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
   "Live market intelligence active",
 ];
 
-function LiveObservation({
-  text,
+function LiveTicker({
+  items,
   reduce,
   streamConnected,
   quota,
 }: {
-  text: string;
+  items: ReadonlyArray<string>;
   reduce: boolean;
   streamConnected: boolean;
   quota: QuotaState | null;
 }) {
-  // Keying the wrapper on `text` forces React to remount on each rotation
-  // so the entry animation re-fires. Cheap — the inner DOM is tiny.
+  // Outer wrapper has no `key` on changing data — it stays mounted
+  // permanently. That's the fix for the LIVE-pill "wackeln":
+  // previously `<div key={text}>` remounted the whole subtree on
+  // every observation change, so the StatusDot + LIVE label briefly
+  // recomputed their layout. Now only the inner ticker strip
+  // reconciles when the queue updates; the dot and label never
+  // reflow.
   return (
     <div
-      key={text}
       aria-live="off"
-      className={[
-        // `w-full` (not just `max-w-full`) so the inner overflow-hidden
-        // viewport for the desktop marquee has a definite width to clip
-        // against; without it the marquee track would size to its
-        // longest content and bleed past the chatbox edge.
-        "inline-flex w-full max-w-full items-center gap-2.5 text-[13px] leading-snug sm:max-w-md",
-        reduce ? "" : "aven-obs-in",
-      ].join(" ")}
+      className="inline-flex w-full max-w-full items-center gap-2.5 text-[13px] leading-snug sm:max-w-md"
     >
       <StatusDot online={streamConnected} quota={quota} />
       <span className="shrink-0 font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/75">
         Live
       </span>
 
-      {/* The text viewport. When motion is allowed (both mobile and
-          desktop) we render two copies of the thought inside an
-          overflow-hidden window and slide the track from 0 → -50%, so
-          the second copy arrives in the first copy's slot at loop end.
-          Seamless ticker — members read the whole thought without it
-          being cut off. Hovering the track pauses the loop while the
-          cursor stays on it. Reduced-motion users fall back to the
-          original truncate-with-ellipsis behaviour on any size. */}
       <div className="min-w-0 flex-1 overflow-hidden">
         {reduce ? (
+          /* Reduced-motion fallback: just the most recent item,
+             truncated with ellipsis. No animation, no scroll. */
           <span className="block truncate italic text-foreground/85">
-            &ldquo;{text}&rdquo;
+            &ldquo;{items[items.length - 1] ?? ""}&rdquo;
           </span>
         ) : (
-          <div className="flex whitespace-nowrap aven-ticker">
-            <span className="aven-obs-shimmer pr-16 italic">
-              &ldquo;{text}&rdquo;
-            </span>
-            <span aria-hidden className="aven-obs-shimmer pr-16 italic">
-              &ldquo;{text}&rdquo;
-            </span>
+          /* News-ticker strip. Items render chronologically with a
+             middle-dot between them; the whole array is rendered
+             twice and the track animates translateX(0) → (-50%) so
+             the second copy lands in the first copy's slot at loop
+             end — seamless without a jump. With MAX_VISIBLE = 5
+             items the strip is many times wider than its viewport,
+             so the duplicated copies are never on screen together. */
+          <div className="flex items-baseline whitespace-nowrap aven-ticker">
+            {items.map((text, i) => (
+              <TickerItem key={`a-${i}`} text={text} />
+            ))}
+            {items.map((text, i) => (
+              <TickerItem key={`b-${i}`} text={text} ariaHidden />
+            ))}
           </div>
         )}
       </div>
 
       <style>{`
-        @keyframes aven-obs-in {
-          0% { opacity: 0; transform: translateX(8px); }
-          60% { opacity: 1; }
-          100% { opacity: 1; transform: translateX(0); }
-        }
-        .aven-obs-in {
-          animation: aven-obs-in 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        @keyframes aven-obs-shimmer {
-          0% { background-position: -150% 0; }
-          100% { background-position: 250% 0; }
-        }
-        .aven-obs-shimmer {
-          background: linear-gradient(
-            90deg,
-            rgba(243, 244, 246, 0.85) 0%,
-            rgba(110, 231, 183, 1) 50%,
-            rgba(243, 244, 246, 0.85) 100%
-          );
-          background-size: 200% 100%;
-          -webkit-background-clip: text;
-          background-clip: text;
-          color: transparent;
-          animation: aven-obs-shimmer 1.6s ease-out 1;
-          animation-fill-mode: forwards;
-        }
         @keyframes aven-ticker {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
@@ -433,18 +394,32 @@ function LiveObservation({
           animation-play-state: paused;
         }
         @media (prefers-reduced-motion: reduce) {
-          .aven-obs-shimmer {
-            animation: none;
-            background: none;
-            -webkit-text-fill-color: rgba(243, 244, 246, 0.85);
-            color: rgba(243, 244, 246, 0.85);
-          }
           .aven-ticker {
             animation: none;
           }
         }
       `}</style>
     </div>
+  );
+}
+
+function TickerItem({
+  text,
+  ariaHidden,
+}: {
+  text: string;
+  ariaHidden?: boolean;
+}) {
+  return (
+    <span
+      aria-hidden={ariaHidden || undefined}
+      className="inline-flex shrink-0 items-baseline"
+    >
+      <span className="italic text-foreground/85">&ldquo;{text}&rdquo;</span>
+      <span aria-hidden className="px-3 text-muted-foreground/50">
+        ·
+      </span>
+    </span>
   );
 }
 
