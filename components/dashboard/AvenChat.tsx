@@ -297,7 +297,7 @@ function AvenLiveBar({
         </p>
       </div>
 
-      <div className="col-span-2 flex min-w-0 justify-center sm:flex-1 sm:justify-start">
+      <div className="col-span-2 flex min-w-0 justify-center sm:flex-1">
         <LiveObservation
           text={obs}
           reduce={!!reduce}
@@ -363,27 +363,21 @@ function LiveObservation({
         Live
       </span>
 
-      {/* The text viewport. On mobile (and for reduced-motion users on
-          any size) we render a single truncated copy — long thoughts
-          ellipsis-clip the same way they did before. On desktop with
-          motion allowed, we render two copies inside an overflow-hidden
-          window and slide the track from 0 → -50%, so the second copy
-          arrives in the first copy's slot at loop end. The result is a
-          seamless ticker that lets members read the whole thought
-          without it being cut off. Hovering the track pauses the loop
-          while the cursor stays on it. */}
+      {/* The text viewport. When motion is allowed (both mobile and
+          desktop) we render two copies of the thought inside an
+          overflow-hidden window and slide the track from 0 → -50%, so
+          the second copy arrives in the first copy's slot at loop end.
+          Seamless ticker — members read the whole thought without it
+          being cut off. Hovering the track pauses the loop while the
+          cursor stays on it. Reduced-motion users fall back to the
+          original truncate-with-ellipsis behaviour on any size. */}
       <div className="min-w-0 flex-1 overflow-hidden">
-        <span
-          className={[
-            "block truncate italic",
-            reduce ? "text-foreground/85" : "aven-obs-shimmer",
-            reduce ? "" : "sm:hidden",
-          ].join(" ")}
-        >
-          &ldquo;{text}&rdquo;
-        </span>
-        {!reduce && (
-          <div className="hidden whitespace-nowrap aven-ticker sm:flex">
+        {reduce ? (
+          <span className="block truncate italic text-foreground/85">
+            &ldquo;{text}&rdquo;
+          </span>
+        ) : (
+          <div className="flex whitespace-nowrap aven-ticker">
             <span className="aven-obs-shimmer pr-16 italic">
               &ldquo;{text}&rdquo;
             </span>
