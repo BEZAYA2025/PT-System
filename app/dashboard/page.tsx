@@ -59,7 +59,7 @@ export default async function DashboardPage() {
   const showTour = user.first_login_completed === false;
 
   return (
-    <main id="main" className="space-y-8 sm:space-y-10">
+    <main id="main" className="space-y-8 sm:space-y-6">
       <MotionSection delay={0.02}>
         <MemberStatsCards
           btcPrice={initialBtcPrice}

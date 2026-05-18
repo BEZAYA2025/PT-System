@@ -171,6 +171,22 @@ export function aggregateExposure(open: YourTrade[]): {
 const num = (v: unknown): number | null =>
   typeof v === "number" && Number.isFinite(v) ? v : null;
 
+// Backend BIGINT columns (trade_number, sequence ids) come over JSON as
+// strings to avoid JS-number precision loss. `num()` rejects strings
+// outright, so the call sites for those fields use this looser parser
+// instead. Returns null on anything that isn't a positive-integer
+// number or a string that parses cleanly to one.
+const numOrIntString = (v: unknown): number | null => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (trimmed === "") return null;
+    const n = Number(trimmed);
+    if (Number.isFinite(n) && Number.isInteger(n)) return n;
+  }
+  return null;
+};
+
 const str = (v: unknown): string | null =>
   typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
 
@@ -389,7 +405,7 @@ function shapePaulEndpointOne(
     reasoning: null,
     score: num(t.score),
     leverage: num(t.leverage),
-    tradeNumber: num(t.trade_number),
+    tradeNumber: numOrIntString(t.trade_number),
     hasAnalysis: t.has_analysis === true,
   };
 }
@@ -606,7 +622,7 @@ function shapeMyEndpointOne(
     closedAt,
     durationLabel,
     leverage: num(t.leverage),
-    tradeNumber: num(t.trade_number),
+    tradeNumber: numOrIntString(t.trade_number),
   };
 }
 

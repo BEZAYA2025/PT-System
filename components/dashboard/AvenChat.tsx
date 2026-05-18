@@ -145,7 +145,7 @@ export function AvenChat({
 
       <div
         ref={scrollRef}
-        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/40 px-6 pb-8 pt-8 sm:px-8 sm:pb-10 sm:pt-10"
+        className="relative flex max-h-[480px] flex-col gap-4 overflow-y-auto bg-background/40 px-6 pb-8 pt-8 sm:max-h-[360px] sm:px-8 sm:pb-6 sm:pt-6"
       >
         {chat.hasOlder && chat.messages.length > 0 && (
           <button
@@ -269,7 +269,7 @@ function AvenLiveBar({
       //   [Avatar]  [AI Mentor]
       //             [Aven      ]
       //   [Live observation — col-span-2, centred horizontally]
-      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:gap-x-4 sm:gap-y-4 sm:px-8 sm:pb-5 sm:pt-6"
+      className="relative grid grid-cols-[auto_1fr] gap-x-3 gap-y-3 px-6 pb-4 pt-5 sm:gap-x-4 sm:gap-y-2.5 sm:px-8 sm:pb-3 sm:pt-4"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -683,7 +683,7 @@ function ChatInput({
   return (
     <form
       onSubmit={onSubmit}
-      className="space-y-2 border-t border-border bg-surface-elevated px-4 py-3 sm:px-8"
+      className="space-y-2 border-t border-border bg-surface-elevated px-4 py-3 sm:px-8 sm:py-2.5"
     >
       {limitReached && (
         <p className="rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-xs text-amber-200">
