@@ -441,7 +441,7 @@ function LastTradesTable({
               <thead className="bg-surface/40 text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   {!hideId && (
-                    <th scope="col" className="px-3 py-2 text-left">ID</th>
+                    <th scope="col" className="px-3 py-2 text-left">Trade #</th>
                   )}
                   <th scope="col" className="px-3 py-2 text-left">Symbol</th>
                   <th scope="col" className="px-3 py-2 text-left">Side</th>
@@ -455,11 +455,10 @@ function LastTradesTable({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {trades.map((t, i) => (
+                {trades.map((t) => (
                   <LastTradeRow
                     key={t.id}
                     trade={t}
-                    fallbackIndex={i + 1}
                     hideUsd={hideUsd}
                     hideId={hideId}
                     onClick={() => onSelect(t)}
@@ -471,11 +470,10 @@ function LastTradesTable({
 
           {/* Mobile card stack */}
           <div className="space-y-1.5 sm:hidden">
-            {trades.map((t, i) => (
+            {trades.map((t) => (
               <LastTradeCard
                 key={t.id}
                 trade={t}
-                fallbackIndex={i + 1}
                 hideUsd={hideUsd}
                 hideId={hideId}
                 onClick={() => onSelect(t)}
@@ -490,23 +488,25 @@ function LastTradesTable({
 
 function LastTradeRow({
   trade,
-  fallbackIndex,
   hideUsd,
   hideId,
   onClick,
 }: {
   trade: AnyTrade;
-  fallbackIndex: number;
   hideUsd: boolean;
   hideId: boolean;
   onClick: () => void;
 }) {
   const positive = trade.pnlPct >= 0;
   const tone = positive ? "text-emerald" : "text-red-300";
+  // The DB row id is never user-facing — only the backend's per-user
+  // `trade_number` is. When it isn't present we render an em-dash so
+  // we don't substitute a positional index that could be mistaken for
+  // a real trade number.
   const idLabel =
     typeof trade.tradeNumber === "number"
       ? `#${trade.tradeNumber}`
-      : `#${fallbackIndex}`;
+      : "—";
   return (
     <tr
       onClick={onClick}
@@ -549,23 +549,23 @@ function LastTradeRow({
 
 function LastTradeCard({
   trade,
-  fallbackIndex,
   hideUsd,
   hideId,
   onClick,
 }: {
   trade: AnyTrade;
-  fallbackIndex: number;
   hideUsd: boolean;
   hideId: boolean;
   onClick: () => void;
 }) {
   const positive = trade.pnlPct >= 0;
   const tone = positive ? "text-emerald" : "text-red-300";
+  // Same rule as LastTradeRow — never substitute the raw DB id or a
+  // positional index for a missing per-user trade_number.
   const idLabel =
     typeof trade.tradeNumber === "number"
       ? `#${trade.tradeNumber}`
-      : `#${fallbackIndex}`;
+      : "—";
   return (
     <button
       type="button"
