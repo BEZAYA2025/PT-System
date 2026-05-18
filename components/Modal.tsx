@@ -128,11 +128,15 @@ export function Modal({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Sticky header — close button + title stay reachable even
-            when the body is scrolled. The 4-row top is taller than
-            the title font so the close button has a comfortable
-            44×44 touch target on mobile. */}
-        <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-border bg-surface-elevated px-5 py-4 sm:px-7 sm:py-5">
+        {/* Fixed header — sits outside the scroll surface so it stays
+            visible no matter how far the member scrolls in a long
+            briefing. `shrink-0` stops flexbox from trying to compress
+            the header when body content is taller than the modal:
+            without it, when total content exceeds `max-h-[90svh]` the
+            algorithm could shrink the header to make room. Paired
+            with `min-h-0` on the body below, which is what actually
+            activates body-only scrolling. */}
+        <header className="z-10 flex shrink-0 items-start justify-between gap-3 border-b border-border bg-surface-elevated px-5 py-4 sm:px-7 sm:py-5">
           {/* Drag handle indicator — only renders on touch devices via
               CSS media query (no JS sniff). Cosmetic; the actual
               gesture detection lives on the body. */}
@@ -163,12 +167,20 @@ export function Modal({
           </button>
         </header>
 
-        {/* Scrollable body — flex-1 lets it fill the remaining height
-            inside the max-h-[90vh] container, overflow-y-auto kicks
-            in when content exceeds that. */}
+        {/* Scrollable body — `flex-1` plus `min-h-0` is the key pair
+            that makes body-only scrolling work. Flex items default to
+            `min-height: auto`, which clamps them to their content's
+            min height and prevents shrinking. With long briefings
+            that meant the body extended past the modal box, got
+            clipped by the outer `overflow-hidden`, and the body's
+            own `overflow-y-auto` never had any overflow to scroll —
+            so any scroll that did happen moved the header out with
+            it. `min-h-0` lets the body shrink to `max-h - header`,
+            its overflow-y-auto activates, and the header (a sibling
+            outside this scroll surface) stays fixed at the top. */}
         <div
           ref={bodyRef}
-          className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 sm:px-7 sm:py-6"
         >
           {children}
         </div>
