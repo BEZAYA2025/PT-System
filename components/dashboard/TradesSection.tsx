@@ -253,7 +253,13 @@ function OpenTradeCard({
             <dd className="text-foreground">{fmtPriceTight(trade.slPrice)}</dd>
             {slPnl !== null && (
               <span className="text-muted-foreground">
-                (<span className="text-red-300">{fmtUsdSuffix(slPnl)}</span>)
+                (
+                <span
+                  className={slPnl > 0 ? "text-emerald" : "text-red-300"}
+                >
+                  {fmtUsdSuffix(slPnl)}
+                </span>
+                )
               </span>
             )}
           </div>

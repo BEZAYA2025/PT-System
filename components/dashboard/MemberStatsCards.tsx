@@ -503,7 +503,10 @@ function TradeExposureRow({ trade }: { trade: YourTrade }) {
           label="SL"
           price={trade.slPrice}
           dollar={slPnl}
-          tone="text-red-300"
+          // Profit-taken-by-stop case: a moved-up SL can lock in a
+          // positive outcome. Colour the $ by sign so green = stop
+          // still leaves you in profit, red = stop locks in a loss.
+          tone={slPnl !== null && slPnl > 0 ? "text-emerald" : "text-red-300"}
         />
       )}
       {trade.slPrice !== null && trade.tpPrice !== null && (
