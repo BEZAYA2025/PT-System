@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { requireUser } from "@/lib/dal";
+import { isFounder, requireUser } from "@/lib/dal";
 import { AdminShell } from "@/components/admin/AdminShell";
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default async function AdminLayout({
   // non-founder lands on /dashboard with no flash of admin chrome
   // because the redirect happens server-side before any HTML streams.
   const user = await requireUser();
-  if (user.is_founder !== true) {
+  if (!isFounder(user)) {
     redirect("/dashboard");
   }
 

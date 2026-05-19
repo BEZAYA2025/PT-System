@@ -150,6 +150,35 @@ export async function requireUser(): Promise<CurrentUser> {
   return user;
 }
 
+/**
+ * Backend has shipped the founder flag under several names across
+ * recent deploys (`is_founder`, `isFounder`, `role: "founder"`),
+ * and Paul's account is reliably identified by the
+ * `credential_status === "founder_env"` marker from the 4-state
+ * credential model. Treat any of those as authoritative so a
+ * single field-name drift on the backend doesn't lock the founder
+ * out of /admin.
+ *
+ * Returns false when `user` is null/undefined — never throws, so
+ * callers can gate UI affordances and the SSR redirect with the
+ * same expression.
+ */
+export function isFounder(user: CurrentUser | null | undefined): boolean {
+  if (!user) return false;
+  if (user.is_founder === true) return true;
+  if (user.credential_status === "founder_env") return true;
+  const u = user as unknown as Record<string, unknown>;
+  if (u.isFounder === true) return true;
+  if (typeof u.role === "string" && u.role.toLowerCase() === "founder")
+    return true;
+  if (
+    typeof u.user_role === "string" &&
+    (u.user_role as string).toLowerCase() === "founder"
+  )
+    return true;
+  return false;
+}
+
 export interface PublicTrade {
   id: string;
   symbol: string;
