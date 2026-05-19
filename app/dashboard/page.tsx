@@ -98,6 +98,7 @@ export default async function DashboardPage() {
         <AvenChat
           initialMessages={history.messages}
           initialHasOlder={history.hasMore}
+          displayName={user.display_name}
         />
       </MotionSection>
 

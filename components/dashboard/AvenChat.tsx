@@ -27,6 +27,9 @@ interface Props {
   initialHasOlder?: boolean;
   /** Optional SSR-fetched quota; client refreshes after mount + each send. */
   initialQuota?: QuotaState | null;
+  /** Member's display name — surfaces in the welcome message when the
+   *  conversation is still empty. */
+  displayName?: string | null;
 }
 
 // Round-16 hydration #418 root cause: this formatter uses
@@ -75,6 +78,7 @@ export function AvenChat({
   initialMessages,
   initialHasOlder,
   initialQuota = null,
+  displayName,
 }: Props) {
   // Iter 7: synthetic greeting + WelcomeCard removed. The daily greeting is
   // now a real Aven message inserted server-side (flagged via
@@ -159,8 +163,13 @@ export function AvenChat({
           </button>
         )}
 
-        {chat.messages.length === 0 && (
-          <ChatEmptyState />
+        {!chat.messages.some((m) => m.role === "user") && (
+          <ChatEmptyState
+            displayName={displayName ?? null}
+            onPromptClick={(text) => void chat.send(text)}
+            hasGreeting={chat.messages.length > 0}
+            disabled={limitReached}
+          />
         )}
 
         <AnimatePresence initial={false} mode="popLayout">
@@ -590,20 +599,65 @@ function Dot({ delay }: { delay: string }) {
 
 // ---------------------------------------------------------------------------
 
-function ChatEmptyState() {
+// Suggested prompt pills shown until the member sends their first
+// message. Clicking a pill calls chat.send(text) directly — same
+// pipeline as a manual keyboard submit, including the optimistic
+// echo and quota refresh.
+const SUGGESTED_PROMPTS: ReadonlyArray<string> = [
+  "What should I know about today's market?",
+  "How do you score a trading setup?",
+  "What's Paul's Wave Riding Method?",
+  "How can I manage my risk better?",
+];
+
+function ChatEmptyState({
+  displayName,
+  onPromptClick,
+  hasGreeting,
+  disabled,
+}: {
+  displayName: string | null;
+  onPromptClick: (text: string) => void;
+  /** True when the daily-greeting effect has already inserted an Aven
+   *  bubble. In that case the welcome copy is hidden so the greeting
+   *  carries the conversation alone — but the suggested-prompt pills
+   *  still render until the member sends their first message. */
+  hasGreeting: boolean;
+  disabled: boolean;
+}) {
+  const safeName = displayName?.trim() || "trader";
   return (
-    <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-      <span className="inline-flex size-14 items-center justify-center rounded-full border border-emerald/30 bg-emerald/[0.06] text-emerald">
-        <IconMessageCircle size={28} stroke={1.5} aria-hidden />
-      </span>
-      <div>
-        <p className="text-sm font-medium text-foreground">
-          Start a conversation with Aven
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Ask about a setup, a trade you&apos;re watching, or just say hi.
-          Aven sees the live market data and Paul&apos;s methodology.
-        </p>
+    <div className="flex flex-col gap-5 px-1 py-2 sm:px-2">
+      {!hasGreeting && (
+        <div className="flex items-start gap-3">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-emerald/30 bg-emerald/[0.06] text-emerald">
+            <IconMessageCircle size={18} stroke={1.5} aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1 rounded-2xl rounded-tl-sm bg-surface-elevated px-4 py-3 text-[15px] leading-relaxed text-foreground">
+            <p>
+              Hi {safeName}, I&apos;m Aven — your AI trading mentor.
+              I&apos;m here to help you trade smarter, not just trade
+              more.
+            </p>
+            <p className="mt-2 text-muted-foreground">
+              Try asking me one of these:
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        {SUGGESTED_PROMPTS.map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPromptClick(prompt)}
+            className="rounded-full border border-emerald/30 bg-emerald/[0.04] px-3.5 py-1.5 text-left text-[13px] text-foreground transition-colors hover:border-emerald/60 hover:bg-emerald/[0.10] hover:text-emerald disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {prompt}
+          </button>
+        ))}
       </div>
     </div>
   );
