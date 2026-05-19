@@ -7,6 +7,7 @@ import { TelegramSettingsCard } from "@/components/dashboard/TelegramSettingsCar
 import { NotificationPrefsCard } from "@/components/dashboard/NotificationPrefsCard";
 import { ExchangeSettingsCard } from "@/components/dashboard/ExchangeSettingsCard";
 import { AccountSettingsCard } from "@/components/dashboard/AccountSettingsCard";
+import { SecurityCard } from "@/components/dashboard/SecurityCard";
 import { PrivacyDataCard } from "@/components/dashboard/PrivacyDataCard";
 import { PrivacyLegalCard } from "@/components/dashboard/PrivacyLegalCard";
 import { HelpSupportCard } from "@/components/dashboard/HelpSupportCard";
@@ -68,6 +69,8 @@ export default async function SettingsPage() {
           email={user.email}
           displayName={user.display_name}
         />
+
+        <SecurityCard />
 
         <PrivacyDataCard />
 
