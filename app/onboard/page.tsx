@@ -4,13 +4,16 @@ import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
 import { OnboardClient } from "./OnboardClient";
 
-// Round-43: /onboard rewritten around the new email-verification
-// flow. Auth handoff happens via an `onboarding_token` set by
-// /verify-email in localStorage (or passed through as a fallback
-// query param when localStorage isn't usable). No more URL-token
-// validation in the server component — the page is just a shell
-// around the client form. If the token is missing the client
-// redirects to /signin.
+// /onboard accepts two token handoffs:
+//   · Backend welcome-email link: /onboard?token=<signup_token>
+//     → POSTs to /api/proxy/auth/complete-signup with the token in
+//       the body.
+//   · /verify-email handoff: onboarding_token in localStorage (or
+//     ?onboarding_token=… when storage is blocked)
+//     → POSTs to /api/proxy/auth/complete-onboarding with a Bearer
+//       Authorization header.
+// The URL token wins when both are present. If neither resolves the
+// client redirects to /signin.
 
 export const metadata: Metadata = {
   title: "Welcome to PT System",

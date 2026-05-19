@@ -37,10 +37,13 @@ const onboardSchema = z
 
 type OnboardInput = z.infer<typeof onboardSchema>;
 
+type TokenSource = "url" | "storage";
+
 export function OnboardClient() {
   const router = useRouter();
   const params = useSearchParams();
   const [token, setToken] = useState<string | null>(null);
+  const [tokenSource, setTokenSource] = useState<TokenSource | null>(null);
   const [tokenChecked, setTokenChecked] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -53,47 +56,66 @@ export function OnboardClient() {
     resolver: zodResolver(onboardSchema),
   });
 
-  // Resolve onboarding token on mount. Prefer localStorage (the
-  // primary handoff from /verify-email); fall back to a query-param
-  // copy that /verify-email writes when localStorage isn't usable
-  // (private session, blocked storage). If neither resolves, bounce
-  // to /signin — the token is the only thing that authorises this
-  // page.
+  // Resolve onboarding token on mount. The backend's welcome email
+  // links straight to /onboard?token=… (the signup_token flow), so
+  // the URL param wins. Fall back to the localStorage handoff from
+  // /verify-email, then to /verify-email's private-session
+  // ?onboarding_token=… query-param fallback. Bounce to /signin only
+  // if nothing resolves.
   useEffect(() => {
-    let resolved: string | null = null;
+    const urlToken = params.get("token");
+    if (urlToken) {
+      setToken(urlToken);
+      setTokenSource("url");
+      setTokenChecked(true);
+      return;
+    }
+
+    let stored: string | null = null;
     try {
-      resolved = localStorage.getItem(STORAGE_KEY);
+      stored = localStorage.getItem(STORAGE_KEY);
     } catch {
       // ignore — fall through to query param
     }
-    if (!resolved) {
-      resolved = params.get("onboarding_token");
+    if (!stored) {
+      stored = params.get("onboarding_token");
     }
-    if (!resolved) {
+    if (!stored) {
       router.replace("/signin");
       return;
     }
-    setToken(resolved);
+    setToken(stored);
+    setTokenSource("storage");
     setTokenChecked(true);
   }, [params, router]);
 
   const onSubmit = async (data: OnboardInput) => {
-    if (!token) return;
+    if (!token || !tokenSource) return;
     setSubmitError(null);
+    const trimmedName = data.display_name ? data.display_name.trim() : undefined;
     try {
-      const res = await fetch("/api/proxy/auth/complete-onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          password: data.password,
-          display_name: data.display_name
-            ? data.display_name.trim()
-            : undefined,
-        }),
-      });
+      const res =
+        tokenSource === "url"
+          ? await fetch("/api/proxy/auth/complete-signup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                token,
+                password: data.password,
+                display_name: trimmedName,
+              }),
+            })
+          : await fetch("/api/proxy/auth/complete-onboarding", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                password: data.password,
+                display_name: trimmedName,
+              }),
+            });
       const resp = (await res.json().catch(() => null)) as {
         access_token?: string;
         error?: string;
