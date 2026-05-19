@@ -19,7 +19,7 @@ import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import { MemberStatsCards } from "@/components/dashboard/MemberStatsCards";
-import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
+import { OnboardingExperience } from "@/components/dashboard/OnboardingExperience";
 import { MotionSection } from "@/components/dashboard/MotionSection";
 import { CredentialDesyncCheck } from "@/components/dashboard/CredentialDesyncCheck";
 
@@ -57,6 +57,11 @@ export default async function DashboardPage() {
     : null;
 
   const showTour = user.first_login_completed === false;
+  // onboarding_completed === false explicitly means the backend has the
+  // field and the member hasn't dismissed yet. `undefined` (older backend
+  // builds) also surfaces the modal — the client-side localStorage hint
+  // then keeps reloads from re-triggering it.
+  const showWelcome = user.onboarding_completed !== true;
 
   return (
     <main id="main" className="space-y-8 sm:space-y-6">
@@ -88,7 +93,11 @@ export default async function DashboardPage() {
         <TradesGrid initial={initialTrades} />
       </MotionSection>
 
-      {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
+      <OnboardingExperience
+        displayName={user.display_name ?? null}
+        showWelcome={showWelcome}
+        showTour={showTour}
+      />
 
       {/* Round-13b: production hit a false-positive where /api/auth/me
           reported `binance_api_key_connected: true` for a user with no
