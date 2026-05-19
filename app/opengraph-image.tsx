@@ -8,7 +8,7 @@ import { ImageResponse } from "next/og";
 // which re-exports the same generator.
 
 export const runtime = "edge";
-export const alt = "PT System — Your AI trading mentor";
+export const alt = "PT System — Aven, your AI trading mentor";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -91,7 +91,7 @@ export default function OpenGraphImage() {
             display: "flex",
           }}
         >
-          Your AI trading mentor.
+          Aven · Your AI trading mentor.
         </div>
 
         <div

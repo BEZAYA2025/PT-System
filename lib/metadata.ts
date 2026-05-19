@@ -2,7 +2,9 @@ import type { Metadata, Viewport } from "next";
 
 export const siteConfig = {
   name: "PT System",
-  title: "PT System · Your AI trading mentor",
+  // Aven is the mentor; PT System is the platform Aven lives inside.
+  // Keep the two anchored to their roles in the title.
+  title: "PT System · Aven, your AI trading mentor",
   description:
     "Aven is your AI trading mentor — trained on Paul's Wave Riding Method. Daily briefings, setup analysis, trade tracking. Try free for 14 days.",
   // Compact OG / Twitter copy — leaves room for the platform's name
