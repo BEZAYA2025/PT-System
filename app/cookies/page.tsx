@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
 
-// BOILERPLATE: Requires legal review before launch.
+// BOILERPLATE: Requires legal review before beta launch.
 
 export const metadata: Metadata = {
-  title: "Cookie Policy",
-  description: "PT System cookie policy — what we use and why.",
+  title: "Cookie Policy · PT System",
+  description: "How PT System uses cookies.",
   alternates: { canonical: "/cookies" },
   robots: { index: true, follow: true },
 };
@@ -20,143 +20,98 @@ export default function CookiesPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
             Cookie Policy
           </h1>
-          <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            Last updated: 19 May 2026 · Boilerplate, subject to legal review
+          <p className="mt-3 text-base text-muted-foreground sm:text-lg sm:leading-[1.7]">
+            How we use cookies on PT System.
           </p>
 
-          <div className="mt-10 space-y-10 text-base leading-[1.75] text-muted-foreground sm:text-[17px]">
-            <Section title="What are cookies?">
+          <div className="mt-12 space-y-10 text-base leading-[1.75] text-muted-foreground sm:text-[17px]">
+            <Section title="1. What are cookies">
               <p>
-                Cookies are small text files that websites place on your
-                device when you visit them. They&apos;re used to make
-                websites work more efficiently, to remember your
-                preferences, and to provide information to the site
-                owner. Cookies set by us are called &ldquo;first-party
-                cookies&rdquo;; cookies set by other providers we use
-                are called &ldquo;third-party cookies&rdquo;.
-              </p>
-              <p>
-                This policy explains what cookies PT System uses, why
-                we use them, and how you can manage them.
+                Cookies are small text files stored on your device when
+                you visit a website. They help websites remember
+                information about your visit, such as your preferences
+                and login state.
               </p>
             </Section>
 
-            <Section title="Cookies we use">
+            <Section title="2. Cookies we use">
               <p>
-                We group cookies into three categories based on what
-                they&apos;re for:
+                <strong className="text-foreground">
+                  Essential cookies
+                </strong>{" "}
+                — required for the service to function. These manage
+                authentication, session state, and security. The
+                service cannot operate without them.
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  Analytics cookies
+                </strong>{" "}
+                — help us understand how the service is used and
+                improve performance. We use privacy-focused analytics
+                that do not identify individual users.
+              </p>
+              <p>
+                <strong className="text-foreground">
+                  Functional cookies
+                </strong>{" "}
+                — remember your preferences such as language, theme,
+                and dashboard layout.
+              </p>
+            </Section>
+
+            <Section title="3. Third-party cookies">
+              <p>
+                The following third-party services may set cookies when
+                you use PT System:
               </p>
               <ul>
-                <li>
-                  <strong className="text-foreground">Essential.</strong>{" "}
-                  Required for the site to function — authentication
-                  sessions, CSRF tokens, and load balancing. These
-                  can&apos;t be disabled without breaking the site.
-                </li>
-                <li>
-                  <strong className="text-foreground">Analytics.</strong>{" "}
-                  Help us understand how members and visitors use the
-                  site so we can improve it. Aggregate usage data only;
-                  no individual identification beyond what&apos;s
-                  necessary for the analytics provider to function.
-                </li>
-                <li>
-                  <strong className="text-foreground">Marketing.</strong>{" "}
-                  Set when you arrive via a marketing link so we can
-                  attribute the source and avoid showing you the same
-                  ad twice. We don&apos;t sell or share marketing
-                  cookie data with third parties.
-                </li>
+                <li>Stripe (payment processing)</li>
+                <li>Cloudflare (security and performance)</li>
+                <li>Vercel (hosting and analytics)</li>
               </ul>
+              <p>
+                Each service operates under its own privacy and cookie
+                policies.
+              </p>
             </Section>
 
-            <Section title="Third-party cookies">
+            <Section title="4. Managing cookies">
               <p>
-                We use a small number of third-party services that may
-                set cookies on your device while you use PT System:
+                Most browsers allow you to control cookies through
+                their settings. You can typically:
               </p>
               <ul>
+                <li>View what cookies are stored</li>
+                <li>Delete existing cookies</li>
+                <li>Block third-party cookies</li>
                 <li>
-                  <strong className="text-foreground">Stripe</strong> —
-                  payment processing. Sets cookies only when you reach
-                  a checkout flow. Stripe&apos;s own cookie policy at{" "}
-                  <a
-                    href="https://stripe.com/cookie-settings"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-emerald transition-colors hover:text-emerald-hover"
-                  >
-                    stripe.com/cookie-settings
-                  </a>{" "}
-                  governs these.
-                </li>
-                <li>
-                  <strong className="text-foreground">Cloudflare</strong>{" "}
-                  — bot mitigation and CDN. Sets a `__cf_bm` cookie that
-                  expires after 30 minutes; used purely to distinguish
-                  human visitors from automated traffic.
-                </li>
-                <li>
-                  <strong className="text-foreground">
-                    Vercel Analytics
-                  </strong>{" "}
-                  — first-party aggregate analytics. Stores anonymous,
-                  hashed identifiers; no cross-site tracking.
-                </li>
-              </ul>
-            </Section>
-
-            <Section title="How to manage cookies">
-              <p>
-                Every major browser lets you view, manage, and delete
-                cookies through its settings. Look for a menu called
-                Privacy, Security, or Site Data:
-              </p>
-              <ul>
-                <li>
-                  Chrome — Settings → Privacy and security → Cookies
-                  and other site data.
-                </li>
-                <li>
-                  Firefox — Preferences → Privacy &amp; Security →
-                  Cookies and Site Data.
-                </li>
-                <li>
-                  Safari — Preferences → Privacy → Cookies and website
-                  data.
-                </li>
-                <li>
-                  Edge — Settings → Cookies and site permissions.
+                  Block all cookies (this will break essential
+                  functionality)
                 </li>
               </ul>
               <p>
-                Disabling cookies entirely will sign you out of PT
-                System and may break parts of the site. Disabling only
-                analytics or marketing cookies is supported and will
-                not break functionality.
+                Note that blocking essential cookies will prevent you
+                from signing in or using core features.
               </p>
             </Section>
 
-            <Section title="Updates to this policy">
+            <Section title="5. Updates to this policy">
               <p>
-                We may update this policy when we add or remove
-                cookies, or when our third-party providers change
-                their own cookie usage. The &ldquo;Last updated&rdquo;
-                date at the top of this page reflects the most recent
-                revision.
+                We may update this Cookie Policy. Material changes will
+                be communicated via the service.
               </p>
             </Section>
 
-            <Section title="Contact us">
+            <Section title="6. Contact">
               <p>
-                Questions about our use of cookies? Reach the team at{" "}
+                For cookie-related questions:{" "}
                 <a
                   href="mailto:hello@ptsystem.ai"
                   className="text-emerald transition-colors hover:text-emerald-hover"
                 >
                   hello@ptsystem.ai
                 </a>
-                .
               </p>
             </Section>
           </div>

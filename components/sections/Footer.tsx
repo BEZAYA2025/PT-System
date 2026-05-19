@@ -40,10 +40,7 @@ export function Footer() {
             disclaimer) goes a touch dimmer (muted/70) so it reads as
             mandatory fine print rather than headline copy. */}
         <div className="mt-12 space-y-2 border-t border-border pt-8 text-xs leading-relaxed text-muted-foreground sm:mt-16">
-          <p>
-            PT System is a product of Fortex Media Ltd. · 71-75 Shelton
-            Street, London, UK WC2H 9JQ
-          </p>
+          <p>PT System is a product of Fortex Media Ltd.</p>
           <p>© 2026 PT System. All rights reserved.</p>
           <p className="text-muted-foreground/70">
             Trading cryptocurrency futures involves substantial risk of

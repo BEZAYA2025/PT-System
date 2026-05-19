@@ -4,11 +4,12 @@ import { Footer } from "@/components/sections/Footer";
 
 // BOILERPLATE: Requires legal review before beta launch.
 //
-// Round-35: /contact replaces the old /impressum route. Carries the
-// member-support + business inboxes, the full Fortex Media Ltd.
-// company-information block, the trading-risk disclosure, and the
-// content/liability + dispute-resolution boilerplate that the
-// Companies-House-registered UK entity needs published.
+// /contact is the public consolidation of the old /impressum: it
+// carries the member-support + business inboxes (with the support
+// address shown prominently and the legal address as quieter
+// secondary copy), the Fortex Media Ltd. company-information block,
+// the trading-risk disclosure, the content/liability disclaimer, and
+// the dispute-resolution boilerplate.
 
 export const metadata: Metadata = {
   title: "Contact · PT System",
@@ -30,23 +31,39 @@ export default function ContactPage() {
           <p className="mt-3 text-base text-muted-foreground sm:text-lg sm:leading-[1.7]">
             Get in touch and find our company info.
           </p>
-          <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-            Last updated: 19 May 2026 · Boilerplate, subject to legal review
-          </p>
 
           <div className="mt-12 space-y-12 text-base leading-[1.75] text-muted-foreground sm:text-[17px]">
             <Section title="Get in touch">
-              <div className="grid gap-5 sm:grid-cols-2 sm:gap-6">
-                <ContactBlock
-                  label="Member support"
-                  email="hello@ptsystem.ai"
-                  note="For questions about your subscription, technical issues, or feedback — this is the fastest way to reach us."
-                />
-                <ContactBlock
-                  label="Legal & business"
-                  email="hello@fortex-media.com"
-                  note="Company correspondence, partnership requests, and anything legal."
-                />
+              {/* Primary block — prominent support address. */}
+              <div>
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald/85">
+                  For everything
+                </p>
+                <a
+                  href="mailto:hello@ptsystem.ai"
+                  className="mt-3 block break-all text-2xl font-medium text-emerald transition-colors hover:text-emerald-hover sm:text-3xl"
+                >
+                  hello@ptsystem.ai
+                </a>
+                <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                  Subscription, technical issues, feedback — fastest
+                  way to reach us.
+                </p>
+              </div>
+
+              <hr className="my-8 border-border" />
+
+              {/* Secondary block — quieter legal-and-company address. */}
+              <div>
+                <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Legal &amp; company matters
+                </p>
+                <a
+                  href="mailto:hello@fortex-media.com"
+                  className="mt-2 inline-block text-sm text-foreground/85 transition-colors hover:text-foreground"
+                >
+                  hello@fortex-media.com
+                </a>
               </div>
             </Section>
 
@@ -62,10 +79,7 @@ export default function ContactPage() {
                 WC2H 9JQ
               </address>
               <dl className="space-y-2.5 pt-2">
-                <Field label="Company Number">
-                  Pending Companies House registration update — to be
-                  published here.
-                </Field>
+                <Field label="Company Number">17000836</Field>
                 <Field label="VAT Number">
                   Not currently registered for VAT.
                 </Field>
@@ -155,33 +169,6 @@ function Section({
       </h2>
       <div className="space-y-3">{children}</div>
     </section>
-  );
-}
-
-function ContactBlock({
-  label,
-  email,
-  note,
-}: {
-  label: string;
-  email: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-surface p-5">
-      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-        {label}
-      </p>
-      <a
-        href={`mailto:${email}`}
-        className="mt-1.5 block text-base font-medium text-emerald transition-colors hover:text-emerald-hover"
-      >
-        {email}
-      </a>
-      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-        {note}
-      </p>
-    </div>
   );
 }
 
