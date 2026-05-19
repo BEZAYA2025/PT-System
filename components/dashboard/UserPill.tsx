@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   IconChevronDown,
   IconLogout,
+  IconShield,
   IconUser,
 } from "@tabler/icons-react";
 
@@ -12,6 +13,9 @@ interface Props {
   displayName: string;
   email: string;
   tier: string | null | undefined;
+  /** Founder-only Admin shortcut. Off by default; the dashboard layout
+   *  flips it on for accounts that pass the isFounder check. */
+  showAdminLink?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -31,7 +35,7 @@ function tierLabel(tier: string | null | undefined): string {
   return "Member";
 }
 
-export function UserPill({ displayName, email, tier }: Props) {
+export function UserPill({ displayName, email, tier, showAdminLink = false }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -128,6 +132,17 @@ export function UserPill({ displayName, email, tier }: Props) {
             </p>
           </div>
           <div className="p-1">
+            {showAdminLink && (
+              <Link
+                href="/admin"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-emerald transition-colors hover:bg-emerald/[0.08]"
+              >
+                <IconShield size={15} stroke={1.75} aria-hidden />
+                Admin
+              </Link>
+            )}
             <Link
               href="/dashboard/settings"
               role="menuitem"
