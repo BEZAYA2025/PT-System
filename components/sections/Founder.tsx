@@ -63,28 +63,18 @@ export function Founder() {
           <Reveal delay={0.1}>
             <blockquote className="mt-8 space-y-6 font-sans text-lg italic leading-[1.85] text-foreground/90 sm:text-xl">
               <p>
-                &ldquo;I&apos;m building PT System because the trading mentor
-                I would have wanted years ago doesn&apos;t exist. Most courses
-                teach in theory. Most signal groups teach nothing at all.
+                &ldquo;PT System is the trading mentor I would have wanted
+                years ago. One that teaches you to actually understand
+                markets — think clearly about setups, respect risk, learn
+                from every trade.
               </p>
               <p>
-                I want members to actually understand markets — to think
-                clearly about setups, to respect risk, to learn from both
-                wins and losses. Aven is how I scale that, without diluting
-                what makes the method work.
-              </p>
-              <p>
-                If that sounds like what you&apos;re looking for, get on the
-                list. We&apos;ll start small, with people who want to learn,
-                not gamble.&rdquo;
+                This isn&apos;t theory or signals. It&apos;s a method refined
+                through a decade of professional trading and real losses.
+                Aven is how I scale it to every member, without diluting what
+                makes it work.&rdquo;
               </p>
             </blockquote>
-          </Reveal>
-
-          <Reveal delay={0.2}>
-            <p className="mt-10 font-mono text-sm font-semibold tracking-wide text-foreground">
-              — Paul
-            </p>
           </Reveal>
         </div>
       </div>

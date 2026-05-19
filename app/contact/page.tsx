@@ -80,9 +80,6 @@ export default function ContactPage() {
               </address>
               <dl className="space-y-2.5 pt-2">
                 <Field label="Company Number">17000836</Field>
-                <Field label="VAT Number">
-                  Not currently registered for VAT.
-                </Field>
                 <Field label="Jurisdiction">
                   Registered in England and Wales.
                 </Field>
