@@ -91,6 +91,11 @@ export interface CurrentUser {
   /** ISO timestamp of the previous dashboard visit. Used to drive the
    *  daily-greeting injection. */
   last_dashboard_visit_at?: string | null;
+  /** Founder flag. Gates the entire /admin tree. Backend exposes this
+   *  on /api/auth/me as a boolean; optional here so older backend
+   *  deploys that haven't shipped the field yet fall through to a
+   *  safe `false` (non-founder) at the call site. */
+  is_founder?: boolean;
 }
 
 export const getAccessToken = cache(async (): Promise<string | null> => {
