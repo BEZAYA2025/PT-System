@@ -120,7 +120,7 @@ export function DashboardHeader({
               <Link
                 href="/admin"
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-sm font-medium text-amber-300"
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald/30 bg-emerald/[0.06] px-3 py-2 text-sm font-medium text-emerald"
               >
                 <IconShield size={16} stroke={1.75} />
                 Admin
