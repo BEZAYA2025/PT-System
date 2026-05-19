@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import {
   IconBell,
   IconBrain,
@@ -438,11 +437,50 @@ function TierCard({
     ? `Start free trial — ${promo!.discountPct}% off`
     : "Start free trial";
 
-  const ctaHref = buildCheckoutHref(
-    tier,
-    cadence,
-    applies ? promo!.code : null,
-  );
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const startCheckout = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await fetch("/api/proxy/stripe/create-checkout-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tier,
+          interval: cadence === "monthly" ? "month" : "year",
+          ...(applies && promo ? { code: promo.code } : {}),
+        }),
+      });
+
+      // Backend not wired yet → fall back to /onboard so the rest of
+      // the frontend flow stays testable end-to-end.
+      if (res.status === 404 || res.status === 501) {
+        window.location.assign("/onboard");
+        return;
+      }
+
+      const data = (await res.json().catch(() => null)) as {
+        checkout_url?: string;
+        url?: string;
+        error?: string;
+      } | null;
+
+      const url = data?.checkout_url ?? data?.url;
+      if (!res.ok || !url) {
+        setSubmitError(data?.error ?? "Couldn't start checkout. Try again.");
+        return;
+      }
+      window.location.assign(url);
+    } catch {
+      setSubmitError("Connection issue. Try again.");
+    } finally {
+      // Stays disabled while the redirect runs; only resets on error.
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div
@@ -490,22 +528,49 @@ function TierCard({
           option (neutral border + foreground), VIP as the primary
           conversion (emerald fill). The recommended-card emerald
           glow on the outside + emerald button on the inside reads
-          as "pick this". */}
-      <Link
-        href={ctaHref}
+          as "pick this". Click POSTs to the Stripe-checkout proxy
+          and redirects to the returned checkout_url; per-card
+          loading state prevents double-submits while the redirect
+          spins up. */}
+      <button
+        type="button"
+        onClick={() => void startCheckout()}
+        disabled={submitting}
+        aria-busy={submitting}
         className={[
-          "mt-7 inline-flex h-12 w-full items-center justify-center rounded-full px-6 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald",
+          "mt-7 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald disabled:cursor-not-allowed disabled:opacity-70",
           recommended
             ? "bg-emerald text-background hover:bg-emerald-hover"
             : "border border-border bg-background text-foreground hover:border-foreground/30 hover:bg-surface-elevated",
         ].join(" ")}
       >
-        {ctaLabel}
-      </Link>
+        {submitting ? (
+          <>
+            <IconLoader2
+              size={14}
+              stroke={2.25}
+              className="animate-spin"
+              aria-hidden
+            />
+            Starting checkout…
+          </>
+        ) : (
+          ctaLabel
+        )}
+      </button>
 
-      <p className="mt-3 text-center text-[11px] text-muted-foreground">
-        14-day free trial · cancel anytime
-      </p>
+      {submitError ? (
+        <p
+          role="alert"
+          className="mt-3 text-center text-[11px] text-red-300"
+        >
+          {submitError}
+        </p>
+      ) : (
+        <p className="mt-3 text-center text-[11px] text-muted-foreground">
+          14-day free trial · cancel anytime
+        </p>
+      )}
 
       <ul className="mt-8 space-y-3.5 border-t border-border pt-7">
         {features?.map((f) => (
@@ -617,12 +682,3 @@ function otherTierLabel(appliesTo: AppliesTo): string {
     : TIER_LABEL.vip;
 }
 
-function buildCheckoutHref(
-  tier: TierId,
-  cadence: Cadence,
-  code: string | null,
-): string {
-  const params = new URLSearchParams({ plan: tier, cadence });
-  if (code) params.set("code", code);
-  return `/signup?${params.toString()}`;
-}

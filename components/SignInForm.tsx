@@ -28,6 +28,10 @@ export function SignInForm() {
   const router = useRouter();
   const search = useSearchParams();
   const redirectTo = search.get("redirect") ?? "/dashboard";
+  // `?reset=1` after a successful /reset-password submit — surface a
+  // one-shot confirmation banner above the form so members see their
+  // password was updated before signing back in.
+  const resetConfirmed = search.get("reset") === "1";
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -83,6 +87,15 @@ export function SignInForm() {
       className="space-y-6"
       aria-describedby={submitError ? "signin-error" : undefined}
     >
+      {resetConfirmed && (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald/30 bg-emerald/[0.06] px-4 py-3 text-sm text-emerald"
+        >
+          Password updated. Sign in with your new password.
+        </p>
+      )}
+
       <div>
         <label htmlFor="email" className={labelClasses}>
           Email
