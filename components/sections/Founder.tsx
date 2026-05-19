@@ -3,7 +3,7 @@ import { Reveal } from "@/components/Reveal";
 
 export function Founder() {
   return (
-    <section id="founder" className="scroll-mt-16 px-6 py-24 sm:py-32 lg:py-40">
+    <section id="about" className="scroll-mt-16 px-6 py-24 sm:py-32 lg:py-40">
       <div className="mx-auto max-w-5xl">
         <div className="grid gap-12 md:grid-cols-[280px_1fr] md:gap-16 lg:grid-cols-[320px_1fr]">
           <Reveal>

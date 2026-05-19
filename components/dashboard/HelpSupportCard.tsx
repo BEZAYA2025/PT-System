@@ -17,8 +17,9 @@ import { SettingsCardHeader } from "./SettingsCardHeader";
 // surfaces: contact email, inline FAQ (no separate page needed for
 // stock questions), Getting-Started doc link, and the public status
 // page. All member-facing email links route to hello@ptsystem.ai —
-// the Fortex Media address is reserved for legal/company contact in
-// the Impressum modal only.
+// the Fortex Media address is reserved for legal/company contact
+// surfaces (the Contact modal in Settings → Privacy & Legal, and
+// the public /contact page).
 
 const SUPPORT_EMAIL = "hello@ptsystem.ai";
 

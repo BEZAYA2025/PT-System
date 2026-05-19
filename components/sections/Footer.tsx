@@ -1,55 +1,44 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/dashboard/BrandLogo";
 
-// Round-30 footer rebuild — four columns (Brand · Product · Company ·
-// Legal) over a three-line bottom-bar (legal entity, copyright, risk
-// disclaimer). Authed-only dashboard / sign-out shortcuts live in the
-// site header now, not the footer; the footer is purely public-page
-// navigation so it stays consistent for visitors and members alike.
+// Round-35 footer — three columns (Brand · Product · Legal & Info)
+// over the same three-line bottom bar. The previous "Company" column
+// is merged into "Legal & Info" via the new /contact page that
+// carries the company-information sections inside it, so we don't
+// need a separate column for them. The "Status · Built in public"
+// caption is also gone — the platform has shipped, no more phase
+// labels.
 
 export function Footer() {
   return (
     <footer className="border-t border-border px-6 py-12 sm:py-16">
       <div className="mx-auto max-w-6xl">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-12">
+        <div className="grid gap-10 sm:grid-cols-3 sm:gap-12">
           <FooterBrand />
           <FooterColumn
             title="Product"
             items={[
               { label: "Pricing", href: "/pricing" },
-              { label: "Start Free Trial", href: "/signup" },
+              { label: "About", href: "/#about" },
               { label: "Sign in", href: "/signin" },
             ]}
           />
           <FooterColumn
-            title="Company"
-            items={[
-              { label: "About Paul", href: "/#founder" },
-              {
-                label: "Contact",
-                href: "mailto:hello@ptsystem.ai",
-                external: true,
-              },
-            ]}
-            extra={
-              <li className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
-                Status · Built in public
-              </li>
-            }
-          />
-          <FooterColumn
-            title="Legal"
+            title="Legal & Info"
             items={[
               { label: "Privacy Policy", href: "/privacy" },
               { label: "Terms of Service", href: "/terms" },
               { label: "Cookie Policy", href: "/cookies" },
               { label: "Refund Policy", href: "/refund" },
-              { label: "Impressum", href: "/impressum" },
+              { label: "Contact", href: "/contact" },
             ]}
           />
         </div>
 
-        {/* Bottom bar — three lines, smaller text, dezent. */}
+        {/* Bottom bar — three lines, smaller text. Lines 1 and 2 use
+            the standard muted-foreground; line 3 (the risk
+            disclaimer) goes a touch dimmer (muted/70) so it reads as
+            mandatory fine print rather than headline copy. */}
         <div className="mt-12 space-y-2 border-t border-border pt-8 text-xs leading-relaxed text-muted-foreground sm:mt-16">
           <p>
             PT System is a product of Fortex Media Ltd. · 71-75 Shelton
@@ -68,12 +57,6 @@ export function Footer() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Column 1 — Brand. Logo + wordmark + tagline. Social-icon row slot
-// reserved (empty container) for the future X / YouTube links so the
-// vertical rhythm stays the same when those land.
-// ---------------------------------------------------------------------------
-
 function FooterBrand() {
   return (
     <div>
@@ -88,30 +71,24 @@ function FooterBrand() {
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
         Your AI trading mentor.
       </p>
-      {/* Social row slot — populated in a later round. */}
+      {/* Reserved space for the future social-icon row — kept so the
+          column rhythm stays the same when those icons land. */}
       <div aria-hidden className="mt-5 h-8" />
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Generic column.
-// ---------------------------------------------------------------------------
-
 interface FooterItem {
   label: string;
   href: string;
-  external?: boolean;
 }
 
 function FooterColumn({
   title,
   items,
-  extra,
 }: {
   title: string;
   items: ReadonlyArray<FooterItem>;
-  extra?: React.ReactNode;
 }) {
   return (
     <div>
@@ -121,24 +98,14 @@ function FooterColumn({
       <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
         {items.map((item) => (
           <li key={item.label}>
-            {item.external ? (
-              <a
-                href={item.href}
-                className="transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ) : (
-              <Link
-                href={item.href}
-                className="transition-colors hover:text-foreground"
-              >
-                {item.label}
-              </Link>
-            )}
+            <Link
+              href={item.href}
+              className="transition-colors hover:text-foreground"
+            >
+              {item.label}
+            </Link>
           </li>
         ))}
-        {extra}
       </ul>
     </div>
   );

@@ -15,13 +15,13 @@ import { SettingsCardHeader } from "./SettingsCardHeader";
 
 // Round-26 legal-surfaces card. Five documents the platform needs in
 // place before launch: Privacy Policy, Terms of Service, Cookie
-// Policy, Refund Policy, and Impressum. Each opens in a modal with
+// Policy, Refund Policy, and Contact. Each opens in a modal with
 // placeholder / boilerplate text — final wording will come from
 // counsel before beta launch, but the structure, company details
 // (Fortex Media Ltd.), and the NOT FINANCIAL ADVICE disclaimer stand
 // today so the UX architecture reads professional.
 //
-// hello@fortex-media.com appears only inside the Impressum body —
+// hello@fortex-media.com appears only inside the Contact body —
 // it's the registered company contact and is reserved for legal /
 // company correspondence. Member-facing support goes via
 // hello@ptsystem.ai (HelpSupportCard).
@@ -31,7 +31,7 @@ type DocKey =
   | "terms"
   | "cookies"
   | "refund"
-  | "impressum";
+  | "contact";
 
 interface DocItem {
   key: DocKey;
@@ -66,8 +66,8 @@ const ITEMS: ReadonlyArray<DocItem> = [
     icon: <IconReceiptRefund size={16} stroke={1.75} aria-hidden />,
   },
   {
-    key: "impressum",
-    title: "Impressum",
+    key: "contact",
+    title: "Contact",
     subtitle: "Fortex Media Ltd. · 71-75 Shelton Street, London.",
     icon: <IconGavel size={16} stroke={1.75} aria-hidden />,
   },
@@ -133,7 +133,7 @@ export function PrivacyLegalCard() {
         {open === "terms" && <TermsBody />}
         {open === "cookies" && <CookiePolicyBody />}
         {open === "refund" && <RefundPolicyBody />}
-        {open === "impressum" && <ImpressumBody />}
+        {open === "contact" && <ContactBody />}
       </Modal>
     </section>
   );
@@ -415,7 +415,7 @@ function RefundPolicyBody() {
   );
 }
 
-function ImpressumBody() {
+function ContactBody() {
   return (
     <div className="space-y-5">
       <Section title="Company details">
