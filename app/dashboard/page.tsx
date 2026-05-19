@@ -20,8 +20,14 @@ import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import { MemberStatsCards } from "@/components/dashboard/MemberStatsCards";
 import { OnboardingExperience } from "@/components/dashboard/OnboardingExperience";
+import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 import { MotionSection } from "@/components/dashboard/MotionSection";
 import { CredentialDesyncCheck } from "@/components/dashboard/CredentialDesyncCheck";
+import {
+  computeSetupSteps,
+  readSetupDismissed,
+  setupAllComplete,
+} from "@/lib/setup-steps";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -63,8 +69,22 @@ export default async function DashboardPage() {
   // then keeps reloads from re-triggering it.
   const showWelcome = user.onboarding_completed !== true;
 
+  const setupSteps = computeSetupSteps(user);
+  const setupDismissed =
+    user.setup_progress_dismissed === true || (await readSetupDismissed());
+  const showSetup = !setupAllComplete(setupSteps);
+
   return (
     <main id="main" className="space-y-8 sm:space-y-6">
+      {showSetup && (
+        <MotionSection delay={0.01}>
+          <SetupProgressCard
+            steps={setupSteps}
+            initiallyDismissed={setupDismissed}
+          />
+        </MotionSection>
+      )}
+
       <MotionSection delay={0.02}>
         <MemberStatsCards
           btcPrice={initialBtcPrice}

@@ -84,6 +84,10 @@ export interface CurrentUser {
    *  to a localStorage hint so reloads during testing don't keep
    *  re-triggering the modal. */
   onboarding_completed?: boolean;
+  /** True once the member chose "I'll do this later" on the 5-step
+   *  setup-progress card. UI falls back to a `setup_dismissed_at`
+   *  cookie when the backend hasn't shipped this field yet. */
+  setup_progress_dismissed?: boolean;
   /** ISO timestamp of the previous dashboard visit. Used to drive the
    *  daily-greeting injection. */
   last_dashboard_visit_at?: string | null;

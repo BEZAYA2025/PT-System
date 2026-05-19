@@ -1,12 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, Sparkles } from "lucide-react";
-import {
-  buttonPrimaryClasses,
-  cardClasses,
-} from "@/lib/ui";
+import { IconCheck, IconChevronRight, IconCircle } from "@tabler/icons-react";
+import { Toast, type ToastState } from "@/components/Toast";
+import { cardClasses } from "@/lib/ui";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
 
@@ -29,43 +27,71 @@ export interface SetupStep {
 interface Props {
   steps: SetupStep[];
   initiallyDismissed: boolean;
-  displayName: string | null;
 }
 
 type ModalKind = "telegram" | "exchange" | null;
 
+const CELEBRATED_KEY = "pt_setup_celebrated";
+
 export function SetupProgressCard({
   steps,
   initiallyDismissed,
-  displayName,
 }: Props) {
   const router = useRouter();
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [dismissed, setDismissed] = useState(initiallyDismissed);
-  const [dismissing, setDismissing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const celebratedRef = useRef(false);
 
   const completedCount = steps.filter((s) => s.complete).length;
   const total = steps.length;
   const allComplete = completedCount === total;
-
-  // Hide the banner once setup is complete or the member dismissed it.
-  if (dismissed || allComplete) return null;
-
   const pct = Math.round((completedCount / total) * 100);
-  const firstActionable = steps.find((s) => !s.complete && s.actionable);
+
+  // Fire the "All set!" toast exactly once per browser — the moment the
+  // member completes the final step. localStorage flag survives reloads
+  // so they don't see the celebration on every subsequent dashboard
+  // visit. Refs guard against the effect firing twice in StrictMode.
+  useEffect(() => {
+    if (!allComplete || celebratedRef.current) return;
+    let already = false;
+    try {
+      already = localStorage.getItem(CELEBRATED_KEY) === "true";
+    } catch {
+      // ignore storage failure
+    }
+    if (already) return;
+    celebratedRef.current = true;
+    setToast({ message: "All set! Enjoy PT System.", tone: "success" });
+    try {
+      localStorage.setItem(CELEBRATED_KEY, "true");
+    } catch {
+      // ignore
+    }
+  }, [allComplete]);
 
   const handleDismiss = async () => {
-    setDismissing(true);
-    try {
-      await fetch("/api/setup/dismiss", { method: "POST" });
-      setDismissed(true);
-      router.refresh();
-    } catch {
-      // Even if the cookie call fails, hide locally — non-critical UX.
-      setDismissed(true);
-    } finally {
-      setDismissing(false);
-    }
+    if (busy) return;
+    setBusy(true);
+    setDismissed(true);
+    // Best-effort: backend persists across devices, cookie persists for
+    // this browser. Either one being honoured is enough to keep the
+    // card collapsed on next load.
+    await Promise.allSettled([
+      fetch("/api/proxy/auth/setup-progress-dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      }),
+      fetch("/api/setup/dismiss", { method: "POST" }),
+    ]);
+    setBusy(false);
+    router.refresh();
+  };
+
+  const handleReExpand = () => {
+    setDismissed(false);
   };
 
   const handleStepClick = (kind: SetupStepKind) => {
@@ -73,9 +99,42 @@ export function SetupProgressCard({
     else if (kind === "exchange") setOpenModal("exchange");
   };
 
-  const greeting = displayName
-    ? `Welcome aboard, ${displayName}.`
-    : "Welcome aboard.";
+  // Card gone — but the "All set!" toast may still be rendering.
+  if (allComplete) {
+    return <Toast value={toast} onDismiss={() => setToast(null)} />;
+  }
+
+  // Collapsed banner — the member chose "I'll do this later" but
+  // the steps aren't all done yet. Tiny strip with a re-expand action
+  // so they can resume any time without digging through Settings.
+  if (dismissed) {
+    return (
+      <button
+        type="button"
+        onClick={handleReExpand}
+        className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left text-sm transition-colors hover:border-emerald/40 hover:bg-emerald/[0.04]"
+      >
+        <span className="flex items-center gap-3">
+          <span
+            aria-hidden
+            className="inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] font-mono text-[11px] font-semibold text-emerald"
+          >
+            {completedCount}/{total}
+          </span>
+          <span className="font-medium text-foreground">
+            Finish setup
+          </span>
+          <span className="hidden text-muted-foreground sm:inline">
+            · {total - completedCount} step{total - completedCount === 1 ? "" : "s"} left
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald">
+          Resume
+          <IconChevronRight size={14} stroke={2} aria-hidden />
+        </span>
+      </button>
+    );
+  }
 
   return (
     <>
@@ -83,40 +142,16 @@ export function SetupProgressCard({
         aria-label="Account setup progress"
         className={`${cardClasses} relative`}
       >
-        <button
-          type="button"
-          onClick={handleDismiss}
-          disabled={dismissing}
-          aria-label="Dismiss setup banner"
-          className="absolute right-3 top-3 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground disabled:opacity-60"
-        >
-          <X aria-hidden className="size-4" />
-        </button>
-
-        <div className="flex items-start gap-3 pr-10">
-          <span
-            aria-hidden
-            className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-emerald/30 bg-emerald/[0.08] text-emerald"
-          >
-            <Sparkles strokeWidth={1.75} className="size-4" />
-          </span>
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-              {greeting}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              A couple of quick steps and Aven is wired up to your trading.
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-6 space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              Account setup
-            </p>
-            <p className="font-mono text-xs text-foreground">
+        <header>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+            Get the most out of PT System
+          </h2>
+          <div className="mt-4 flex items-center justify-between gap-4">
+            <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
               {completedCount} of {total} complete
+            </p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {pct}%
             </p>
           </div>
           <div
@@ -125,76 +160,89 @@ export function SetupProgressCard({
             aria-valuemax={total}
             aria-valuenow={completedCount}
             aria-label="Setup progress"
-            className="h-1.5 w-full overflow-hidden rounded-full bg-surface"
+            className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-elevated"
           >
             <div
               className="h-full bg-emerald transition-all duration-500"
               style={{ width: `${pct}%` }}
             />
           </div>
-        </div>
+        </header>
 
-        <ul className="mt-6 space-y-2">
+        <ul className="mt-6 space-y-2.5">
           {steps.map((step) => (
             <li
               key={step.kind}
               className={[
-                "flex items-center gap-3 rounded-lg border px-4 py-3",
+                "flex items-center gap-3 rounded-xl border px-4 py-3.5",
                 step.complete
                   ? "border-emerald/20 bg-emerald/[0.03]"
-                  : "border-border bg-surface/30",
+                  : "border-border bg-background",
               ].join(" ")}
             >
               <span
                 aria-hidden
                 className={[
-                  "inline-flex size-6 shrink-0 items-center justify-center rounded-full border",
+                  "inline-flex size-6 shrink-0 items-center justify-center rounded-full",
                   step.complete
-                    ? "border-emerald bg-emerald text-background"
-                    : "border-border bg-surface text-muted-foreground",
+                    ? "bg-emerald text-background"
+                    : "border border-border text-muted-foreground",
                 ].join(" ")}
               >
-                {step.complete && <Check strokeWidth={2.5} className="size-3.5" />}
+                {step.complete ? (
+                  <IconCheck size={14} stroke={2.5} />
+                ) : (
+                  <IconCircle size={12} stroke={1.75} />
+                )}
               </span>
-              <div className="flex-1 min-w-0">
+
+              <div className="min-w-0 flex-1">
                 <p
                   className={[
-                    "text-sm",
-                    step.complete
-                      ? "text-muted-foreground line-through decoration-muted-foreground/40"
-                      : "text-foreground",
+                    "text-sm font-medium",
+                    step.complete ? "text-foreground/80" : "text-foreground",
                   ].join(" ")}
                 >
                   {step.label}
                 </p>
-                {!step.complete && step.helper && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                {step.helper && (
+                  <p
+                    className={[
+                      "mt-0.5 text-xs",
+                      step.complete && step.helper === "Done"
+                        ? "text-emerald/80"
+                        : "text-muted-foreground",
+                    ].join(" ")}
+                  >
                     {step.helper}
                   </p>
                 )}
               </div>
+
               {!step.complete && step.actionable && (
                 <button
                   type="button"
                   onClick={() => handleStepClick(step.kind)}
-                  className="shrink-0 text-xs font-medium text-emerald transition-colors hover:text-emerald-hover"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald/40 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold text-emerald transition-colors hover:bg-emerald/[0.14]"
                 >
-                  Connect →
+                  Connect
+                  <IconChevronRight size={12} stroke={2} aria-hidden />
                 </button>
               )}
             </li>
           ))}
         </ul>
 
-        {firstActionable && (
+        <div className="mt-5 flex justify-end">
           <button
             type="button"
-            onClick={() => handleStepClick(firstActionable.kind)}
-            className={`${buttonPrimaryClasses} mt-6 w-full sm:w-auto`}
+            onClick={handleDismiss}
+            disabled={busy}
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
           >
-            Complete setup
+            I&apos;ll do this later →
           </button>
-        )}
+        </div>
       </section>
 
       <ConnectTelegramModal
@@ -205,6 +253,8 @@ export function SetupProgressCard({
         open={openModal === "exchange"}
         onClose={() => setOpenModal(null)}
       />
+
+      <Toast value={toast} onDismiss={() => setToast(null)} />
     </>
   );
 }
