@@ -15,7 +15,7 @@ const FAQ: ReadonlyArray<QA> = [
   },
   {
     q: "What's the difference between Standard and VIP?",
-    a: "Standard focuses everything on Bitcoin — daily briefings, setup alerts, Aven analysis. VIP unlocks all major coins, unlimited Aven chat, deeper reasoning, and on-chain data. Both tiers show you Paul's full trade activity.",
+    a: "Standard focuses everything on Bitcoin — daily briefings, setup alerts, Aven analysis. VIP unlocks all major coins, unlimited Aven chat, Deep-Mode reasoning, personal coaching with weekly reviews, and advanced risk management. Both tiers show you Paul's full trade activity.",
   },
   {
     q: "How do I cancel?",

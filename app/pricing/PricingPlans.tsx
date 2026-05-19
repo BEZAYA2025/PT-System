@@ -2,7 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { IconCheck, IconLoader2, IconTicket, IconX } from "@tabler/icons-react";
+import {
+  IconBell,
+  IconBrain,
+  IconCheck,
+  IconEye,
+  IconInfinity,
+  IconLoader2,
+  IconMessageCircle,
+  IconMicrophone,
+  IconPlugConnected,
+  IconShieldCheck,
+  IconSun,
+  IconTargetArrow,
+  IconTicket,
+  IconWorld,
+  IconX,
+  type IconProps,
+} from "@tabler/icons-react";
 
 // /pricing — interactive plans surface. One client component owns
 // cadence + promo state so both cards stay in sync. The promo input
@@ -33,32 +50,40 @@ const PRICES: Record<TierId, Record<Cadence, number>> = {
   vip: { monthly: 299, yearly: 2990 },
 };
 
-// Round-33 feature lists — tightened to six bullets each, BTC-only
-// for Standard, major-coins coverage for VIP. No "BTC + ETH"
-// mentions anywhere; ETH only shows up incidentally as part of
-// Paul's trade activity (which Standard members also see).
-const STANDARD_FEATURES: ReadonlyArray<string> = [
-  "Aven AI Chat — 50 messages a day",
-  "Daily briefing on Bitcoin",
-  "Bitcoin setup alerts with confluence scoring",
-  "Paul's full trade activity, fully visible",
-  "Voice messages + annotated charts in chat",
-  "Connect any of 9 exchanges (read-only)",
+// Round-34 feature lists — line-art icons replace the emoji bullets
+// so Standard and VIP read with the same visual language. Standard
+// stays Bitcoin-focused; VIP differentiates on coin coverage,
+// reasoning depth, coaching cadence, and risk management.
+type TablerIcon = React.ComponentType<IconProps>;
+type FeatureItem = { Icon: TablerIcon; label: string };
+
+const STANDARD_FEATURES: ReadonlyArray<FeatureItem> = [
+  { Icon: IconMessageCircle, label: "Aven AI Chat — 50 messages a day" },
+  { Icon: IconSun, label: "Daily briefing on Bitcoin" },
+  { Icon: IconBell, label: "Setup alerts with confluence scoring" },
+  { Icon: IconEye, label: "Paul's full trade activity, visible" },
+  { Icon: IconMicrophone, label: "Voice messages + annotated charts" },
+  {
+    Icon: IconPlugConnected,
+    label: "Connect any of 9 exchanges (read-only)",
+  },
 ];
 
-const VIP_EXTRAS: ReadonlyArray<{ emoji: string; label: string }> = [
-  { emoji: "⚡", label: "Unlimited Aven AI Chat" },
+const VIP_EXTRAS: ReadonlyArray<FeatureItem> = [
+  { Icon: IconInfinity, label: "Unlimited Aven AI Chat" },
+  { Icon: IconWorld, label: "Full coverage — all major coins" },
   {
-    emoji: "🌐",
-    label: "Full coverage — all major coins, not just Bitcoin",
+    Icon: IconBrain,
+    label: "Aven Deep-Mode — richer reasoning, deeper market analysis",
   },
   {
-    emoji: "🧠",
-    label: "Aven Deep-Mode — richer setup reasoning, more confluence sources",
+    Icon: IconTargetArrow,
+    label: "Personal trade coaching with weekly reviews",
   },
-  { emoji: "⏩", label: "Priority Aven response times" },
-  { emoji: "🔗", label: "On-chain data insights" },
-  { emoji: "🚀", label: "Early access to new features" },
+  {
+    Icon: IconShieldCheck,
+    label: "Advanced risk management with proactive warnings",
+  },
 ];
 
 const TIER_LABEL: Record<TierId, string> = {
@@ -153,7 +178,7 @@ export function PricingPlans() {
         <TierCard
           tier="standard"
           title="Aven Standard"
-          subtitle="For active BTC traders"
+          subtitle="For active Bitcoin traders"
           cadence={cadence}
           promo={activePromo}
           features={STANDARD_FEATURES}
@@ -382,10 +407,10 @@ function TierCard({
   subtitle: string;
   cadence: Cadence;
   promo: ValidPromo | null;
-  // Standard passes its 6-bullet list; VIP passes `null` and shows
-  // only the "Everything in Standard, plus" prefix + its extras.
-  features: ReadonlyArray<string> | null;
-  vipExtras?: ReadonlyArray<{ emoji: string; label: string }>;
+  // Standard passes its 6 bullets; VIP passes `null` and shows only
+  // the "Everything in Standard, plus" prefix + its extras.
+  features: ReadonlyArray<FeatureItem> | null;
+  vipExtras?: ReadonlyArray<FeatureItem>;
   recommended?: boolean;
 }) {
   const basePrice = PRICES[tier][cadence];
@@ -410,8 +435,8 @@ function TierCard({
       : null;
 
   const ctaLabel = applies
-    ? `Start Free Trial — ${promo!.discountPct}% off`
-    : "Start Free Trial";
+    ? `Start free trial — ${promo!.discountPct}% off`
+    : "Start free trial";
 
   const ctaHref = buildCheckoutHref(
     tier,
@@ -461,9 +486,19 @@ function TierCard({
         </p>
       )}
 
+      {/* CTA tone differs by tier — Standard reads as the secondary
+          option (neutral border + foreground), VIP as the primary
+          conversion (emerald fill). The recommended-card emerald
+          glow on the outside + emerald button on the inside reads
+          as "pick this". */}
       <Link
         href={ctaHref}
-        className="mt-7 inline-flex h-12 w-full items-center justify-center rounded-full bg-emerald px-6 text-sm font-semibold text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
+        className={[
+          "mt-7 inline-flex h-12 w-full items-center justify-center rounded-full px-6 text-sm font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald",
+          recommended
+            ? "bg-emerald text-background hover:bg-emerald-hover"
+            : "border border-border bg-background text-foreground hover:border-foreground/30 hover:bg-surface-elevated",
+        ].join(" ")}
       >
         {ctaLabel}
       </Link>
@@ -472,19 +507,9 @@ function TierCard({
         14-day free trial · cancel anytime
       </p>
 
-      <ul className="mt-8 space-y-3 border-t border-border pt-7">
+      <ul className="mt-8 space-y-3.5 border-t border-border pt-7">
         {features?.map((f) => (
-          <li key={f} className="flex items-start gap-2.5">
-            <IconCheck
-              size={14}
-              stroke={2.5}
-              className="mt-1 shrink-0 text-emerald"
-              aria-hidden
-            />
-            <span className="text-[14px] leading-relaxed text-foreground/90">
-              {f}
-            </span>
-          </li>
+          <FeatureRow key={f.label} Icon={f.Icon} label={f.label} />
         ))}
         {vipExtras && (
           <>
@@ -497,19 +522,28 @@ function TierCard({
               Everything in Standard, plus:
             </li>
             {vipExtras.map((x) => (
-              <li key={x.label} className="flex items-start gap-2.5">
-                <span aria-hidden className="mt-0.5 text-base leading-none">
-                  {x.emoji}
-                </span>
-                <span className="text-[14px] leading-relaxed text-foreground/90">
-                  {x.label}
-                </span>
-              </li>
+              <FeatureRow key={x.label} Icon={x.Icon} label={x.label} />
             ))}
           </>
         )}
       </ul>
     </div>
+  );
+}
+
+function FeatureRow({ Icon, label }: { Icon: TablerIcon; label: string }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span
+        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-emerald/[0.08] text-emerald ring-1 ring-emerald/15"
+        aria-hidden
+      >
+        <Icon size={14} stroke={1.75} />
+      </span>
+      <span className="text-[14px] leading-relaxed text-foreground/90">
+        {label}
+      </span>
+    </li>
   );
 }
 
