@@ -33,6 +33,19 @@ export interface AdminMembersListEntry {
   binance_api_key_connected?: boolean;
   telegram_connected?: boolean;
   has_exchange_connection?: boolean;
+  // Sprint 2 additions — all optional so legacy backend deploys still
+  // render rows. Missing values surface as "—" / muted tone, never null
+  // crashes in the table.
+  engagement_score?: number | null;
+  aven_messages_count_7d?: number | null;
+  trades_count_7d?: number | null;
+  brief_views_count_7d?: number | null;
+  lifetime_value_usd?: number | null;
+  last_active_at?: string | null;
+  /** Sprint 2 alias for has_exchange_connection — the spec uses
+   *  this shorter name; we accept either to stay compatible. */
+  exchange_connected?: boolean;
+  tags?: string[] | null;
 }
 
 export interface AdminMembersResponse {
