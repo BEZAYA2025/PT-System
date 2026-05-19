@@ -85,10 +85,6 @@ function fmtUsdSuffix(n: number): string {
   return `${sign}${v}$`;
 }
 
-function capitalize(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
 // ---------------------------------------------------------------------------
 // Side badge with optional leverage suffix
 // ---------------------------------------------------------------------------
@@ -692,20 +688,19 @@ function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
       />
     );
   }
-  const exchangeLabel = ex ? capitalize(ex) : "your exchange";
   return (
     <ColdStart
       tone="emerald"
       Icon={IconChartCandle}
-      title="No positions yet"
-      body={`Start trading on ${exchangeLabel} — your live PnL appears here as soon as a position opens.`}
+      title="No trades yet"
+      body="Once you open a position, your trade will appear here. Aven tracks it live, alerts you on risks, and reviews it after close."
     />
   );
 }
 
-// Round-10: clickable empty-state — whole card navigates to Settings →
-// Exchange API (deep-link via #exchange-api anchor on that section). The
-// nested "Connect Now" pill is decorative; the entire Link captures clicks.
+// Clickable empty-state for members who haven't linked an exchange yet —
+// whole card navigates to Settings → Exchange API. The nested "Connect
+// exchange" pill is decorative; the surrounding Link captures clicks.
 function ConnectExchangeColdStart() {
   return (
     <Link
@@ -718,15 +713,16 @@ function ConnectExchangeColdStart() {
       </span>
       <div>
         <p className="text-base font-semibold text-foreground">
-          Connect your exchange
+          No trades yet
         </p>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Link a read-only key to track your live positions, ROI, and stats
-          right here on the dashboard.
+          Once you connect your exchange and open a position, your
+          trade will appear here. Aven tracks it live, alerts you on
+          risks, and reviews it after close.
         </p>
       </div>
       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald px-5 py-2.5 text-sm font-medium text-background transition-colors group-hover:bg-emerald-hover">
-        Connect Now
+        Connect exchange
         <IconArrowRight
           size={14}
           stroke={2}

@@ -326,15 +326,18 @@ function AvenLiveBar({
 // bounded as more SSE events keep arriving.
 const MAX_VISIBLE = 5;
 
+// Empty-state strings shown before the SSE feed produces a real
+// observation. Kept deliberately concrete (funding flips, key levels,
+// setup confluence) so a new member reads it as "Aven is watching —
+// here's what counts as relevant" rather than as live signals to act
+// on. Once /api/aven/observations starts emitting, the real feed
+// takes over and these strings stop rendering entirely.
 const LIVE_OBSERVATIONS: ReadonlyArray<string> = [
-  "Analyzing 4H market structure…",
-  "Monitoring liquidity layers",
-  "Watching key levels",
-  "Tracking funding rate flow",
-  "Observing volume patterns",
-  "Setup detection running",
-  "Market scan in progress",
-  "Live market intelligence active",
+  "Aven is watching the market",
+  "Tracking funding flips",
+  "Marking key levels",
+  "Scanning for setup confluence",
+  "Live, all day",
 ];
 
 function LiveTicker({
