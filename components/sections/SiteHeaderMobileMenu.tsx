@@ -53,14 +53,6 @@ export function SiteHeaderMobileMenu({ isAuthed }: { isAuthed: boolean }) {
           aria-label="Primary navigation"
           className="fixed inset-0 top-14 z-50 flex flex-col gap-4 border-t border-border bg-background px-6 py-8"
         >
-          <Link
-            href="/pricing"
-            onClick={() => setOpen(false)}
-            className="rounded-lg px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-surface"
-          >
-            Pricing
-          </Link>
-
           {isAuthed ? (
             <>
               <SignOutButton

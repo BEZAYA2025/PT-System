@@ -26,19 +26,15 @@ export async function SiteHeader() {
           <span>PT System</span>
         </Link>
 
-        {/* Desktop nav — Pricing · Sign in · primary CTA. Mobile sees
-            this collapsed into the SiteHeaderMobileMenu below. */}
+        {/* Desktop nav — Sign in + primary CTA. Pricing dropped from
+            the nav in round-38 because both CTAs already funnel
+            visitors there; the standalone Pricing link was redundant
+            chrome. Mobile sees this collapsed into the
+            SiteHeaderMobileMenu below. */}
         <nav
           aria-label="Primary"
           className="hidden items-center gap-3 sm:flex"
         >
-          <Link
-            href="/pricing"
-            className="rounded-full px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Pricing
-          </Link>
-
           {isAuthed ? (
             <>
               <SignOutButton

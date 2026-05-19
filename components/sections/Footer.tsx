@@ -66,7 +66,7 @@ function FooterBrand() {
         <span>PT System</span>
       </Link>
       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-        Your AI trading mentor.
+        Aven · Your AI trading mentor.
       </p>
       {/* Reserved space for the future social-icon row — kept so the
           column rhythm stays the same when those icons land. */}

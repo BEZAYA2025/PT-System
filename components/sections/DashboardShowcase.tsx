@@ -24,22 +24,20 @@ type Phase = "idle" | "setup" | "discipline";
 
 const PHASE_ORDER: ReadonlyArray<Phase> = ["idle", "setup", "discipline"];
 
-// Round-29: tightened loop. Iter-2 ran ~52s and members felt the
-// conversation transitions dragged. Now: idle 6s · setup 16s ·
-// discipline 11s = ~33s total with the trimmed phase-transition
-// gap (0.3s exit + 0.2s pause + 0.3s enter ≈ 0.5s per swap).
+// Round-38: ~25% snappier hold times across all phases and a tighter
+// inter-phase pause. Was 6 / 16 / 11s = 33s total. Now 4.5 / 12 /
+// 8s = ~24.5s total content, ~26s full loop including transitions.
+// Cross-fade durations stay at 0.3s each (smooth, not jumpy); only
+// the inter-phase pause and the per-phase hold time shrink.
 const PHASE_DURATION_MS: Record<Phase, number> = {
-  idle: 6000,
-  setup: 16000,
-  discipline: 11000,
+  idle: 4500,
+  setup: 12000,
+  discipline: 8000,
 };
 
-// Cross-fade durations between phases. Snappy enough that members
-// don't sit waiting for the next bubble; still smooth enough not to
-// feel jumpy.
 const PHASE_EXIT_S = 0.3;
 const PHASE_ENTER_S = 0.3;
-const PHASE_GAP_S = 0.2;
+const PHASE_GAP_S = 0.15;
 
 const PHASE_LABELS: Record<Phase, string> = {
   idle: "Live dashboard",
@@ -653,23 +651,22 @@ function ChatInputBar() {
 // ---------------------------------------------------------------------------
 
 function SetupConversation({ reduce }: { reduce: boolean }) {
-  // Round-29 tightening — internal delays trimmed by ~30% to match
-  // the shorter 16s phase. Bubbles arrive sooner so members spend
-  // more of the phase reading rather than waiting.
+  // Round-38: every delay scaled 0.75× to match the shorter 12s
+  // phase. Same beat structure, just less hold time between events.
   const d = reduce
     ? { memberTyping: 0, memberMsg: 0, avenThinking: 0, avenMsg: 0, chartIn: 0 }
     : {
-        memberTyping: 0.4,
-        memberMsg: 1.6,
-        avenThinking: 2.6,
-        avenMsg: 4.0,
-        chartIn: 5.6,
+        memberTyping: 0.3,
+        memberMsg: 1.2,
+        avenThinking: 2.0,
+        avenMsg: 3.0,
+        chartIn: 4.2,
       };
 
   return (
     <>
       {!reduce && (
-        <FadingTypingDots align="right" delay={d.memberTyping} duration={1.4} />
+        <FadingTypingDots align="right" delay={d.memberTyping} duration={1.0} />
       )}
       <MemberBubble
         text="BTC bouncing off 78.5k — does the setup hold?"
@@ -677,7 +674,7 @@ function SetupConversation({ reduce }: { reduce: boolean }) {
         delay={d.memberMsg}
       />
       {!reduce && (
-        <FadingTypingDots align="left" delay={d.avenThinking} duration={1.6} />
+        <FadingTypingDots align="left" delay={d.avenThinking} duration={1.2} />
       )}
       <AvenBubble
         score={8}
@@ -692,21 +689,21 @@ function SetupConversation({ reduce }: { reduce: boolean }) {
 }
 
 function DisciplineConversation() {
-  // Phase budget is 11s — same trim-pattern as the setup convo.
+  // 8s phase budget — same 0.75× scaling on every delay.
   return (
     <>
-      <FadingTypingDots align="right" delay={1.8} duration={1.0} />
+      <FadingTypingDots align="right" delay={1.4} duration={0.75} />
       <MemberBubble
         text="My long is down 2%, should I cut or hold?"
         ts="14:08"
-        delay={2.8}
+        delay={2.1}
       />
-      <FadingTypingDots align="left" delay={3.8} duration={1.4} />
+      <FadingTypingDots align="left" delay={2.9} duration={1.0} />
       <AvenBubble
         intro="Entry was solid — 8/10 setup. SL at $74,500 still valid (12% from current). RSI 1H at 32 — historical bounce zone."
         body="The thesis hasn't broken. Discipline check: are you reacting to price or to your plan?"
         ts="14:09"
-        delay={5.2}
+        delay={3.9}
       />
     </>
   );
