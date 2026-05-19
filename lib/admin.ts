@@ -194,6 +194,88 @@ export async function fetchAdminSystemHealth(): Promise<SystemHealthResponse | n
   return { services, overall };
 }
 
+export interface MemberNote {
+  id: string;
+  content: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  author_id?: string | null;
+}
+
+export interface MemberDetail extends AdminMembersListEntry {
+  // ADMIN_API_SPEC.md §13: detail response is the list entry shape
+  // plus these audit / engagement / notes fields. All optional —
+  // older backend deploys silently degrade rather than 500ing.
+  notes?: MemberNote[] | null;
+  total_trades?: number | null;
+  win_rate?: number | null;
+  total_pnl?: number | null;
+  aven_messages?: number | null;
+  aven_conversations?: number | null;
+  total_aven_messages?: number | null;
+  total_conversations?: number | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  billing_interval?: "monthly" | "yearly" | null;
+  exchange_type?: string | null;
+  signed_up_at?: string | null;
+  last_login_at?: string | null;
+  subscription_period_end?: string | null;
+  current_period_end?: string | null;
+}
+
+export async function fetchAdminMemberDetail(
+  id: string,
+): Promise<MemberDetail | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>(
+    `/api/admin/members/${encodeURIComponent(id)}`,
+    { method: "GET", token },
+  );
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (!d || typeof d !== "object") return null;
+  const inner =
+    (d as { member?: MemberDetail }).member ??
+    (d as MemberDetail);
+  return inner ?? null;
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  created_at?: string | null;
+  ip_address?: string | null;
+  user_agent_parsed?: {
+    browser?: string | null;
+    os?: string | null;
+    device?: string | null;
+  } | null;
+  user_agent?: string | null;
+}
+
+export async function fetchAdminMemberLoginHistory(
+  id: string,
+  options: { days?: number; limit?: number } = {},
+): Promise<LoginHistoryEntry[] | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const qs = new URLSearchParams();
+  if (options.days) qs.set("days", String(options.days));
+  if (options.limit) qs.set("limit", String(options.limit));
+  const path = `/api/admin/members/${encodeURIComponent(id)}/login-history${qs.toString() ? `?${qs}` : ""}`;
+  const res = await backendFetch<unknown>(path, { method: "GET", token });
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as LoginHistoryEntry[];
+  if (d && typeof d === "object") {
+    const arr = (d as { history?: unknown; entries?: unknown }).history
+      ?? (d as { entries?: unknown }).entries;
+    if (Array.isArray(arr)) return arr as LoginHistoryEntry[];
+  }
+  return [];
+}
+
 export interface DiscountCode {
   id: string;
   code: string;
