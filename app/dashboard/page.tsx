@@ -111,7 +111,7 @@ export default async function DashboardPage() {
       </MotionSection>
 
       <MotionSection tour="brief" delay={0.14}>
-        <DailyBriefCard brief={initialBrief} />
+        <DailyBriefCard brief={initialBrief} isFounder={founder} />
       </MotionSection>
 
       <MotionSection tour="market" delay={0.20}>
@@ -119,7 +119,7 @@ export default async function DashboardPage() {
       </MotionSection>
 
       <MotionSection tour="trades" delay={0.26}>
-        <TradesGrid initial={initialTrades} />
+        <TradesGrid initial={initialTrades} isFounder={founder} />
       </MotionSection>
 
       <OnboardingExperience

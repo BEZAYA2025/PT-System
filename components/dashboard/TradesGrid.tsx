@@ -27,9 +27,14 @@ const STALE_TICK_MS = 15_000;
 
 interface Props {
   initial: TradesView | null;
+  /** Founder accounts see a single Trades column (their own positions
+   *  are Paul's positions — surfacing a separate Paul column would
+   *  duplicate the same data). The MyTradesSection header also
+   *  simplifies to "Trades" instead of "Your trades". */
+  isFounder?: boolean;
 }
 
-export function TradesGrid({ initial }: Props) {
+export function TradesGrid({ initial, isFounder = false }: Props) {
   const [view, setView] = useState<TradesView | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(initial === null);
@@ -138,8 +143,17 @@ export function TradesGrid({ initial }: Props) {
             either section can never force the grid item wider than its
             allocated column — without this, a multi-trade carousel's
             content width pushed the column out past the page bounds on
-            narrow viewports. */}
-        <div className="grid gap-4 lg:grid-cols-2 [&>*]:min-w-0">
+            narrow viewports.
+
+            Founder accounts drop the lg:grid-cols-2 and skip the
+            Paul column entirely — there's nothing to compare against
+            when "your trades" and "Paul's trades" are the same row
+            set. */}
+        <div
+          className={`grid gap-4 [&>*]:min-w-0 ${
+            isFounder ? "" : "lg:grid-cols-2"
+          }`}
+        >
           <MyTradesSection
             active={view?.your.active ?? []}
             recent={view?.your.recent ?? []}
@@ -154,21 +168,24 @@ export function TradesGrid({ initial }: Props) {
             }
             meta={view?.yourMeta}
             onSelect={setDetail}
+            isFounder={isFounder}
           />
-          <PaulsTradesSection
-            active={view?.pauls.active ?? []}
-            recent={view?.pauls.recent ?? []}
-            stats={
-              view?.pauls.stats ?? {
-                unrealizedPnlSum: null,
-                unrealizedPnlPct: null,
-                realizedPnlSum: null,
-                winRatePct: null,
-                closedCount: null,
+          {!isFounder && (
+            <PaulsTradesSection
+              active={view?.pauls.active ?? []}
+              recent={view?.pauls.recent ?? []}
+              stats={
+                view?.pauls.stats ?? {
+                  unrealizedPnlSum: null,
+                  unrealizedPnlPct: null,
+                  realizedPnlSum: null,
+                  winRatePct: null,
+                  closedCount: null,
+                }
               }
-            }
-            onSelect={setDetail}
-          />
+              onSelect={setDetail}
+            />
+          )}
         </div>
       </div>
 

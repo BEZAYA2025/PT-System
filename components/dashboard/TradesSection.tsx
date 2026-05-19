@@ -679,8 +679,14 @@ function LastTradeCard({
 // Empty-state for member's section (4 cases)
 // ---------------------------------------------------------------------------
 
-function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
-  if (!meta.hasExchange) {
+function YourTradesColdStart({
+  meta,
+  isFounder = false,
+}: {
+  meta: YourTradesMeta;
+  isFounder?: boolean;
+}) {
+  if (!meta.hasExchange && !isFounder) {
     return <ConnectExchangeColdStart />;
   }
   const ex = meta.exchangeType?.toLowerCase() ?? null;
@@ -690,7 +696,11 @@ function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
         tone="amber"
         Icon={IconChartCandle}
         title="Bitunix tracking coming soon"
-        body="Multi-exchange support is in development — your Bitunix positions will appear here once it lands."
+        body={
+          isFounder
+            ? undefined
+            : "Multi-exchange support is in development — your Bitunix positions will appear here once it lands."
+        }
       />
     );
   }
@@ -699,7 +709,11 @@ function YourTradesColdStart({ meta }: { meta: YourTradesMeta }) {
       tone="emerald"
       Icon={IconChartCandle}
       title="No trades yet"
-      body="Once you open a position, your trade will appear here. Aven tracks it live, alerts you on risks, and reviews it after close."
+      body={
+        isFounder
+          ? undefined
+          : "Once you open a position, your trade will appear here. Aven tracks it live, alerts you on risks, and reviews it after close."
+      }
     />
   );
 }
@@ -753,7 +767,7 @@ function ColdStart({
     "aria-hidden"?: boolean;
   }>;
   title: string;
-  body: string;
+  body?: string;
 }) {
   const toneClasses =
     tone === "amber"
@@ -774,7 +788,9 @@ function ColdStart({
       </span>
       <div>
         <p className="text-sm font-medium text-foreground">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{body}</p>
+        {body && (
+          <p className="mt-1 text-xs text-muted-foreground">{body}</p>
+        )}
       </div>
     </div>
   );
@@ -796,7 +812,8 @@ export function MyTradesSection({
   recent,
   meta,
   onSelect,
-}: CommonProps & { meta?: YourTradesMeta }) {
+  isFounder = false,
+}: CommonProps & { meta?: YourTradesMeta; isFounder?: boolean }) {
   const empty = active.length === 0 && recent.length === 0;
   const showColdStart = empty && meta !== undefined;
 
@@ -804,12 +821,12 @@ export function MyTradesSection({
     <section className="min-w-0 space-y-4 rounded-2xl border border-border bg-surface p-5 sm:p-6">
       <header className="flex items-center justify-between gap-3">
         <h2 className="text-base font-semibold tracking-tight text-foreground">
-          Your trades
+          {isFounder ? "Trades" : "Your trades"}
         </h2>
       </header>
 
       {showColdStart ? (
-        <YourTradesColdStart meta={meta} />
+        <YourTradesColdStart meta={meta} isFounder={isFounder} />
       ) : (
         <>
           <OpenTradesPanel

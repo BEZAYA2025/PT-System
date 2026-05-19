@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { IconBook2, IconClockHour4 } from "@tabler/icons-react";
+import Link from "next/link";
+import {
+  IconArrowRight,
+  IconBook2,
+  IconClockHour4,
+} from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { BriefAvatar } from "./BriefAvatar";
 import { BriefingFullView } from "./BriefingFullView";
@@ -44,10 +49,41 @@ function AuthorByline({ generatedAt }: { generatedAt: string }) {
   );
 }
 
-export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
+export function DailyBriefCard({
+  brief,
+  isFounder = false,
+}: {
+  brief: DailyBriefView | null;
+  isFounder?: boolean;
+}) {
   const [open, setOpen] = useState(false);
 
   if (!brief) {
+    // Founders see a route into /admin/briefings — for them, "no
+    // briefing yet" usually means there's a pending one waiting on
+    // their own approval, not an Aven generation gap.
+    if (isFounder) {
+      return (
+        <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 sm:p-8">
+          <div className="flex items-start gap-4">
+            <BriefAvatar size={36} />
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
+                No briefing approved yet
+              </h2>
+              <Link
+                href="/admin/briefings"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/[0.08] px-3 py-1.5 text-sm font-medium text-amber-200 transition-colors hover:border-amber-500/55 hover:bg-amber-500/[0.14]"
+              >
+                Review pending briefings
+                <IconArrowRight size={13} stroke={2} aria-hidden />
+              </Link>
+            </div>
+          </div>
+        </section>
+      );
+    }
+
     return (
       <section className="rounded-2xl border border-amber-500/15 bg-gradient-to-br from-surface via-surface to-amber-500/[0.03] p-6 sm:p-8">
         <div className="flex items-start gap-4">
