@@ -4,6 +4,7 @@ import {
   getInitialMyTrades,
   getInitialPaulTrades,
   getRawSnapshot,
+  isFounder,
   requireUser,
 } from "@/lib/dal";
 import {
@@ -62,17 +63,23 @@ export default async function DashboardPage() {
     ? buildBtcPriceView(raw as RawSnapshotMetrics, fetchedAt).price
     : null;
 
-  const showTour = user.first_login_completed === false;
+  // Founder accounts skip every member-onboarding affordance — they
+  // built the system, they don't need the tour, the welcome modal,
+  // or the 5-step setup card. Single source-of-truth via isFounder()
+  // so each gate below stays readable.
+  const founder = isFounder(user);
+
+  const showTour = !founder && user.first_login_completed === false;
   // onboarding_completed === false explicitly means the backend has the
   // field and the member hasn't dismissed yet. `undefined` (older backend
   // builds) also surfaces the modal — the client-side localStorage hint
   // then keeps reloads from re-triggering it.
-  const showWelcome = user.onboarding_completed !== true;
+  const showWelcome = !founder && user.onboarding_completed !== true;
 
   const setupSteps = computeSetupSteps(user);
   const setupDismissed =
     user.setup_progress_dismissed === true || (await readSetupDismissed());
-  const showSetup = !setupAllComplete(setupSteps);
+  const showSetup = !founder && !setupAllComplete(setupSteps);
 
   return (
     <main id="main" className="space-y-8 sm:space-y-6">
@@ -99,6 +106,7 @@ export default async function DashboardPage() {
           initialMessages={history.messages}
           initialHasOlder={history.hasMore}
           displayName={user.display_name}
+          isFounder={founder}
         />
       </MotionSection>
 

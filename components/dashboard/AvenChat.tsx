@@ -30,6 +30,10 @@ interface Props {
   /** Member's display name — surfaces in the welcome message when the
    *  conversation is still empty. */
   displayName?: string | null;
+  /** Founder accounts skip the onboarding welcome + suggested-prompt
+   *  pills — those exist to help new members get unstuck, which the
+   *  founder doesn't need. */
+  isFounder?: boolean;
 }
 
 // Round-16 hydration #418 root cause: this formatter uses
@@ -79,6 +83,7 @@ export function AvenChat({
   initialHasOlder,
   initialQuota = null,
   displayName,
+  isFounder = false,
 }: Props) {
   // Iter 7: synthetic greeting + WelcomeCard removed. The daily greeting is
   // now a real Aven message inserted server-side (flagged via
@@ -163,7 +168,7 @@ export function AvenChat({
           </button>
         )}
 
-        {!chat.messages.some((m) => m.role === "user") && (
+        {!isFounder && !chat.messages.some((m) => m.role === "user") && (
           <ChatEmptyState
             displayName={displayName ?? null}
             onPromptClick={(text) => void chat.send(text)}
