@@ -54,10 +54,13 @@ export function DailyBriefCard({ brief }: { brief: DailyBriefView | null }) {
           <BriefAvatar size={36} />
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Today&apos;s brief is being prepared…
+              Your first briefing arrives tomorrow at 7 AM
             </h2>
-            <p className="mt-1.5 text-sm text-muted-foreground">
-              Aven posts daily around 06:00 UTC.
+            <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+              Aven analyzes Bitcoin across five timeframes — Daily, 4H,
+              1H, 30m, 15m — and delivers a 2-minute read so you know
+              what to expect today. Look for it in your morning
+              routine.
             </p>
           </div>
         </div>

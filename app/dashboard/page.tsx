@@ -19,9 +19,15 @@ import { DailyBriefCard } from "@/components/dashboard/DailyBriefCard";
 import { AvenChat } from "@/components/dashboard/AvenChat";
 import { TradesGrid } from "@/components/dashboard/TradesGrid";
 import { MemberStatsCards } from "@/components/dashboard/MemberStatsCards";
-import { SpotlightTour } from "@/components/dashboard/SpotlightTour";
+import { OnboardingExperience } from "@/components/dashboard/OnboardingExperience";
+import { SetupProgressCard } from "@/components/dashboard/SetupProgressCard";
 import { MotionSection } from "@/components/dashboard/MotionSection";
 import { CredentialDesyncCheck } from "@/components/dashboard/CredentialDesyncCheck";
+import {
+  computeSetupSteps,
+  readSetupDismissed,
+  setupAllComplete,
+} from "@/lib/setup-steps";
 
 export const metadata: Metadata = {
   title: "Dashboard · PT System",
@@ -57,9 +63,28 @@ export default async function DashboardPage() {
     : null;
 
   const showTour = user.first_login_completed === false;
+  // onboarding_completed === false explicitly means the backend has the
+  // field and the member hasn't dismissed yet. `undefined` (older backend
+  // builds) also surfaces the modal — the client-side localStorage hint
+  // then keeps reloads from re-triggering it.
+  const showWelcome = user.onboarding_completed !== true;
+
+  const setupSteps = computeSetupSteps(user);
+  const setupDismissed =
+    user.setup_progress_dismissed === true || (await readSetupDismissed());
+  const showSetup = !setupAllComplete(setupSteps);
 
   return (
     <main id="main" className="space-y-8 sm:space-y-6">
+      {showSetup && (
+        <MotionSection delay={0.01}>
+          <SetupProgressCard
+            steps={setupSteps}
+            initiallyDismissed={setupDismissed}
+          />
+        </MotionSection>
+      )}
+
       <MotionSection delay={0.02}>
         <MemberStatsCards
           btcPrice={initialBtcPrice}
@@ -73,6 +98,7 @@ export default async function DashboardPage() {
         <AvenChat
           initialMessages={history.messages}
           initialHasOlder={history.hasMore}
+          displayName={user.display_name}
         />
       </MotionSection>
 
@@ -88,7 +114,11 @@ export default async function DashboardPage() {
         <TradesGrid initial={initialTrades} />
       </MotionSection>
 
-      {showTour && <SpotlightTour displayName={user.display_name ?? null} />}
+      <OnboardingExperience
+        displayName={user.display_name ?? null}
+        showWelcome={showWelcome}
+        showTour={showTour}
+      />
 
       {/* Round-13b: production hit a false-positive where /api/auth/me
           reported `binance_api_key_connected: true` for a user with no
