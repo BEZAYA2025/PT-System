@@ -23,10 +23,11 @@ interface Props {
   tier: string | null | undefined;
   notifications: NotificationItem[];
   unreadCount: number;
-  /** Founder-only affordance. UserPill renders an Admin shortcut and
-   *  the mobile drawer adds the same row. Defaults to false so non-
-   *  founders never see the link even if the prop is ever omitted. */
-  showAdminLink?: boolean;
+  /** Founder-only state. Drives the FOUNDER badge styling in UserPill
+   *  and surfaces an Admin shortcut in both the user-pill dropdown and
+   *  the mobile drawer. Defaults to false so non-founders never see
+   *  founder-only chrome. */
+  isFounder?: boolean;
 }
 
 export function DashboardHeader({
@@ -35,7 +36,7 @@ export function DashboardHeader({
   tier,
   notifications,
   unreadCount,
-  showAdminLink = false,
+  isFounder = false,
 }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -79,7 +80,7 @@ export function DashboardHeader({
             displayName={displayName}
             email={email}
             tier={tier}
-            showAdminLink={showAdminLink}
+            isFounder={isFounder}
           />
         </div>
 
@@ -115,11 +116,11 @@ export function DashboardHeader({
           </p>
           <p className="text-xs text-muted-foreground">{email}</p>
           <div className="mt-4 grid gap-2">
-            {showAdminLink && (
+            {isFounder && (
               <Link
                 href="/admin"
                 onClick={() => setMobileOpen(false)}
-                className="inline-flex items-center gap-2 rounded-lg border border-emerald/30 bg-emerald/[0.06] px-3 py-2 text-sm font-medium text-emerald"
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-sm font-medium text-amber-300"
               >
                 <IconShield size={16} stroke={1.75} />
                 Admin

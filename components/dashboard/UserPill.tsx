@@ -13,9 +13,10 @@ interface Props {
   displayName: string;
   email: string;
   tier: string | null | undefined;
-  /** Founder-only Admin shortcut. Off by default; the dashboard layout
-   *  flips it on for accounts that pass the isFounder check. */
-  showAdminLink?: boolean;
+  /** When true, the badge reads "FOUNDER" (gold), the avatar uses an
+   *  amber gradient, and an Admin shortcut sits at the top of the
+   *  dropdown. The dashboard layout sets this from isFounder(user). */
+  isFounder?: boolean;
 }
 
 function getInitials(name: string): string {
@@ -35,7 +36,7 @@ function tierLabel(tier: string | null | undefined): string {
   return "Member";
 }
 
-export function UserPill({ displayName, email, tier, showAdminLink = false }: Props) {
+export function UserPill({ displayName, email, tier, isFounder = false }: Props) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -56,8 +57,11 @@ export function UserPill({ displayName, email, tier, showAdminLink = false }: Pr
   }, [open]);
 
   const initials = getInitials(displayName);
-  const tLabel = tierLabel(tier);
-  const isVip = (tier ?? "").toLowerCase() === "vip";
+  // Founder badge wins over every tier — it reflects the platform role,
+  // not the subscription. VIP styling stays as the fallback so a
+  // non-founder VIP member still sees the emerald gradient pill.
+  const badgeLabel = isFounder ? "Founder" : tierLabel(tier);
+  const isVip = !isFounder && (tier ?? "").toLowerCase() === "vip";
 
   const handleSignOut = async () => {
     try {
@@ -80,9 +84,11 @@ export function UserPill({ displayName, email, tier, showAdminLink = false }: Pr
           aria-hidden
           className={[
             "inline-flex size-8 shrink-0 items-center justify-center rounded-full font-mono text-xs font-semibold",
-            isVip
-              ? "bg-gradient-to-br from-emerald to-emerald-hover text-background shadow-[0_0_16px_-6px_rgba(16,185,129,0.6)]"
-              : "bg-emerald/[0.12] text-emerald",
+            isFounder
+              ? "bg-gradient-to-br from-amber-300 to-amber-500 text-background shadow-[0_0_16px_-6px_rgba(251,191,36,0.7)]"
+              : isVip
+                ? "bg-gradient-to-br from-emerald to-emerald-hover text-background shadow-[0_0_16px_-6px_rgba(16,185,129,0.6)]"
+                : "bg-emerald/[0.12] text-emerald",
           ].join(" ")}
         >
           {initials}
@@ -94,10 +100,14 @@ export function UserPill({ displayName, email, tier, showAdminLink = false }: Pr
           <span
             className={[
               "block font-mono text-[9px] uppercase tracking-[0.12em]",
-              isVip ? "text-emerald" : "text-muted-foreground",
+              isFounder
+                ? "text-amber-300"
+                : isVip
+                  ? "text-emerald"
+                  : "text-muted-foreground",
             ].join(" ")}
           >
-            {tLabel}
+            {badgeLabel}
           </span>
         </span>
         <IconChevronDown
@@ -125,14 +135,18 @@ export function UserPill({ displayName, email, tier, showAdminLink = false }: Pr
             <p
               className={[
                 "mt-1.5 inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider",
-                isVip ? "text-emerald" : "text-muted-foreground",
+                isFounder
+                  ? "text-amber-300"
+                  : isVip
+                    ? "text-emerald"
+                    : "text-muted-foreground",
               ].join(" ")}
             >
-              {tLabel}
+              {badgeLabel}
             </p>
           </div>
           <div className="p-1">
-            {showAdminLink && (
+            {isFounder && (
               <Link
                 href="/admin"
                 role="menuitem"
