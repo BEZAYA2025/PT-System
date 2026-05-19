@@ -68,17 +68,22 @@ export function Hero({ isAuthed = false }: { isAuthed?: boolean }) {
               </Link>
             </>
           ) : (
-            // Single CTA — the waitlist option was dropped so members
-            // land on Pricing → Subscribe with no decoy alternative.
-            <Link
-              href="/pricing"
-              className="inline-flex h-12 items-center justify-center rounded-full bg-emerald px-8 text-sm font-medium text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
-            >
-              Subscribe now
-            </Link>
+            // Single CTA — the waitlist option was dropped so visitors
+            // land on Pricing → trial signup with no decoy alternative.
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/pricing"
+                className="inline-flex h-12 items-center justify-center rounded-full bg-emerald px-8 text-sm font-medium text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
+              >
+                Start free trial
+              </Link>
+              <p className="text-center text-xs text-muted-foreground">
+                14 days free · no credit card needed
+              </p>
+            </div>
           )}
         </motion.div>
-        <motion.div {...fade(0.65)} className="mt-6">
+        <motion.div {...fade(0.65)} className="mt-8">
           <Link
             href="#what-is"
             className="text-sm font-medium text-foreground/70 underline-offset-4 transition-colors hover:text-foreground hover:underline"

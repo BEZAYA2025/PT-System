@@ -1,43 +1,14 @@
-import type { Metadata } from "next";
-import { redirect } from "next/navigation";
-import { WaitlistForm } from "@/components/WaitlistForm";
-import { SiteHeader } from "@/components/sections/SiteHeader";
-import { Footer } from "@/components/sections/Footer";
-import { getCurrentUser } from "@/lib/dal";
+import { permanentRedirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Join the Waitlist",
-  description:
-    "Sign up for the PT System waitlist. We'll reach out when Beta opens.",
-  alternates: { canonical: "/signup" },
-};
+// Round-37: /signup was the legacy "Join the waitlist" landing page
+// before the platform shipped. All marketing CTAs now point to
+// /pricing, where visitors pick a tier and start the 14-day free
+// trial. Existing inbound links to /signup (bookmarks, old email,
+// pricing-page tier CTAs that still carry `?plan=…` query strings
+// for the eventual checkout flow) get 308'd to /pricing. When the
+// real trial-signup / Stripe-checkout flow is built, this redirect
+// comes off and the page is rebuilt at /signup.
 
-export const dynamic = "force-dynamic";
-
-export default async function SignupPage() {
-  const user = await getCurrentUser();
-  if (user) redirect("/dashboard");
-
-  return (
-    <>
-      <SiteHeader />
-      <main id="main" className="flex-1 px-6 py-16 sm:py-24">
-        <div className="mx-auto w-full max-w-xl">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Join the PT System Waitlist
-            </h1>
-            <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-              We&apos;ll reach out when Beta opens.
-            </p>
-          </div>
-
-          <div className="mt-12">
-            <WaitlistForm />
-          </div>
-        </div>
-      </main>
-      <Footer />
-    </>
-  );
+export default function SignupRedirect(): never {
+  permanentRedirect("/pricing");
 }

@@ -61,10 +61,10 @@ export async function SiteHeader() {
                 Sign in
               </Link>
               <Link
-                href="/signup"
+                href="/pricing"
                 className="inline-flex h-9 items-center justify-center rounded-full bg-emerald px-4 text-sm font-medium text-background transition-colors hover:bg-emerald-hover sm:h-10 sm:px-5"
               >
-                Start Free Trial
+                Start free trial
               </Link>
             </>
           )}

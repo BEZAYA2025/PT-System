@@ -85,11 +85,11 @@ export function SiteHeaderMobileMenu({ isAuthed }: { isAuthed: boolean }) {
                 Sign in
               </Link>
               <Link
-                href="/signup"
+                href="/pricing"
                 onClick={() => setOpen(false)}
                 className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-base font-medium text-background transition-colors hover:bg-emerald-hover"
               >
-                Start Free Trial
+                Start free trial
               </Link>
             </>
           )}
