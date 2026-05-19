@@ -450,7 +450,12 @@ function TierCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tier,
-          interval: cadence === "monthly" ? "month" : "year",
+          // Backend contract: `interval` must be exactly the strings
+          // "monthly" or "yearly" (lowercase, no trim). `cadence` is
+          // already typed as that exact union — pass it straight
+          // through. The fallback `?? "monthly"` is defensive in
+          // case the union ever widens to allow undefined.
+          interval: cadence ?? "monthly",
           ...(applies && promo ? { code: promo.code } : {}),
         }),
       });
