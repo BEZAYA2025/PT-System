@@ -24,15 +24,19 @@ type Phase = "idle" | "setup" | "discipline";
 
 const PHASE_ORDER: ReadonlyArray<Phase> = ["idle", "setup", "discipline"];
 
-// Round-39: another ~15% trim on hold times. Round-38 was 4.5 / 12 /
-// 8s ≈ 26s loop; now 3.8 / 10.2 / 6.8s ≈ 22s loop including the
-// shorter inter-phase pause. Cross-fade durations stay at 0.3s
-// each — only hold time and the pause shrink, the transitions
-// themselves don't get rushed.
+// Round-40: narrowed trim on just the post-content tails of phase 2
+// and phase 3. Phase 1 → 2 transition was fine; phase 2 → 3 (idle
+// time after Aven's setup answer + chart finishes drawing) and
+// phase 3 → 1 (idle time after Aven's discipline answer) felt too
+// long, so those two phase durations shrink:
+//   setup       10.2 → 9.5s    (tail 2.1s → 1.4s, ~33% shorter)
+//   discipline   6.8 → 5.8s    (tail 2.9s → 1.9s, ~34% shorter)
+// idle stays at 3.8s. Cross-fade durations + per-phase hold time on
+// each individual bubble are unchanged.
 const PHASE_DURATION_MS: Record<Phase, number> = {
   idle: 3800,
-  setup: 10200,
-  discipline: 6800,
+  setup: 9500,
+  discipline: 5800,
 };
 
 const PHASE_EXIT_S = 0.3;
