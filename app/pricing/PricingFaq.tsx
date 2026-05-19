@@ -11,27 +11,19 @@ interface QA {
 const FAQ: ReadonlyArray<QA> = [
   {
     q: "What happens after the 14-day trial?",
-    a: "After 14 days, you'll be charged your selected plan automatically. You can cancel anytime from your dashboard before the trial ends — no charge.",
-  },
-  {
-    q: "Can I switch between Standard and VIP?",
-    a: "Yes. Upgrade or downgrade anytime from your dashboard. Changes take effect at the next billing cycle.",
-  },
-  {
-    q: "Which exchanges do you support?",
-    a: "Binance, Bybit, OKX, Bitget, Kucoin, MEXC, Gate.io, Bitunix, and Hyperliquid. PT System uses read-only API keys — your funds stay on your exchange.",
+    a: "After 14 days, you'll be charged your selected plan automatically. Cancel anytime from your dashboard before the trial ends — no charge.",
   },
   {
     q: "What's the difference between Standard and VIP?",
-    a: "Standard gives you everything you need to trade with Aven daily. VIP unlocks unlimited Aven chat, deeper reasoning, full setup-scanner access, priority response times, and exclusive on-chain data.",
-  },
-  {
-    q: "Is this financial advice?",
-    a: "No. PT System is educational content and a mentorship tool. We do not provide financial, investment, or trading advice. Trading futures involves substantial risk.",
+    a: "Standard focuses everything on Bitcoin — daily briefings, setup alerts, Aven analysis. VIP unlocks all major coins, unlimited Aven chat, deeper reasoning, and on-chain data. Both tiers show you Paul's full trade activity.",
   },
   {
     q: "How do I cancel?",
-    a: "Cancel anytime from your dashboard settings. No questions asked, no retention emails.",
+    a: "Anytime from your dashboard settings. No questions asked.",
+  },
+  {
+    q: "Is this financial advice?",
+    a: "No. PT System provides educational content and mentorship tools. It does not constitute financial, investment, or trading advice. Trading futures involves substantial risk.",
   },
 ];
 

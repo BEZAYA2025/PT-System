@@ -33,26 +33,32 @@ const PRICES: Record<TierId, Record<Cadence, number>> = {
   vip: { monthly: 299, yearly: 2990 },
 };
 
+// Round-33 feature lists — tightened to six bullets each, BTC-only
+// for Standard, major-coins coverage for VIP. No "BTC + ETH"
+// mentions anywhere; ETH only shows up incidentally as part of
+// Paul's trade activity (which Standard members also see).
 const STANDARD_FEATURES: ReadonlyArray<string> = [
-  "Aven Chat (Web + Telegram) — 50 messages / day",
-  "Daily Briefings, multi-timeframe analyzed",
-  "Top Setup-Scanner alerts (score 7–10)",
-  "Paul's trades visible (entry, exit, ROI, reasoning)",
-  "Your trades tracked + analyzed",
-  "Annotated charts in chat",
-  "Voice mode with Aven",
-  "Live observations stream",
-  "All 9 exchanges supported",
-  "BTC + ETH focus",
+  "Aven AI Chat — 50 messages a day",
+  "Daily briefing on Bitcoin",
+  "Bitcoin setup alerts with confluence scoring",
+  "Paul's full trade activity, fully visible",
+  "Voice messages + annotated charts in chat",
+  "Connect any of 9 exchanges (read-only)",
 ];
 
 const VIP_EXTRAS: ReadonlyArray<{ emoji: string; label: string }> = [
-  { emoji: "⚡", label: "Aven Chat — UNLIMITED messages" },
-  { emoji: "🧠", label: "Aven Deep-Mode (longer reasoning, more confluence)" },
-  { emoji: "🎯", label: "Full Setup-Scanner (all setups, custom filterable)" },
-  { emoji: "⏩", label: "Priority Aven response-times" },
-  { emoji: "🔗", label: "On-Chain data insights (CryptoQuant)" },
-  { emoji: "🚀", label: "Early access to new features (1–2 weeks ahead)" },
+  { emoji: "⚡", label: "Unlimited Aven AI Chat" },
+  {
+    emoji: "🌐",
+    label: "Full coverage — all major coins, not just Bitcoin",
+  },
+  {
+    emoji: "🧠",
+    label: "Aven Deep-Mode — richer setup reasoning, more confluence sources",
+  },
+  { emoji: "⏩", label: "Priority Aven response times" },
+  { emoji: "🔗", label: "On-chain data insights" },
+  { emoji: "🚀", label: "Early access to new features" },
 ];
 
 const TIER_LABEL: Record<TierId, string> = {
@@ -143,19 +149,11 @@ export function PricingPlans() {
     <section className="mt-10 sm:mt-12">
       <CadenceToggle cadence={cadence} onChange={setCadence} />
 
-      <PromoInput
-        code={code}
-        setCode={setCode}
-        promo={promo}
-        onApply={applyCode}
-        onClear={clearPromo}
-      />
-
-      <div className="mt-10 grid gap-6 sm:mt-12 lg:grid-cols-2 lg:gap-8">
+      <div className="mt-10 grid gap-6 sm:mt-14 lg:grid-cols-2 lg:gap-8">
         <TierCard
           tier="standard"
           title="Aven Standard"
-          subtitle="For active traders"
+          subtitle="For active BTC traders"
           cadence={cadence}
           promo={activePromo}
           features={STANDARD_FEATURES}
@@ -163,14 +161,25 @@ export function PricingPlans() {
         <TierCard
           tier="vip"
           title="Aven VIP"
-          subtitle="For serious traders who want everything"
+          subtitle="For traders who want it all"
           cadence={cadence}
           promo={activePromo}
-          features={STANDARD_FEATURES}
+          features={null}
           vipExtras={VIP_EXTRAS}
           recommended
         />
       </div>
+
+      {/* Round-33: promo input back under the cards. Toggle + cards
+          are the two things visitors compare side-by-side; the code
+          input is supporting copy that follows. */}
+      <PromoInput
+        code={code}
+        setCode={setCode}
+        promo={promo}
+        onApply={applyCode}
+        onClear={clearPromo}
+      />
     </section>
   );
 }
@@ -373,7 +382,9 @@ function TierCard({
   subtitle: string;
   cadence: Cadence;
   promo: ValidPromo | null;
-  features: ReadonlyArray<string>;
+  // Standard passes its 6-bullet list; VIP passes `null` and shows
+  // only the "Everything in Standard, plus" prefix + its extras.
+  features: ReadonlyArray<string> | null;
   vipExtras?: ReadonlyArray<{ emoji: string; label: string }>;
   recommended?: boolean;
 }) {
@@ -462,7 +473,7 @@ function TierCard({
       </p>
 
       <ul className="mt-8 space-y-3 border-t border-border pt-7">
-        {features.map((f) => (
+        {features?.map((f) => (
           <li key={f} className="flex items-start gap-2.5">
             <IconCheck
               size={14}
@@ -477,7 +488,12 @@ function TierCard({
         ))}
         {vipExtras && (
           <>
-            <li className="pt-3 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald/85">
+            <li
+              className={[
+                "font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald/85",
+                features ? "pt-3" : "",
+              ].join(" ")}
+            >
               Everything in Standard, plus:
             </li>
             {vipExtras.map((x) => (
