@@ -180,3 +180,45 @@ export async function fetchAdminSystemHealth(): Promise<SystemHealthResponse | n
   }
   return { services, overall };
 }
+
+export interface DiscountCode {
+  id: string;
+  code: string;
+  /** Percentage (1-100) when discount_type === "percent", else absolute USD. */
+  discount_value?: number | null;
+  discount_type?: "percent" | "fixed" | string | null;
+  /** "once" | "forever" | "repeating" (with `duration_in_months` set). */
+  duration?: "once" | "forever" | "repeating" | string | null;
+  duration_in_months?: number | null;
+  uses?: number | null;
+  redemptions?: number | null;
+  max_uses?: number | null;
+  max_redemptions?: number | null;
+  status?: "active" | "disabled" | string | null;
+  active?: boolean;
+  created_at?: string | null;
+  expires_at?: string | null;
+}
+
+export interface DiscountCodesResponse {
+  codes: DiscountCode[];
+}
+
+export async function fetchAdminDiscountCodes(): Promise<DiscountCodesResponse | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>("/api/admin/discount-codes", {
+    method: "GET",
+    token,
+  });
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return { codes: d as DiscountCode[] };
+  if (d && typeof d === "object") {
+    const list =
+      (d as { codes?: unknown }).codes ??
+      (d as { discount_codes?: unknown }).discount_codes;
+    if (Array.isArray(list)) return { codes: list as DiscountCode[] };
+  }
+  return { codes: [] };
+}
