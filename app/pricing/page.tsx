@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { SiteHeader } from "@/components/sections/SiteHeader";
 import { Footer } from "@/components/sections/Footer";
 import { PricingPlans } from "./PricingPlans";
@@ -42,22 +41,6 @@ export default function PricingPage() {
           <PricingPlans />
 
           <PricingFaq />
-
-          {/* Bottom CTA — final push, centred. */}
-          <section className="mx-auto mt-24 max-w-xl text-center sm:mt-32">
-            <h2 className="text-3xl font-semibold leading-[1.1] tracking-tight text-foreground sm:text-4xl">
-              Try Aven free for 14 days.
-            </h2>
-            <p className="mt-4 text-base text-muted-foreground sm:text-lg">
-              No credit card needed. Cancel anytime.
-            </p>
-            <Link
-              href="/signup"
-              className="mt-8 inline-flex h-14 items-center justify-center rounded-full bg-emerald px-10 text-base font-semibold text-background transition-colors duration-200 hover:bg-emerald-hover focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald"
-            >
-              Start Free Trial
-            </Link>
-          </section>
 
           {/* Risk disclaimer — small, deliberate, mandatory. */}
           <p className="mx-auto mt-20 max-w-3xl text-center text-xs leading-relaxed text-muted-foreground/70 sm:mt-24">

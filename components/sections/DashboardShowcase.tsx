@@ -24,20 +24,20 @@ type Phase = "idle" | "setup" | "discipline";
 
 const PHASE_ORDER: ReadonlyArray<Phase> = ["idle", "setup", "discipline"];
 
-// Round-38: ~25% snappier hold times across all phases and a tighter
-// inter-phase pause. Was 6 / 16 / 11s = 33s total. Now 4.5 / 12 /
-// 8s = ~24.5s total content, ~26s full loop including transitions.
-// Cross-fade durations stay at 0.3s each (smooth, not jumpy); only
-// the inter-phase pause and the per-phase hold time shrink.
+// Round-39: another ~15% trim on hold times. Round-38 was 4.5 / 12 /
+// 8s ≈ 26s loop; now 3.8 / 10.2 / 6.8s ≈ 22s loop including the
+// shorter inter-phase pause. Cross-fade durations stay at 0.3s
+// each — only hold time and the pause shrink, the transitions
+// themselves don't get rushed.
 const PHASE_DURATION_MS: Record<Phase, number> = {
-  idle: 4500,
-  setup: 12000,
-  discipline: 8000,
+  idle: 3800,
+  setup: 10200,
+  discipline: 6800,
 };
 
 const PHASE_EXIT_S = 0.3;
 const PHASE_ENTER_S = 0.3;
-const PHASE_GAP_S = 0.15;
+const PHASE_GAP_S = 0.13;
 
 const PHASE_LABELS: Record<Phase, string> = {
   idle: "Live dashboard",
@@ -651,22 +651,23 @@ function ChatInputBar() {
 // ---------------------------------------------------------------------------
 
 function SetupConversation({ reduce }: { reduce: boolean }) {
-  // Round-38: every delay scaled 0.75× to match the shorter 12s
-  // phase. Same beat structure, just less hold time between events.
+  // Round-39: every delay scaled another 0.85× on top of round-38's
+  // 0.75×. Net effect vs the original: ~0.64×. Same beat structure,
+  // just shorter hold between events.
   const d = reduce
     ? { memberTyping: 0, memberMsg: 0, avenThinking: 0, avenMsg: 0, chartIn: 0 }
     : {
-        memberTyping: 0.3,
-        memberMsg: 1.2,
-        avenThinking: 2.0,
-        avenMsg: 3.0,
-        chartIn: 4.2,
+        memberTyping: 0.25,
+        memberMsg: 1.0,
+        avenThinking: 1.7,
+        avenMsg: 2.5,
+        chartIn: 3.6,
       };
 
   return (
     <>
       {!reduce && (
-        <FadingTypingDots align="right" delay={d.memberTyping} duration={1.0} />
+        <FadingTypingDots align="right" delay={d.memberTyping} duration={0.85} />
       )}
       <MemberBubble
         text="BTC bouncing off 78.5k — does the setup hold?"
@@ -674,7 +675,7 @@ function SetupConversation({ reduce }: { reduce: boolean }) {
         delay={d.memberMsg}
       />
       {!reduce && (
-        <FadingTypingDots align="left" delay={d.avenThinking} duration={1.2} />
+        <FadingTypingDots align="left" delay={d.avenThinking} duration={1.0} />
       )}
       <AvenBubble
         score={8}
@@ -689,21 +690,21 @@ function SetupConversation({ reduce }: { reduce: boolean }) {
 }
 
 function DisciplineConversation() {
-  // 8s phase budget — same 0.75× scaling on every delay.
+  // 6.8s phase budget — same 0.85× round-39 scaling.
   return (
     <>
-      <FadingTypingDots align="right" delay={1.4} duration={0.75} />
+      <FadingTypingDots align="right" delay={1.2} duration={0.65} />
       <MemberBubble
         text="My long is down 2%, should I cut or hold?"
         ts="14:08"
-        delay={2.1}
+        delay={1.8}
       />
-      <FadingTypingDots align="left" delay={2.9} duration={1.0} />
+      <FadingTypingDots align="left" delay={2.5} duration={0.85} />
       <AvenBubble
         intro="Entry was solid — 8/10 setup. SL at $74,500 still valid (12% from current). RSI 1H at 32 — historical bounce zone."
         body="The thesis hasn't broken. Discipline check: are you reacting to price or to your plan?"
         ts="14:09"
-        delay={3.9}
+        delay={3.3}
       />
     </>
   );

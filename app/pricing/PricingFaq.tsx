@@ -8,22 +8,31 @@ interface QA {
   a: string;
 }
 
+// Round-39 FAQ — re-ordered to follow the funnel: cost → security →
+// coverage → exit → legal. The Standard-vs-VIP question was dropped
+// (already on the cards directly above); two new entries replace it
+// to address the two questions members actually ask before
+// connecting an exchange API key.
 const FAQ: ReadonlyArray<QA> = [
   {
-    q: "What happens after the 14-day trial?",
-    a: "After 14 days, you'll be charged your selected plan automatically. Cancel anytime from your dashboard before the trial ends — no charge.",
+    q: "Do I need to pay anything to start the trial?",
+    a: "No. Start your 14-day free trial with no payment details. If you decide to continue after the trial, you'll add payment then. If not, access simply ends — no surprise charges.",
   },
   {
-    q: "What's the difference between Standard and VIP?",
-    a: "Standard focuses everything on Bitcoin — daily briefings, setup alerts, Aven analysis. VIP unlocks all major coins, unlimited Aven chat, Deep-Mode reasoning, personal coaching with weekly reviews, and advanced risk management. Both tiers show you Paul's full trade activity.",
+    q: "Is my exchange account safe?",
+    a: "Yes. PT System connects to your exchange via read-only API keys. We can see your trade data but cannot move funds, place trades, or withdraw. Your funds always stay on your exchange.",
+  },
+  {
+    q: "Which coins does PT System analyze?",
+    a: "Standard focuses on Bitcoin. VIP covers all major coins (BTC, ETH, SOL, and other top altcoins). Paul's full trade activity — across all coins — is visible in both tiers.",
   },
   {
     q: "How do I cancel?",
-    a: "Anytime from your dashboard settings. No questions asked.",
+    a: "Anytime from your dashboard settings. No retention process, no questions asked.",
   },
   {
     q: "Is this financial advice?",
-    a: "No. PT System provides educational content and mentorship tools. It does not constitute financial, investment, or trading advice. Trading futures involves substantial risk.",
+    a: "No. PT System provides educational content and mentorship tools only. It does not constitute financial, investment, or trading advice. Trading cryptocurrency futures involves substantial risk.",
   },
 ];
 
