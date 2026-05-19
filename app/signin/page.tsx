@@ -9,7 +9,7 @@ import { getCurrentUser } from "@/lib/dal";
 
 export const metadata: Metadata = {
   title: "Sign In · PT System",
-  description: "Sign in to the PT System member cockpit.",
+  description: "Sign in to the PT System member dashboard.",
   alternates: { canonical: "/signin" },
 };
 
@@ -26,10 +26,11 @@ export default async function SignInPage() {
         <div className="mx-auto w-full max-w-md">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              Sign in to PT System
+              Sign in
             </h1>
             <p className="mt-3 text-base text-muted-foreground">
-              Welcome back. Access your cockpit, briefings, and trades.
+              Welcome back. Access your dashboard, briefings, and
+              trades.
             </p>
           </div>
 
@@ -39,13 +40,13 @@ export default async function SignInPage() {
             </Suspense>
           </div>
 
-          <p className="mt-8 text-sm text-muted-foreground">
-            Don&apos;t have an account yet?{" "}
+          <p className="mt-8 text-center text-sm text-muted-foreground">
+            Don&apos;t have an account?{" "}
             <Link
               href="/pricing"
-              className="font-medium text-foreground transition-colors hover:text-emerald"
+              className="font-medium text-emerald transition-colors hover:text-emerald-hover"
             >
-              View pricing
+              Start free trial →
             </Link>
           </p>
         </div>

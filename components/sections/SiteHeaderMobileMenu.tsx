@@ -57,12 +57,12 @@ export function SiteHeaderMobileMenu({ isAuthed }: { isAuthed: boolean }) {
             <>
               <SignOutButton
                 label="Sign out"
-                className="inline-flex w-full items-center rounded-lg px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-surface disabled:opacity-60"
+                className="inline-flex w-full items-center rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface disabled:opacity-60"
               />
               <Link
                 href="/dashboard"
                 onClick={() => setOpen(false)}
-                className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-base font-medium text-background transition-colors hover:bg-emerald-hover"
+                className="inline-flex items-center justify-center rounded-full bg-emerald px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-emerald-hover"
               >
                 Open Dashboard
               </Link>
@@ -72,14 +72,14 @@ export function SiteHeaderMobileMenu({ isAuthed }: { isAuthed: boolean }) {
               <Link
                 href="/signin"
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-4 py-3 text-base font-medium text-foreground transition-colors hover:bg-surface"
+                className="rounded-lg px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-surface"
               >
                 Sign in
               </Link>
               <Link
                 href="/pricing"
                 onClick={() => setOpen(false)}
-                className="inline-flex items-center justify-center rounded-full bg-emerald px-6 py-3 text-base font-medium text-background transition-colors hover:bg-emerald-hover"
+                className="inline-flex items-center justify-center rounded-full bg-emerald px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-emerald-hover"
               >
                 Start free trial
               </Link>

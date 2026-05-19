@@ -11,9 +11,9 @@ import { BrandLogo } from "@/components/dashboard/BrandLogo";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border px-6 py-12 sm:py-16">
+    <footer className="border-t border-border px-6 py-10 sm:py-16">
       <div className="mx-auto max-w-6xl">
-        <div className="grid gap-10 sm:grid-cols-3 sm:gap-12">
+        <div className="grid gap-6 sm:grid-cols-3 sm:gap-12">
           <FooterBrand />
           <FooterColumn
             title="Product"
@@ -38,8 +38,10 @@ export function Footer() {
         {/* Bottom bar — three lines, smaller text. Lines 1 and 2 use
             the standard muted-foreground; line 3 (the risk
             disclaimer) goes a touch dimmer (muted/70) so it reads as
-            mandatory fine print rather than headline copy. */}
-        <div className="mt-12 space-y-2 border-t border-border pt-8 text-xs leading-relaxed text-muted-foreground sm:mt-16">
+            mandatory fine print rather than headline copy. Tighter
+            line-height + smaller mt on mobile so the footer doesn't
+            feel endless on phones. */}
+        <div className="mt-8 space-y-1.5 border-t border-border pt-5 text-xs leading-snug text-muted-foreground sm:mt-16 sm:space-y-2 sm:pt-8 sm:leading-relaxed">
           <p>PT System is a product of Fortex Media Ltd.</p>
           <p>© 2026 PT System. All rights reserved.</p>
           <p className="text-muted-foreground/70">
@@ -69,8 +71,10 @@ function FooterBrand() {
         Aven · Your AI trading mentor.
       </p>
       {/* Reserved space for the future social-icon row — kept so the
-          column rhythm stays the same when those icons land. */}
-      <div aria-hidden className="mt-5 h-8" />
+          column rhythm stays the same when those icons land. Hidden
+          on mobile so the brand block doesn't leave a 32px hole at
+          the top of the stack. */}
+      <div aria-hidden className="hidden h-8 sm:mt-5 sm:block" />
     </div>
   );
 }

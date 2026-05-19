@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -119,8 +120,13 @@ export function SignInForm() {
             {errors.password.message}
           </p>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">
-          Forgot password? Reset flow opens with Phase 2.5.
+        <p className="mt-2 text-right text-xs">
+          <Link
+            href="/forgot-password"
+            className="text-muted-foreground transition-colors hover:text-emerald"
+          >
+            Forgot password?
+          </Link>
         </p>
       </div>
 
