@@ -79,9 +79,9 @@ export function SiteHeaderMobileMenu({ isAuthed }: { isAuthed: boolean }) {
               <Link
                 href="/pricing"
                 onClick={() => setOpen(false)}
-                className="inline-flex items-center justify-center rounded-full bg-emerald px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-emerald-hover"
+                className="inline-flex w-fit items-center justify-center rounded-full bg-emerald px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-emerald-hover"
               >
-                Start free trial
+                Start trial
               </Link>
             </>
           )}
