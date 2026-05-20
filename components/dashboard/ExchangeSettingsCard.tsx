@@ -23,6 +23,7 @@ import {
   formatExchangeLabel,
   type ExchangeId,
 } from "@/lib/exchanges";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
@@ -86,6 +87,7 @@ export function ExchangeSettingsCard({
   invalidSince?: string | null;
 }) {
   const router = useRouter();
+  const { active: impersonating } = useImpersonation();
   const [modalOpen, setModalOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -206,6 +208,7 @@ export function ExchangeSettingsCard({
             onConnect={() => setModalOpen(true)}
             onRelink={() => setModalOpen(true)}
             onDisconnect={() => setConfirming(true)}
+            disabled={impersonating}
           />
         ) : (
           <div className="mt-6 rounded-lg border border-red-500/30 bg-red-500/[0.04] p-4">
@@ -382,9 +385,11 @@ function ActionRow({
   onConnect,
   onRelink,
   onDisconnect,
+  disabled = false,
 }: {
   status: CredentialStatus;
   onConnect: () => void;
+  disabled?: boolean;
   onRelink: () => void;
   onDisconnect: () => void;
 }) {
@@ -396,6 +401,8 @@ function ActionRow({
         <button
           type="button"
           onClick={onConnect}
+          disabled={disabled}
+          title={disabled ? "Disabled during impersonation" : undefined}
           className={buttonSecondaryClasses}
         >
           Update key
@@ -403,7 +410,9 @@ function ActionRow({
         <button
           type="button"
           onClick={onDisconnect}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-500/[0.06] px-6 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10"
+          disabled={disabled}
+          title={disabled ? "Disabled during impersonation" : undefined}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-red-500/40 bg-red-500/[0.06] px-6 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10 disabled:opacity-60"
         >
           <IconUnlink size={15} stroke={1.75} aria-hidden />
           Disconnect
@@ -418,7 +427,9 @@ function ActionRow({
         <button
           type="button"
           onClick={onRelink}
-          className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-amber-400 px-6 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-300"
+          disabled={disabled}
+          title={disabled ? "Disabled during impersonation" : undefined}
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-amber-400 px-6 text-sm font-medium text-amber-950 transition-colors hover:bg-amber-300 disabled:opacity-60"
         >
           <IconLink size={15} stroke={1.75} aria-hidden />
           Re-link exchange
@@ -426,6 +437,8 @@ function ActionRow({
         <button
           type="button"
           onClick={onDisconnect}
+          disabled={disabled}
+          title={disabled ? "Disabled during impersonation" : undefined}
           className={buttonSecondaryClasses}
         >
           Remove instead
@@ -440,6 +453,8 @@ function ActionRow({
       <button
         type="button"
         onClick={onConnect}
+        disabled={disabled}
+        title={disabled ? "Disabled during impersonation" : undefined}
         className={buttonSecondaryClasses}
       >
         Connect exchange

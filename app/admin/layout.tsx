@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isFounder, requireUser } from "@/lib/dal";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { FetchAuthInterceptor } from "@/components/FetchAuthInterceptor";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { PageViewTracker } from "@/components/PageViewTracker";
 
@@ -23,13 +24,16 @@ export default async function AdminLayout({
   // because the redirect happens server-side before any HTML streams.
   const user = await requireUser();
   if (!isFounder(user)) {
-    redirect("/dashboard");
+    // Bounce non-founders to the dashboard with a query flash so
+    // the AccessDeniedFlash component renders a toast there.
+    redirect("/dashboard?denied=admin");
   }
 
   const displayName = user.display_name?.trim() || user.email;
 
   return (
     <>
+      <FetchAuthInterceptor />
       <ImpersonationBanner />
       <AdminShell displayName={displayName}>
         {children}

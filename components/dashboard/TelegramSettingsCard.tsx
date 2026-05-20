@@ -9,6 +9,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { Toast, type ToastState } from "@/components/Toast";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
@@ -18,6 +19,7 @@ export function TelegramSettingsCard({
   telegramUsername: string | null;
 }) {
   const router = useRouter();
+  const { active: impersonating } = useImpersonation();
   const [modalOpen, setModalOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
@@ -84,6 +86,8 @@ export function TelegramSettingsCard({
             <button
               type="button"
               onClick={() => setModalOpen(true)}
+              disabled={impersonating}
+              title={impersonating ? "Disabled during impersonation" : undefined}
               className={buttonSecondaryClasses}
             >
               {connected ? "Re-link Telegram" : "Connect Telegram"}
@@ -92,6 +96,8 @@ export function TelegramSettingsCard({
               <button
                 type="button"
                 onClick={() => setConfirming(true)}
+                disabled={impersonating}
+                title={impersonating ? "Disabled during impersonation" : undefined}
                 className="inline-flex h-12 items-center justify-center rounded-full border border-red-500/40 bg-red-500/[0.06] px-6 text-sm font-medium text-red-300 transition-colors hover:bg-red-500/10"
               >
                 Disconnect
