@@ -1,19 +1,23 @@
 import Link from "next/link";
 import {
+  IconArrowRight,
   IconClipboardCheck,
   IconCircleCheck,
   IconCircleDot,
   IconExclamationCircle,
+  IconLockSquare,
   IconPlus,
   IconUsers,
 } from "@tabler/icons-react";
 import { requireUser } from "@/lib/dal";
 import {
+  fetchAdminImpersonationSessions,
   fetchAdminMembers,
   fetchAdminMrr,
   fetchAdminPendingBriefings,
   fetchAdminSystemHealth,
   type AdminMembersListEntry,
+  type ImpersonationSession,
 } from "@/lib/admin";
 import { KPICard } from "@/components/admin/KPICard";
 
@@ -41,6 +45,15 @@ function isActive(member: AdminMembersListEntry): boolean {
   return s === "active" || s === "trialing" || s === "trial";
 }
 
+function isImpersonationActive(s: ImpersonationSession): boolean {
+  if (s.ended_at) return false;
+  if (s.expires_at) {
+    const t = Date.parse(s.expires_at);
+    if (Number.isFinite(t) && t <= Date.now()) return false;
+  }
+  return true;
+}
+
 function joinedWithinDays(member: AdminMembersListEntry, days: number): boolean {
   const raw = member.joined_at ?? member.created_at;
   if (!raw) return false;
@@ -53,12 +66,18 @@ export default async function AdminOverviewPage() {
   const user = await requireUser();
   const displayName = user.display_name?.trim() || user.email;
 
-  const [membersRes, mrrRes, pendingRes, healthRes] = await Promise.all([
-    fetchAdminMembers(),
-    fetchAdminMrr(),
-    fetchAdminPendingBriefings(),
-    fetchAdminSystemHealth(),
-  ]);
+  const [membersRes, mrrRes, pendingRes, healthRes, impSessions] =
+    await Promise.all([
+      fetchAdminMembers(),
+      fetchAdminMrr(),
+      fetchAdminPendingBriefings(),
+      fetchAdminSystemHealth(),
+      fetchAdminImpersonationSessions(),
+    ]);
+
+  const activeImpersonations = (impSessions ?? []).filter(
+    (s) => isImpersonationActive(s),
+  );
 
   const activeCount = membersRes
     ? membersRes.members.filter(isActive).length
@@ -156,6 +175,55 @@ export default async function AdminOverviewPage() {
           />
         </div>
       </section>
+
+      {activeImpersonations.length > 0 && (
+        <section
+          aria-label="Active impersonations"
+          className="rounded-2xl border border-amber-500/40 bg-amber-500/[0.05] p-5"
+        >
+          <header className="flex items-center justify-between gap-2">
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight text-amber-200">
+              <IconLockSquare size={14} stroke={2} aria-hidden />
+              Active impersonations · {activeImpersonations.length}
+            </h2>
+            <Link
+              href="/admin/impersonation-sessions"
+              className="inline-flex items-center gap-1 text-xs font-medium text-amber-200 hover:text-amber-100"
+            >
+              View all
+              <IconArrowRight size={11} stroke={2} aria-hidden />
+            </Link>
+          </header>
+          <ul className="mt-3 space-y-2">
+            {activeImpersonations.slice(0, 5).map((s) => (
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-500/20 bg-background px-3 py-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground">
+                    {s.target_member_name ??
+                      s.target_member_email ??
+                      s.target_member_id ??
+                      "—"}
+                  </p>
+                  {s.reason && (
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">
+                      {s.reason}
+                    </p>
+                  )}
+                </div>
+                <Link
+                  href="/admin/impersonation-sessions"
+                  className="font-mono text-[10px] uppercase tracking-wider text-amber-200 hover:text-amber-100"
+                >
+                  Manage →
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section aria-label="Quick actions">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">

@@ -299,6 +299,39 @@ export interface MemberInvoice {
   invoice_pdf?: string | null;
 }
 
+export interface ImpersonationSession {
+  id: string;
+  admin_id?: string | null;
+  target_member_id?: string | null;
+  target_member_email?: string | null;
+  target_member_name?: string | null;
+  started_at?: string | null;
+  expires_at?: string | null;
+  ended_at?: string | null;
+  reason?: string | null;
+}
+
+export async function fetchAdminImpersonationSessions(): Promise<
+  ImpersonationSession[] | null
+> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>(
+    "/api/admin/impersonation-sessions",
+    { method: "GET", token },
+  );
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as ImpersonationSession[];
+  if (d && typeof d === "object") {
+    const arr =
+      (d as { sessions?: unknown }).sessions ??
+      (d as { items?: unknown }).items;
+    if (Array.isArray(arr)) return arr as ImpersonationSession[];
+  }
+  return [];
+}
+
 export interface MemberTradeStats {
   total_count?: number | null;
   win_rate?: number | null;
