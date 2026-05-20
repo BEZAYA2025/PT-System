@@ -175,7 +175,13 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             detail={
               member.telegram_username
                 ? `@${member.telegram_username}`
-                : null
+                : member.telegram_connected
+                  ? // Backend §25 Auftrag G: telegram_username is always
+                    // null — the Bot API only ships chat_id, never the
+                    // human handle. Surface that explicitly so the
+                    // founder isn't left wondering.
+                    "Linked, username unknown"
+                  : null
             }
           />
           <ConnectionRow
@@ -185,8 +191,9 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             detail={
               exchangeConnected
                 ? `${member.exchange_type ?? "Connected"}${
-                    member.binance_api_key_added_at
-                      ? ` · since ${formatDate(member.binance_api_key_added_at)}`
+                    (member.exchange_api_added_at ??
+                      member.binance_api_key_added_at)
+                      ? ` · since ${formatDate(member.exchange_api_added_at ?? member.binance_api_key_added_at)}`
                       : ""
                   }`
                 : null

@@ -142,10 +142,12 @@ export function TrainAvenFeedbackTab() {
     };
   }, []);
 
+  // Backend §25 Auftrag G: body key is `feedback_type` (not `type`)
+  // and accepts `improved_response` alongside `comment`.
   const sendFeedback = async (
     item: ReviewItem,
-    type: "correct" | "drift" | "improve",
-    body: { comment?: string } = {},
+    feedback_type: "correct" | "drift" | "improve",
+    body: { comment?: string; improved_response?: string } = {},
   ) => {
     setBusyId(item.id);
     try {
@@ -155,7 +157,7 @@ export function TrainAvenFeedbackTab() {
         body: JSON.stringify({
           message_id: item.id,
           conversation_id: item.conversationId,
-          type,
+          feedback_type,
           ...body,
         }),
       });
@@ -164,9 +166,9 @@ export function TrainAvenFeedbackTab() {
       setItems((prev) => prev.filter((p) => p.id !== item.id));
       setToast({
         message:
-          type === "correct"
+          feedback_type === "correct"
             ? "Marked correct"
-            : type === "drift"
+            : feedback_type === "drift"
               ? "Drift confirmed"
               : "Improvement noted",
         tone: "success",

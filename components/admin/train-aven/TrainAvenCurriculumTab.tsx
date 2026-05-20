@@ -290,7 +290,12 @@ function TopicModal({
   const isEdit = topic !== null;
   const [topicText, setTopicText] = useState(topic?.topic ?? "");
   const [description, setDescription] = useState(topic?.description ?? "");
-  const [status, setStatus] = useState<string>(topic?.status ?? "pending");
+  // Backend §25 Auftrag G: status enum is case-SENSITIVE
+  // (pending|in_progress|covered). Normalize on read so a backend
+  // shape drift doesn't surface a 400 on save.
+  const [status, setStatus] = useState<string>(
+    (topic?.status ?? "pending").toLowerCase(),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -312,7 +317,7 @@ function TopicModal({
         body: JSON.stringify({
           topic: topicText.trim(),
           description: description.trim() || null,
-          status,
+          status: status.toLowerCase(),
         }),
       });
       if (!res.ok) {

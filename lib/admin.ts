@@ -293,10 +293,22 @@ export interface MemberDetail extends AdminMembersListEntry {
     activity_7d_total?: number | null;
     score?: number | null;
   } | null;
+  /** Backend §25 Auftrag G: nested trades roll-up. Prefer
+   *  `trades_summary.win_rate` over the top-level `win_rate` (which
+   *  remains for legacy deploys); both express the win-rate as a
+   *  0..1 fraction. `win_rate_pct` (0..100) is an additional
+   *  shape some endpoints expose — formatPct() handles either. */
+  trades_summary?: {
+    win_rate?: number | null;
+    win_rate_pct?: number | null;
+    total_pnl_usd?: number | null;
+  } | null;
   notes?: MemberNote[] | null;
   total_trades?: number | null;
   win_rate?: number | null;
+  win_rate_pct?: number | null;
   total_pnl?: number | null;
+  total_pnl_usd?: number | null;
   aven_messages?: number | null;
   aven_conversations?: number | null;
   total_aven_messages?: number | null;
@@ -309,7 +321,14 @@ export interface MemberDetail extends AdminMembersListEntry {
   last_login_at?: string | null;
   subscription_period_end?: string | null;
   current_period_end?: string | null;
+  /** Backend §25 Auftrag G: ALWAYS null (Telegram-Bot API only
+   *  exposes chat_id, never the human handle). UI renders
+   *  "Linked, username unknown" when telegram_connected && null. */
   telegram_username?: string | null;
+  /** Backend §25 Auftrag G alias of binance_api_key_added_at —
+   *  generic across exchanges. Read both via `?? ` so renames
+   *  don't blank the row. */
+  exchange_api_added_at?: string | null;
   binance_api_key_added_at?: string | null;
   payment_method?: {
     brand?: string | null;

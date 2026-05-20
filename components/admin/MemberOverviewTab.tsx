@@ -192,7 +192,17 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
     member.total_aven_messages ??
     null;
   const tradesTotal = member.total_trades ?? null;
-  const winRate = member.win_rate ?? null;
+  // Backend §25 Auftrag G: trades_summary.win_rate (0..1) is the new
+  // canonical home; trades_summary.win_rate_pct (0..100) is an
+  // alternate shape. Older deploys ship the top-level win_rate.
+  // formatPct() handles both 0..1 and 0..100 scales so either path
+  // renders correctly.
+  const winRate =
+    member.trades_summary?.win_rate ??
+    member.trades_summary?.win_rate_pct ??
+    member.win_rate ??
+    member.win_rate_pct ??
+    null;
 
   const activity = activity7dParts(member);
   // Stack only renders when backend ships the breakdown (brief_views

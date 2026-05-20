@@ -147,10 +147,17 @@ export function TrainAvenSparringTab() {
     }
   };
 
+  // Backend §25 Auftrag G: body key is `feedback_type` (not `type`)
+  // and accepts `improved_response` alongside `comment` +
+  // `curriculum_topic_id`.
   const sendFeedback = async (
     m: SparringMessage,
-    type: "correct" | "drift" | "improve",
-    body: { comment?: string; curriculum_topic_id?: string } = {},
+    feedback_type: "correct" | "drift" | "improve",
+    body: {
+      comment?: string;
+      improved_response?: string;
+      curriculum_topic_id?: string;
+    } = {},
   ) => {
     try {
       const res = await fetch("/api/proxy/admin/aven/feedback", {
@@ -158,7 +165,7 @@ export function TrainAvenSparringTab() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message_id: m.id,
-          type,
+          feedback_type,
           ...body,
         }),
       });
@@ -170,14 +177,14 @@ export function TrainAvenSparringTab() {
       }
       setMessages((prev) =>
         prev.map((p) =>
-          p.id === m.id ? { ...p, feedbackGiven: type } : p,
+          p.id === m.id ? { ...p, feedbackGiven: feedback_type } : p,
         ),
       );
       setToast({
         message:
-          type === "correct"
+          feedback_type === "correct"
             ? "Marked correct"
-            : type === "drift"
+            : feedback_type === "drift"
               ? "Flagged as drift"
               : "Improvement noted",
         tone: "success",

@@ -484,7 +484,16 @@ function TemplateModal({
   );
 }
 
-// ----- Send (bulk-email / bulk-telegram, 2-phase) ------------------
+// ----- Send (bulk-email / bulk-telegram, 2-endpoint flow) ----------
+//
+// Backend §25 Auftrag G replaced the phase-flag pattern with a real
+// 2-endpoint dance:
+//   POST .../bulk-email{,-telegram}        → returns confirm_token
+//   POST .../bulk-email{,-telegram}/confirm → fires the send
+//
+// Body shape is now raw {subject, text, html?, audience} — no
+// template_id. Templates still serve as a starting-point picker that
+// pre-fills the subject/text fields client-side.
 
 type BulkChannel = "email" | "telegram";
 type RecipientMode = "all" | "csv";
@@ -492,6 +501,8 @@ type RecipientMode = "all" | "csv";
 interface BulkPreview {
   recipient_count?: number | null;
   count?: number | null;
+  confirm_token?: string | null;
+  /** Legacy backend response key — accepted as a fallback. */
   confirmation_token?: string | null;
   preview?: string | null;
   warnings?: string[] | null;
@@ -501,6 +512,8 @@ function SendTab() {
   const [channel, setChannel] = useState<BulkChannel>("email");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState<string>("");
+  const [subject, setSubject] = useState("");
+  const [text, setText] = useState("");
   const [mode, setMode] = useState<RecipientMode>("all");
   const [csvText, setCsvText] = useState("");
   const [preview, setPreview] = useState<BulkPreview | null>(null);
@@ -526,7 +539,19 @@ function SendTab() {
     channel === "email" ? t.kind !== "telegram" : t.kind !== "email",
   );
 
-  const parsedEmails =
+  // Loading a template pre-fills the editable subject + text fields.
+  // Founder can tweak before sending — the server-side request is
+  // raw subject/text/audience, not template_id.
+  const loadTemplate = (id: string) => {
+    setTemplateId(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) {
+      setSubject(t.subject ?? "");
+      setText(t.body ?? "");
+    }
+  };
+
+  const parsedRecipients =
     mode === "csv"
       ? csvText
           .split(/[\n,;]/)
@@ -534,14 +559,25 @@ function SendTab() {
           .filter(Boolean)
       : [];
 
+  const audience = mode === "all" ? "all" : parsedRecipients;
+
   const endpoint =
     channel === "email"
       ? "/api/proxy/admin/communications/bulk-email"
       : "/api/proxy/admin/communications/bulk-telegram";
+  const confirmEndpoint = `${endpoint}/confirm`;
 
-  const phase1 = async () => {
-    if (!templateId) {
-      setError("Pick a template.");
+  const previewSend = async () => {
+    if (channel === "email" && !subject.trim()) {
+      setError("Subject is required for email sends.");
+      return;
+    }
+    if (!text.trim()) {
+      setError("Body text is required.");
+      return;
+    }
+    if (mode === "csv" && parsedRecipients.length === 0) {
+      setError("CSV is empty — paste at least one recipient.");
       return;
     }
     setBusy(true);
@@ -549,10 +585,10 @@ function SendTab() {
     setPreview(null);
     try {
       const body: Record<string, unknown> = {
-        template_id: templateId,
-        phase: "preview",
-        recipients: mode === "all" ? "all" : parsedEmails,
+        text: text.trim(),
+        audience,
       };
+      if (channel === "email") body.subject = subject.trim();
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -566,7 +602,11 @@ function SendTab() {
             : null) ?? `HTTP ${res.status}`;
         throw new Error(msg);
       }
-      setPreview((data ?? {}) as BulkPreview);
+      const p = (data ?? {}) as BulkPreview;
+      if (!p.confirm_token && !p.confirmation_token) {
+        throw new Error("Backend response missing confirm_token");
+      }
+      setPreview(p);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed");
     } finally {
@@ -574,23 +614,20 @@ function SendTab() {
     }
   };
 
-  const phase2 = async () => {
+  const confirmSend = async () => {
     if (!preview || busy) return;
+    const token = preview.confirm_token ?? preview.confirmation_token;
+    if (!token) {
+      setToast({ message: "Missing confirm token", tone: "error" });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const body: Record<string, unknown> = {
-        template_id: templateId,
-        phase: "execute",
-        recipients: mode === "all" ? "all" : parsedEmails,
-      };
-      if (preview.confirmation_token) {
-        body.confirmation_token = preview.confirmation_token;
-      }
-      const res = await fetch(endpoint, {
+      const res = await fetch(confirmEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ confirm_token: token }),
       });
       const data: unknown = await res.json().catch(() => null);
       if (!res.ok) {
@@ -603,6 +640,9 @@ function SendTab() {
       setToast({ message: "Send queued", tone: "success" });
       setPreview(null);
       setCsvText("");
+      setSubject("");
+      setText("");
+      setTemplateId("");
     } catch (err) {
       setToast({
         message:
@@ -649,20 +689,47 @@ function SendTab() {
 
       <label className="block">
         <span className="text-xs uppercase tracking-wider text-muted-foreground">
-          Template
+          Load from template{" "}
+          <span className="text-muted-foreground/70">(optional)</span>
         </span>
         <select
           value={templateId}
-          onChange={(e) => setTemplateId(e.target.value)}
+          onChange={(e) => loadTemplate(e.target.value)}
           className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-emerald focus:outline-none"
         >
-          <option value="">— Pick a template —</option>
+          <option value="">— Compose from scratch —</option>
           {filtered.map((t) => (
             <option key={t.id} value={t.id}>
               {t.name ?? t.id}
             </option>
           ))}
         </select>
+      </label>
+
+      {channel === "email" && (
+        <label className="block">
+          <span className="text-xs uppercase tracking-wider text-muted-foreground">
+            Subject
+          </span>
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus:border-emerald focus:outline-none"
+          />
+        </label>
+      )}
+
+      <label className="block">
+        <span className="text-xs uppercase tracking-wider text-muted-foreground">
+          {channel === "email" ? "Body (plain text)" : "Message"}
+        </span>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={8}
+          className="mt-1 w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-xs text-foreground focus:border-emerald focus:outline-none"
+        />
       </label>
 
       <fieldset>
@@ -711,8 +778,8 @@ function SendTab() {
       {!preview ? (
         <button
           type="button"
-          onClick={() => void phase1()}
-          disabled={busy || !templateId}
+          onClick={() => void previewSend()}
+          disabled={busy || !text.trim()}
           className="inline-flex h-10 items-center gap-1.5 rounded-md bg-emerald px-4 text-sm font-semibold text-background hover:bg-emerald-hover disabled:opacity-60"
         >
           {busy && (
@@ -729,7 +796,7 @@ function SendTab() {
         <section className="rounded-2xl border border-amber-500/40 bg-amber-500/[0.05] p-5">
           <header>
             <h3 className="text-sm font-semibold text-amber-200">
-              Phase 2 confirmation
+              Confirm send
             </h3>
             <p className="mt-1 text-xs text-amber-200/90">
               About to send to{" "}
@@ -764,7 +831,7 @@ function SendTab() {
             </button>
             <button
               type="button"
-              onClick={() => void phase2()}
+              onClick={() => void confirmSend()}
               disabled={busy}
               className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-400/40 bg-red-500/[0.08] px-3 text-sm font-semibold text-red-200 hover:bg-red-500/[0.14] disabled:opacity-60"
             >
@@ -987,19 +1054,22 @@ function LifecycleTab() {
     };
   }, []);
 
+  // Backend §25 Auftrag G: per-trigger PATCH at .../lifecycle-configs/<trigger>
+  // with {template_name, enabled, override_subject?, conditions?}. Body
+  // no longer carries the trigger — it's in the URL.
   const save = async (m: LifecycleMapping) => {
     setSavingTrigger(m.trigger);
     try {
+      const body: Record<string, unknown> = {
+        template_name: m.template_name ?? null,
+        enabled: Boolean(m.enabled),
+      };
       const res = await fetch(
-        "/api/proxy/admin/communications/lifecycle-configs",
+        `/api/proxy/admin/communications/lifecycle-configs/${encodeURIComponent(m.trigger)}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            trigger: m.trigger,
-            template_id: m.template_id,
-            enabled: m.enabled,
-          }),
+          body: JSON.stringify(body),
         },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -1062,16 +1132,19 @@ function LifecycleTab() {
                   </td>
                   <td className="px-3 py-2">
                     <select
-                      value={m.template_id ?? ""}
+                      value={m.template_name ?? ""}
                       onChange={(e) =>
-                        void save({ ...m, template_id: e.target.value || null })
+                        void save({
+                          ...m,
+                          template_name: e.target.value || null,
+                        })
                       }
                       disabled={savingTrigger === m.trigger}
                       className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-emerald focus:outline-none"
                     >
                       <option value="">— None —</option>
                       {templates.map((t) => (
-                        <option key={t.id} value={t.id}>
+                        <option key={t.id} value={t.name ?? ""}>
                           {t.name ?? t.id}
                         </option>
                       ))}
