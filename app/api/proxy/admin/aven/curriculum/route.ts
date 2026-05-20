@@ -9,3 +9,9 @@ export async function GET(req: NextRequest) {
     requireAuth: true,
   });
 }
+
+export async function POST(req: NextRequest) {
+  return proxyToBackend(req, "/api/admin/aven/curriculum", {
+    requireAuth: true,
+  });
+}

@@ -2,6 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { TrainAvenSparringTab } from "./train-aven/TrainAvenSparringTab";
+import { TrainAvenCurriculumTab } from "./train-aven/TrainAvenCurriculumTab";
+import { AvenVoiceNotesTab } from "./AvenVoiceNotesTab";
+import { AvenVkbTab } from "./AvenVkbTab";
 
 type TabKey =
   | "sparring"
@@ -95,7 +98,10 @@ export function TrainAvenSectionView() {
 
       <section>
         {activeTab === "sparring" && <TrainAvenSparringTab />}
-        {activeTab !== "sparring" && (
+        {activeTab === "curriculum" && <TrainAvenCurriculumTab />}
+        {activeTab === "voice-notes" && <AvenVoiceNotesTab />}
+        {activeTab === "vkb" && <AvenVkbTab />}
+        {(activeTab === "feedback" || activeTab === "system") && (
           <div className="rounded-xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted-foreground">
             Coming in the next commit.
           </div>
