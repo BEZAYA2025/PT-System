@@ -95,29 +95,35 @@ export function MemberAvenTab({ member }: Props) {
 
   const stats = useMemo(() => {
     const list = conversations ?? [];
-    const total = list.length;
-    const totalMessages = list.reduce(
+    const listTotal = list.length;
+    const listMessages = list.reduce(
       (acc, c) => acc + (c.message_count ?? 0),
       0,
     );
-    // Aven messages count in member detail covers all-time; the source
-    // can drift from the search-result sum so we expose the larger of
-    // the two.
-    const totalAllTime =
-      (member.aven_messages ?? member.total_aven_messages ?? null) ??
-      totalMessages;
+    // Defensive layering — when /conversations/search returns 0 for a
+    // member but the member-detail endpoint says they have N total
+    // messages (verified for baba: 50 Aven messages, 0 search hits),
+    // prefer the detail-endpoint counts so the stats card surfaces
+    // the truth instead of "0". List-derived numbers are the
+    // last-resort fallback.
+    const conversationsCount =
+      member.total_conversations ?? member.aven_conversations ?? listTotal;
+    const totalMessages =
+      member.total_aven_messages ??
+      member.aven_messages ??
+      listMessages;
     const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    const messages7d = list.reduce((acc, c) => {
+    const listMessages7d = list.reduce((acc, c) => {
       const t = Date.parse(c.started_at ?? "") || 0;
       if (t >= sevenDaysAgo) return acc + (c.message_count ?? 0);
       return acc;
     }, 0);
-    const avg = total > 0 ? totalMessages / total : 0;
+    const avg = conversationsCount > 0 ? totalMessages / conversationsCount : 0;
     return {
-      total,
-      totalMessages: totalAllTime,
+      total: conversationsCount,
+      totalMessages,
       messages7d:
-        member.aven_messages_count_7d ?? messages7d,
+        member.aven_messages_count_7d ?? listMessages7d,
       avg,
     };
   }, [conversations, member]);

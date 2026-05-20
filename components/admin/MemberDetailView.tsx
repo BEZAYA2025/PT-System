@@ -275,7 +275,13 @@ export function MemberDetailView({
                   </dt>
                   <dd className="text-foreground">
                     {formatDate(
+                      // Spec §25 ships `joined` on the list endpoint
+                      // and `signed_up_at` on the detail endpoint —
+                      // include BOTH plus the legacy fallbacks so the
+                      // header doesn't blank out on a detail-only
+                      // payload (root cause of baba's empty Joined).
                       member.joined ??
+                        member.signed_up_at ??
                         member.joined_at ??
                         member.created_at,
                     )}
@@ -287,7 +293,13 @@ export function MemberDetailView({
                     Last active
                   </dt>
                   <dd className="text-foreground">
-                    {relativeShort(member.last_active_at)}
+                    {relativeShort(
+                      // Same defensive widening — some deploys put the
+                      // last-touch timestamp under last_login_at on the
+                      // detail endpoint while the list keeps
+                      // last_active_at. Read both.
+                      member.last_active_at ?? member.last_login_at,
+                    )}
                   </dd>
                 </div>
                 <div
