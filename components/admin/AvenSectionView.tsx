@@ -3,6 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { AvenLiveTab } from "./AvenLiveTab";
 import { AvenSearchTab } from "./AvenSearchTab";
+import { AvenCurriculumTab } from "./AvenCurriculumTab";
+import { AvenTokenUsageTab } from "./AvenTokenUsageTab";
+import { AvenDriftLogTab } from "./AvenDriftLogTab";
 
 type TabKey =
   | "live"
@@ -96,9 +99,9 @@ export function AvenSectionView() {
       <section>
         {activeTab === "live" && <AvenLiveTab />}
         {activeTab === "search" && <AvenSearchTab />}
-        {activeTab === "curriculum" && <TabPlaceholder name="Curriculum" />}
-        {activeTab === "tokens" && <TabPlaceholder name="Token Usage" />}
-        {activeTab === "drift" && <TabPlaceholder name="Drift Log" />}
+        {activeTab === "curriculum" && <AvenCurriculumTab />}
+        {activeTab === "tokens" && <AvenTokenUsageTab />}
+        {activeTab === "drift" && <AvenDriftLogTab />}
         {activeTab === "vkb" && <TabPlaceholder name="VKB" />}
       </section>
     </div>
