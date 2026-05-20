@@ -260,27 +260,31 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
           value={tradesTotal !== null ? tradesTotal.toLocaleString() : "—"}
           hint={
             // Pack win-rate + PnL into the hint so both surface at a
-            // glance without breaking the 2x2 KPI grid. PnL gets a
-            // sign-aware colour (P1) — emerald for profit, red for
-            // loss, muted for break-even / unknown. Win-rate stays
-            // muted alongside.
+            // glance without breaking the 2x2 KPI grid. ONLY the PnL
+            // number gets the sign-aware tone (emerald / red / muted)
+            // — the "PnL" label itself stays muted alongside win-rate
+            // so the row still reads as one supporting line, not a
+            // shouting tag.
             winRate !== null || totalPnl !== null ? (
               <>
                 {winRate !== null && <>{formatPct(winRate)} win</>}
                 {winRate !== null && totalPnl !== null && " · "}
                 {totalPnl !== null && (
-                  <span
-                    className={
-                      totalPnl > 0
-                        ? "font-semibold text-emerald"
-                        : totalPnl < 0
-                          ? "font-semibold text-red-300"
-                          : ""
-                    }
-                  >
-                    PnL {totalPnl > 0 ? "+" : ""}
-                    {formatUSD(totalPnl)}
-                  </span>
+                  <>
+                    PnL{" "}
+                    <span
+                      className={
+                        totalPnl > 0
+                          ? "font-semibold text-emerald"
+                          : totalPnl < 0
+                            ? "font-semibold text-red-300"
+                            : ""
+                      }
+                    >
+                      {totalPnl > 0 ? "+" : ""}
+                      {formatUSD(totalPnl)}
+                    </span>
+                  </>
                 )}
               </>
             ) : (
