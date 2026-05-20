@@ -26,6 +26,17 @@ export interface AdminMembersListEntry {
     | "past_due"
     | "incomplete"
     | null;
+  /** Backend §27 O4: effective_status is the canonical display field —
+   *  derived server-side so it correctly says "trialing" for members
+   *  whose raw subscription_status is "active" + trial_started_at.
+   *  Read this in PREFERENCE to the raw `status` column to avoid
+   *  Pauls "all members show active" bug. `subscription_status_display`
+   *  is the older alias (identical content). `is_trial` is the
+   *  unambiguous boolean for trial-vs-not. */
+  effective_status?: string | null;
+  subscription_status_display?: string | null;
+  subscription_status?: string | null;
+  is_trial?: boolean | null;
   joined_at?: string | null;
   created_at?: string | null;
   trial_end?: string | null;
@@ -187,15 +198,28 @@ export interface AdminSignupsPayload {
   new_7d?: number | null;
   new_30d?: number | null;
   active?: number | null;
+  /** Backend §27 O1: 30d total may live nested under `totals.total`
+   *  on the new endpoint shape. Read both. */
+  totals?: { total?: number | null } | null;
+  /** Newly exposed per Auftrag G §27 — top-level subscription
+   *  counters Paul wants to surface on the dashboard. */
+  active_trials?: number | null;
+  active_paying?: number | null;
 }
 
 export async function fetchAdminSignups(): Promise<AdminSignupsPayload | null> {
   const token = await getAccessToken();
   if (!token) return null;
-  const res = await backendFetch<unknown>("/api/admin/metrics/signups", {
-    method: "GET",
-    token,
-  });
+  // Backend §27 O1: pass window=30d so the response is scoped to the
+  // rolling 30-day window the dashboard wants. The endpoint accepts
+  // range / window / days / period — picked `window` for readability.
+  const res = await backendFetch<unknown>(
+    "/api/admin/metrics/signups?window=30d",
+    {
+      method: "GET",
+      token,
+    },
+  );
   if (!res.ok) return null;
   return (res.data ?? {}) as AdminSignupsPayload;
 }

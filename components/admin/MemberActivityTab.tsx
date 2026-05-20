@@ -81,8 +81,14 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    // §27 P7: drop the event_type=activity filter — it was silently
+    // narrowing the response to nothing depending on backend's
+    // event-type taxonomy. Just ask for the last 30 days; the backend
+    // (now also accepting /activity as an alias of /events, returning
+    // either {events} or {activities}) gives us everything. Response
+    // shape widened to read both wrappers + raw array.
     fetch(
-      `/api/proxy/admin/members/${encodeURIComponent(member.id)}/events?event_type=activity&days=30`,
+      `/api/proxy/admin/members/${encodeURIComponent(member.id)}/events?days=30`,
       { cache: "no-store" },
     )
       .then(async (r) => {
@@ -94,7 +100,9 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
         const list = Array.isArray(data)
           ? (data as MemberEvent[])
           : data && typeof data === "object"
-            ? ((data as { events?: MemberEvent[] }).events ?? [])
+            ? ((data as { events?: MemberEvent[] }).events ??
+              (data as { activities?: MemberEvent[] }).activities ??
+              [])
             : [];
         setEvents(list);
       })

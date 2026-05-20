@@ -239,14 +239,41 @@ export function OverviewView({
           title="Membership"
           rightSlot={
             list.length > 0 ? (
-              <span className="inline-flex items-baseline gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1 text-emerald">
-                <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
-                  Total
+              // §27 O3: surface active_trials + active_paying alongside
+              // the Total chip so the founder sees the subscription
+              // split at a glance. Both come from the signups payload
+              // (top-level §27 counters); chips hide gracefully when
+              // backend hasn't shipped the field yet.
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="inline-flex items-baseline gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1 text-emerald">
+                  <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
+                    Total
+                  </span>
+                  <span className="font-mono text-sm font-semibold">
+                    {formatNumber(list.length)}
+                  </span>
                 </span>
-                <span className="font-mono text-sm font-semibold">
-                  {formatNumber(list.length)}
-                </span>
-              </span>
+                {typeof signups?.active_paying === "number" && (
+                  <span className="inline-flex items-baseline gap-1.5 rounded-full border border-border bg-surface px-3 py-1 text-foreground">
+                    <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                      Paying
+                    </span>
+                    <span className="font-mono text-sm font-semibold">
+                      {formatNumber(signups.active_paying)}
+                    </span>
+                  </span>
+                )}
+                {typeof signups?.active_trials === "number" && (
+                  <span className="inline-flex items-baseline gap-1.5 rounded-full border border-sky-400/30 bg-sky-400/[0.08] px-3 py-1 text-sky-300">
+                    <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
+                      Trial
+                    </span>
+                    <span className="font-mono text-sm font-semibold">
+                      {formatNumber(signups.active_trials)}
+                    </span>
+                  </span>
+                )}
+              </div>
             ) : undefined
           }
         />

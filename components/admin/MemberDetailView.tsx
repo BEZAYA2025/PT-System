@@ -207,7 +207,17 @@ export function MemberDetailView({
     if (ok) setConfirm(null);
   };
 
-  const isSuspended = (member.status ?? "").toLowerCase() === "suspended";
+  // §27 O4: effective_status carries the canonical display value
+  // (trialing vs active distinguished even though raw subscription_status
+  // is "active" for both).
+  const effectiveStatus =
+    member.effective_status ??
+    member.subscription_status_display ??
+    (member.is_trial ? "trialing" : null) ??
+    member.subscription_status ??
+    member.status ??
+    null;
+  const isSuspended = (effectiveStatus ?? "").toLowerCase() === "suspended";
   const displayName = member.display_name?.trim() || member.email;
 
   return (
@@ -245,9 +255,9 @@ export function MemberDetailView({
                   {member.tier ?? "standard"}
                 </span>
                 <span
-                  className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(member.status)}`}
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(effectiveStatus)}`}
                 >
-                  {member.status ?? "—"}
+                  {effectiveStatus ?? "—"}
                 </span>
               </div>
               <p className="mt-1.5 inline-flex items-center gap-2 text-xs text-muted-foreground">

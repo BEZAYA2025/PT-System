@@ -86,6 +86,19 @@ const PAGE_SIZE = 25;
 const INACTIVE_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+// Backend §27 O4: the raw `subscription_status` column is "active" for
+// trialing members too (DB stores trial_started_at separately) — using
+// it directly is the root cause of "all members show active". Read in
+// strict order: effective_status > subscription_status_display >
+// is_trial → "trialing" > raw status. Plus is_trial is the unambiguous
+// trial boolean which we honour as a second-pass override.
+function memberStatusOf(m: AdminMembersListEntry): string | null {
+  const eff = m.effective_status ?? m.subscription_status_display ?? null;
+  if (eff) return eff;
+  if (m.is_trial === true) return "trialing";
+  return m.subscription_status ?? m.status ?? null;
+}
+
 function statusGroup(
   status: string | null | undefined,
 ): "active" | "trial" | "cancelled" | "suspended" | "all" {
@@ -231,7 +244,7 @@ function exportCSV(rows: AdminMembersListEntry[]) {
         csvEscape(m.email),
         csvEscape(m.display_name),
         csvEscape(m.tier),
-        csvEscape(m.status),
+        csvEscape(memberStatusOf(m)),
         csvEscape(joinedAt(m)),
         csvEscape(m.last_active_at),
         csvEscape(m.engagement_score),
@@ -287,7 +300,7 @@ export function MembersTable({ initialMembers }: Props) {
 
     if (statusFilter !== "all") {
       list = list.filter((m) => {
-        const g = statusGroup(m.status);
+        const g = statusGroup(memberStatusOf(m));
         if (statusFilter === "inactive") {
           const d = daysSince(m.last_active_at);
           return d === null || d > INACTIVE_DAYS;
@@ -1280,11 +1293,16 @@ function MemberRow({
         </span>
       </td>
       <td className="px-4 py-3">
-        <span
-          className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(member.status)}`}
-        >
-          {member.status ?? "—"}
-        </span>
+        {(() => {
+          const s = memberStatusOf(member);
+          return (
+            <span
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(s)}`}
+            >
+              {s ?? "—"}
+            </span>
+          );
+        })()}
       </td>
       <td className="px-4 py-3 text-xs text-muted-foreground" suppressHydrationWarning>
         <span className="inline-flex items-center gap-1.5">
@@ -1374,11 +1392,16 @@ function MemberCard({
               <p className="truncate text-sm font-semibold text-foreground">
                 {member.display_name ?? member.email}
               </p>
-              <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(member.status)}`}
-              >
-                {member.status ?? "—"}
-              </span>
+              {(() => {
+                const s = memberStatusOf(member);
+                return (
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(s)}`}
+                  >
+                    {s ?? "—"}
+                  </span>
+                );
+              })()}
             </div>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">
               {member.email}
@@ -1436,7 +1459,7 @@ function RowActions({
   href: string;
 }) {
   const router = useRouter();
-  const isSuspended = statusGroup(member.status) === "suspended";
+  const isSuspended = statusGroup(memberStatusOf(member)) === "suspended";
   const items = [
     {
       label: "View details",

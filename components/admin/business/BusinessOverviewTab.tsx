@@ -28,6 +28,8 @@ interface SignupsPayload {
   new_7d?: number | null;
   new_30d?: number | null;
   active?: number | null;
+  // §27 O1: 30d window total may nest under `totals.total`.
+  totals?: { total?: number | null } | null;
 }
 
 export function BusinessOverviewTab() {
@@ -46,9 +48,9 @@ export function BusinessOverviewTab() {
       fetch("/api/proxy/admin/metrics/churn", { cache: "no-store" }).then(
         (r) => (r.ok ? r.json() : null),
       ),
-      fetch("/api/proxy/admin/metrics/signups", { cache: "no-store" }).then(
-        (r) => (r.ok ? r.json() : null),
-      ),
+      fetch("/api/proxy/admin/metrics/signups?window=30d", {
+        cache: "no-store",
+      }).then((r) => (r.ok ? r.json() : null)),
     ])
       .then(([m, c, s]) => {
         if (cancelled) return;
@@ -69,7 +71,14 @@ export function BusinessOverviewTab() {
 
   const mrrCur = mrr?.current ?? 0;
   const arr = mrrCur * 12;
-  const activeCount = signups?.active ?? signups?.total ?? 0;
+  // §27 O1 strict: total → body.total OR body.totals.total. Avoid the
+  // pre-fix path that pulled the first daily bucket (always 0 on a
+  // sparse range).
+  const activeCount =
+    signups?.active ??
+    signups?.total ??
+    signups?.totals?.total ??
+    0;
 
   return (
     <div className="space-y-6">
