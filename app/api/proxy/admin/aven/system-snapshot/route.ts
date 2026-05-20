@@ -5,13 +5,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  return proxyToBackend(req, "/api/admin/aven/curriculum", {
-    requireAuth: true,
-  });
-}
-
-export async function POST(req: NextRequest) {
-  return proxyToBackend(req, "/api/admin/aven/curriculum", {
+  return proxyToBackend(req, "/api/admin/aven/system-snapshot", {
     requireAuth: true,
   });
 }

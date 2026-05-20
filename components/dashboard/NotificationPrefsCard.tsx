@@ -8,6 +8,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { Toast, type ToastState } from "@/components/Toast";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
 // Round-26 notifications-rewrite: one row per notification class, with
@@ -92,6 +93,7 @@ function channelFromTelegramOn(on: boolean): Channel {
 }
 
 export function NotificationPrefsCard() {
+  const { active: impersonating } = useImpersonation();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULT_PREFS);
   const [hydrated, setHydrated] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -217,7 +219,7 @@ export function NotificationPrefsCard() {
             key={row.key}
             row={row}
             telegramOn={telegramOnFromChannel(prefs[row.key])}
-            disabled={saving || !hydrated}
+            disabled={saving || !hydrated || impersonating}
             onToggle={(on) => setTelegram(row.key, on)}
           />
         ))}
@@ -233,7 +235,8 @@ export function NotificationPrefsCard() {
         <button
           type="button"
           onClick={() => void save(prefs)}
-          disabled={saving}
+          disabled={saving || impersonating}
+          title={impersonating ? "Disabled during impersonation" : undefined}
           className={`${buttonPrimaryClasses} mt-3`}
         >
           {saving ? "Retrying…" : "Retry save"}

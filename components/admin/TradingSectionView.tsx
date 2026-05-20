@@ -413,6 +413,10 @@ interface PaulTrade {
   side?: "long" | "short" | string | null;
   entry?: number | null;
   exit?: number | null;
+  /** Margin-ROI (leverage-aware) — preferred after the backend
+   *  ROI fix; roi_pct kept as defensive fallback for pre-fix
+   *  cached responses. */
+  margin_roi_pct?: number | null;
   roi_pct?: number | null;
   pnl_usd?: number | null;
   status?: "open" | "closed" | string | null;
@@ -520,7 +524,7 @@ function PaulTradesTab() {
                       {t.exit ?? "—"}
                     </td>
                     <td className={`px-3 py-2 text-right font-mono text-xs ${tone}`}>
-                      {formatPct(t.roi_pct)}
+                      {formatPct(t.margin_roi_pct ?? t.roi_pct)}
                     </td>
                     <td className={`px-3 py-2 text-right font-mono text-xs ${tone}`}>
                       {formatUSD(t.pnl_usd)}

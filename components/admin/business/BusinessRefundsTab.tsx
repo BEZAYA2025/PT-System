@@ -101,7 +101,8 @@ export function BusinessRefundsTab() {
         </p>
       ) : rows.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted-foreground">
-          No refunds on record.
+          No refunds yet — refunds appear here when you process one
+          from a member detail page.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface/40">

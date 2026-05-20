@@ -248,6 +248,7 @@ export function MembersTable({ initialMembers }: Props) {
   const [valueFilter, setValueFilter] = useState<ValueFilter>("all");
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [connFilter, setConnFilter] = useState<ConnectionFilter>("all");
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("joined");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(0);
@@ -605,57 +606,133 @@ export function MembersTable({ initialMembers }: Props) {
           </p>
         </div>
 
-        {/* Primary status pills */}
-        <FilterRow
-          filters={STATUS_FILTERS}
-          value={statusFilter}
-          onChange={(v) => {
-            setStatusFilter(v);
-            setPage(0);
-          }}
-        />
-
-        {/* Secondary filter row — wraps onto multiple lines on narrow
-            viewports. Each segmented group lives in its own bordered
-            chip so the rows stay visually distinct. */}
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {/* Primary status pills + advanced toggle. Secondary filter
+            stacks (risk / value / tier / connection) live in a
+            collapsible panel so the page header stays compact when
+            you're not actively segmenting. */}
+        <div className="flex flex-wrap items-center gap-2">
           <FilterRow
-            filters={RISK_FILTERS}
-            value={riskFilter}
+            filters={STATUS_FILTERS}
+            value={statusFilter}
             onChange={(v) => {
-              setRiskFilter(v);
+              setStatusFilter(v);
               setPage(0);
             }}
-            tone="amber"
           />
-          <FilterRow
-            filters={VALUE_FILTERS}
-            value={valueFilter}
-            onChange={(v) => {
-              setValueFilter(v);
-              setPage(0);
-            }}
-            tone="amber"
-          />
-          <FilterRow
-            filters={TIER_FILTERS}
-            value={tierFilter}
-            onChange={(v) => {
-              setTierFilter(v);
-              setPage(0);
-            }}
-            tone="amber"
-          />
-          <FilterRow
-            filters={CONNECTION_FILTERS}
-            value={connFilter}
-            onChange={(v) => {
-              setConnFilter(v);
-              setPage(0);
-            }}
-            tone="amber"
-          />
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            aria-expanded={showAdvanced}
+            className="ml-auto inline-flex h-7 items-center gap-1 rounded-full border border-border bg-surface px-3 text-xs font-medium text-muted-foreground hover:text-foreground"
+          >
+            {showAdvanced ? "Hide filters ▴" : "More filters ▾"}
+          </button>
         </div>
+
+        {/* Active filter chips — render only the non-default values
+            so the founder can clear individual filters or wipe them
+            all in one click. */}
+        {(riskFilter !== "all" ||
+          valueFilter !== "all" ||
+          tierFilter !== "all" ||
+          connFilter !== "all") && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {riskFilter !== "all" && (
+              <FilterChip
+                label={`Risk · ${RISK_FILTERS.find((f) => f.key === riskFilter)?.label}`}
+                onClear={() => {
+                  setRiskFilter("all");
+                  setPage(0);
+                }}
+              />
+            )}
+            {valueFilter !== "all" && (
+              <FilterChip
+                label={`Value · ${VALUE_FILTERS.find((f) => f.key === valueFilter)?.label}`}
+                onClear={() => {
+                  setValueFilter("all");
+                  setPage(0);
+                }}
+              />
+            )}
+            {tierFilter !== "all" && (
+              <FilterChip
+                label={`Tier · ${TIER_FILTERS.find((f) => f.key === tierFilter)?.label}`}
+                onClear={() => {
+                  setTierFilter("all");
+                  setPage(0);
+                }}
+              />
+            )}
+            {connFilter !== "all" && (
+              <FilterChip
+                label={`Conn · ${CONNECTION_FILTERS.find((f) => f.key === connFilter)?.label}`}
+                onClear={() => {
+                  setConnFilter("all");
+                  setPage(0);
+                }}
+              />
+            )}
+            {[riskFilter, valueFilter, tierFilter, connFilter].filter(
+              (f) => f !== "all",
+            ).length >= 2 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRiskFilter("all");
+                  setValueFilter("all");
+                  setTierFilter("all");
+                  setConnFilter("all");
+                  setPage(0);
+                }}
+                className="ml-1 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                Clear all filters
+              </button>
+            )}
+          </div>
+        )}
+
+        {showAdvanced && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-surface/40 p-3">
+            <FilterRow
+              filters={RISK_FILTERS}
+              value={riskFilter}
+              onChange={(v) => {
+                setRiskFilter(v);
+                setPage(0);
+              }}
+              tone="amber"
+            />
+            <FilterRow
+              filters={VALUE_FILTERS}
+              value={valueFilter}
+              onChange={(v) => {
+                setValueFilter(v);
+                setPage(0);
+              }}
+              tone="amber"
+            />
+            <FilterRow
+              filters={TIER_FILTERS}
+              value={tierFilter}
+              onChange={(v) => {
+                setTierFilter(v);
+                setPage(0);
+              }}
+              tone="amber"
+            />
+            <FilterRow
+              filters={CONNECTION_FILTERS}
+              value={connFilter}
+              onChange={(v) => {
+                setConnFilter(v);
+                setPage(0);
+              }}
+              tone="amber"
+            />
+          </div>
+        )}
 
         {/* Bulk-action bar — sticky-ish above table, shown only when
             anything is selected. CSV export honours the selection if
@@ -1036,6 +1113,28 @@ export function MembersTable({ initialMembers }: Props) {
 
       <Toast value={toast} onDismiss={() => setToast(null)} />
     </>
+  );
+}
+
+function FilterChip({
+  label,
+  onClear,
+}: {
+  label: string;
+  onClear: () => void;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald">
+      {label}
+      <button
+        type="button"
+        aria-label={`Clear ${label}`}
+        onClick={onClear}
+        className="ml-0.5 inline-flex size-3.5 items-center justify-center rounded-full text-emerald/70 hover:bg-emerald/[0.18] hover:text-emerald"
+      >
+        ×
+      </button>
+    </span>
   );
 }
 

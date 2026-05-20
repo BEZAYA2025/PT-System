@@ -1,5 +1,7 @@
 import { getInitialNotifications, isFounder, requireUser } from "@/lib/dal";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { AccessDeniedFlash } from "@/components/AccessDeniedFlash";
+import { FetchAuthInterceptor } from "@/components/FetchAuthInterceptor";
 import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { PageViewTracker } from "@/components/PageViewTracker";
 import { mockUserView } from "@/lib/mock-dashboard";
@@ -17,6 +19,8 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-svh bg-background">
+      <FetchAuthInterceptor />
+      <AccessDeniedFlash />
       <ImpersonationBanner />
       <DashboardHeader
         displayName={displayName}

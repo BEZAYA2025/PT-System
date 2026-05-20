@@ -116,7 +116,8 @@ export function BusinessCohortsTab() {
 
       {!loading && !error && cohorts.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted-foreground">
-          No cohort data yet for the selected window.
+          Not enough cohort data yet — need at least a few weeks of
+          signups before w1/w4/w12 retention is computable.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface/40">
