@@ -13,6 +13,7 @@ import {
   IconLayoutDashboard,
   IconLogout,
   IconMail,
+  IconSchool,
   IconShield,
   IconTicket,
   IconUsers,
@@ -25,14 +26,15 @@ const ACTIVE_LINKS: Array<{
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
 }> = [
   { href: "/admin", label: "Overview", icon: IconLayoutDashboard },
-  { href: "/admin/briefings", label: "Briefings", icon: IconClipboardCheck },
   { href: "/admin/members", label: "Members", icon: IconUsers },
+  { href: "/admin/train-aven", label: "Train Aven", icon: IconSchool },
   { href: "/admin/aven", label: "Aven Insights", icon: IconBrain },
   { href: "/admin/business", label: "Business", icon: IconChartLine },
+  { href: "/admin/briefings", label: "Briefings", icon: IconClipboardCheck },
+  { href: "/admin/trading", label: "Trading", icon: IconChartCandle },
+  { href: "/admin/communications", label: "Communications", icon: IconMail },
   { href: "/admin/system", label: "System", icon: IconActivity },
   { href: "/admin/configurations", label: "Configurations", icon: IconAdjustments },
-  { href: "/admin/communications", label: "Communications", icon: IconMail },
-  { href: "/admin/trading", label: "Trading", icon: IconChartCandle },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
   { href: "/admin/audit", label: "Audit Log", icon: IconClipboardList },
 ];
