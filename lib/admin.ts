@@ -362,6 +362,25 @@ export interface MemberEvent {
   metadata?: Record<string, unknown> | null;
 }
 
+export interface AvenMessage {
+  role?: "user" | "aven" | string | null;
+  content?: string | null;
+  timestamp?: string | null;
+  ts?: string | null;
+  created_at?: string | null;
+}
+
+export function parseAvenMessages(data: unknown): AvenMessage[] {
+  if (Array.isArray(data)) return data as AvenMessage[];
+  if (data && typeof data === "object") {
+    const inner =
+      (data as { messages?: unknown }).messages ??
+      (data as { conversation?: { messages?: unknown } }).conversation?.messages;
+    if (Array.isArray(inner)) return inner as AvenMessage[];
+  }
+  return [];
+}
+
 export interface AvenConversationSummary {
   id: string;
   member_id?: string | null;

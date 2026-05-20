@@ -10,9 +10,11 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import type {
-  AvenConversationSummary,
-  MemberDetail,
+import {
+  parseAvenMessages,
+  type AvenConversationSummary,
+  type AvenMessage,
+  type MemberDetail,
 } from "@/lib/admin";
 
 interface Props {
@@ -235,28 +237,74 @@ function ConversationModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [messages, setMessages] = useState<AvenMessage[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    if (!conversation) return;
+    let cancelled = false;
+    setLoading(true);
+    setUnavailable(false);
+    setMessages(null);
+    fetch(
+      `/api/proxy/admin/aven/conversations/${encodeURIComponent(conversation.id)}`,
+      { cache: "no-store" },
+    )
+      .then(async (r) => {
+        if (r.status === 404) {
+          if (!cancelled) setUnavailable(true);
+          return null;
+        }
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: unknown) => {
+        if (cancelled || data === null) return;
+        setMessages(parseAvenMessages(data));
+      })
+      .catch(() => {
+        if (!cancelled) setUnavailable(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [conversation]);
+
   if (!conversation) return null;
 
   const copyTranscript = async () => {
-    const lines = [
-      `Conversation · ${formatDateTime(conversation.started_at)}`,
-      `Member: ${member.display_name ?? member.email}`,
-      `Messages: ${conversation.message_count ?? 0}`,
-      "",
-      "First message:",
-      conversation.first_user_message ?? "(none)",
-      "",
-      "Snippet:",
-      conversation.snippet ?? "(none)",
-    ];
+    let body: string;
+    if (messages && messages.length > 0) {
+      body = messages
+        .map((m) => `${m.role ?? "?"}: ${m.content ?? ""}`)
+        .join("\n\n");
+    } else {
+      body = [
+        `Conversation · ${formatDateTime(conversation.started_at)}`,
+        `Member: ${member.display_name ?? member.email}`,
+        `Messages: ${conversation.message_count ?? 0}`,
+        "",
+        "First message:",
+        conversation.first_user_message ?? "(none)",
+        "",
+        "Snippet:",
+        conversation.snippet ?? "(none)",
+      ].join("\n");
+    }
     try {
-      await navigator.clipboard.writeText(lines.join("\n"));
+      await navigator.clipboard.writeText(body);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       // ignore
     }
   };
+
+  const hasFullTranscript = messages !== null && messages.length > 0;
 
   return (
     <Modal
@@ -272,38 +320,87 @@ function ConversationModal({
       size="lg"
     >
       <div className="space-y-4 text-sm">
-        {conversation.first_user_message && (
-          <div className="ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              <IconUser size={10} stroke={1.75} className="mr-1 inline" aria-hidden />
-              Member · first message
-            </p>
-            <p className="mt-1 whitespace-pre-wrap text-foreground">
-              {conversation.first_user_message}
-            </p>
-          </div>
-        )}
-        {conversation.snippet && (
-          <div className="mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3">
-            <p className="font-mono text-[10px] uppercase tracking-wider text-emerald/80">
-              Aven · matched snippet
-            </p>
-            <p
-              className="mt-1 whitespace-pre-wrap text-foreground"
-              dangerouslySetInnerHTML={{ __html: conversation.snippet }}
+        {loading && (
+          <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <IconLoader2
+              size={12}
+              stroke={2}
+              className="animate-spin"
+              aria-hidden
             />
-          </div>
+            Loading transcript…
+          </p>
         )}
 
-        <div className="rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-          The full transcript endpoint hasn&apos;t landed yet — this view
-          surfaces the first user message and the matching snippet
-          returned by the search. Once
-          <code className="ml-1 font-mono text-[11px]">
-            /api/admin/aven/conversations/&lt;id&gt;
-          </code>{" "}
-          ships, the full message thread renders here automatically.
-        </div>
+        {hasFullTranscript ? (
+          <div className="space-y-3">
+            {messages.map((m, i) => {
+              const role = (m.role ?? "").toLowerCase();
+              const isUser = role === "user" || role === "member";
+              return (
+                <div
+                  key={i}
+                  className={
+                    isUser
+                      ? "ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right"
+                      : "mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3"
+                  }
+                >
+                  <p
+                    className={
+                      isUser
+                        ? "font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                        : "font-mono text-[10px] uppercase tracking-wider text-emerald/80"
+                    }
+                  >
+                    {isUser ? "Member" : "Aven"}
+                    {m.timestamp || m.ts || m.created_at
+                      ? ` · ${formatDateTime(m.timestamp ?? m.ts ?? m.created_at)}`
+                      : ""}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-foreground">
+                    {m.content ?? ""}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <>
+            {conversation.first_user_message && (
+              <div className="ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <IconUser size={10} stroke={1.75} className="mr-1 inline" aria-hidden />
+                  Member · first message
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-foreground">
+                  {conversation.first_user_message}
+                </p>
+              </div>
+            )}
+            {conversation.snippet && (
+              <div className="mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-emerald/80">
+                  Aven · matched snippet
+                </p>
+                <p
+                  className="mt-1 whitespace-pre-wrap text-foreground"
+                  dangerouslySetInnerHTML={{ __html: conversation.snippet }}
+                />
+              </div>
+            )}
+            {unavailable && !loading && (
+              <div className="rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs text-muted-foreground">
+                Full transcript endpoint not available yet — showing
+                the search snippet. Auto-upgrades the moment{" "}
+                <code className="font-mono text-[11px]">
+                  /api/admin/aven/conversations/&lt;id&gt;
+                </code>{" "}
+                ships.
+              </div>
+            )}
+          </>
+        )}
 
         <div className="flex justify-end gap-2">
           <button
