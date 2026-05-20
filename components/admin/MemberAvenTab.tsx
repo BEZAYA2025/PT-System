@@ -10,11 +10,10 @@ import {
   IconUser,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import {
-  parseAvenMessages,
-  type AvenConversationSummary,
-  type AvenMessage,
-  type MemberDetail,
+import { parseAvenMessages, type AvenMessage } from "@/lib/admin-helpers";
+import type {
+  AvenConversationSummary,
+  MemberDetail,
 } from "@/lib/admin";
 
 interface Props {

@@ -10,11 +10,8 @@ import {
   IconSearch,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
-import {
-  parseAvenMessages,
-  type AvenConversationSummary,
-  type AvenMessage,
-} from "@/lib/admin";
+import { parseAvenMessages, type AvenMessage } from "@/lib/admin-helpers";
+import type { AvenConversationSummary } from "@/lib/admin";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
