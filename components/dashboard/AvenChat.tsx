@@ -18,6 +18,7 @@ import {
 import { AvenAvatar } from "./AvenAvatar";
 import { useAvenChat } from "./use-aven-chat";
 import { useAvenObservations } from "./use-aven-observations";
+import { DaySeparator } from "./ChatBubbleList";
 import type { ChatMessage, QuotaState } from "@/lib/aven";
 
 interface Props {
@@ -178,21 +179,43 @@ export function AvenChat({
         )}
 
         <AnimatePresence initial={false} mode="popLayout">
-          {sortChronological(chat.messages).map((m) => (
-            <motion.div
-              key={m.localId ?? m.id}
-              layout="position"
-              initial={reduce ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <ChatBubble
-                message={m}
-                onRetry={() => m.localId && void chat.retry(m.localId)}
-              />
-            </motion.div>
-          ))}
+          {(() => {
+            // WhatsApp-style day separator: emit a <DaySeparator>
+            // (static, non-motion) the first time we encounter each
+            // calendar day in the chronological stream. Bubbles
+            // themselves stay wrapped in motion.div so the existing
+            // entry/exit animation behaviour is preserved unchanged.
+            // Live send + receive flows are untouched — this is a
+            // pure render-side additive.
+            const elements: React.ReactNode[] = [];
+            let lastDay = "";
+            for (const m of sortChronological(chat.messages)) {
+              const t = Date.parse(m.ts);
+              if (Number.isFinite(t)) {
+                const day = new Date(t).toISOString().slice(0, 10);
+                if (day !== lastDay) {
+                  elements.push(<DaySeparator key={`sep-${day}`} day={day} />);
+                  lastDay = day;
+                }
+              }
+              elements.push(
+                <motion.div
+                  key={m.localId ?? m.id}
+                  layout="position"
+                  initial={reduce ? false : { opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  <ChatBubble
+                    message={m}
+                    onRetry={() => m.localId && void chat.retry(m.localId)}
+                  />
+                </motion.div>,
+              );
+            }
+            return elements;
+          })()}
         </AnimatePresence>
 
         {chat.thinking && <ThinkingIndicator />}
