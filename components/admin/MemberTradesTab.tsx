@@ -343,17 +343,13 @@ export function MemberTradesTab({ member }: Props) {
                       >
                         <td className="px-3 py-2 font-mono text-foreground">
                           {t.symbol ?? "—"}
-                          {t.leverage ? (
-                            <span className="ml-1.5 rounded border border-border bg-surface px-1 font-mono text-[10px] text-muted-foreground">
-                              {t.leverage}×
-                            </span>
-                          ) : null}
                         </td>
                         <td className="px-3 py-2">
                           <span
                             className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${sideBadgeClass(t.side)}`}
                           >
                             {t.side ?? "—"}
+                            {t.leverage ? <span>·{t.leverage}×</span> : null}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-xs text-foreground">
@@ -559,17 +555,13 @@ function OpenTradeCard({
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-foreground">
           {trade.symbol ?? "—"}
-          {trade.leverage ? (
-            <span className="font-mono text-[10px] text-muted-foreground">
-              {trade.leverage}×
-            </span>
-          ) : null}
         </span>
         <span
           className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${sideBadgeClass(trade.side)}`}
         >
           <SideIcon size={10} stroke={2} aria-hidden />
           {trade.side ?? "—"}
+          {trade.leverage ? <span>·{trade.leverage}×</span> : null}
         </span>
       </div>
       <div className="flex items-baseline gap-2">

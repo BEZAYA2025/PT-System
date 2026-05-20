@@ -235,7 +235,13 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
   // login-history payload so the timeline still has content for
   // members whose events row is sparse.
   const timeline = events.length > 0 ? events : loginsAsEvents(loginHistory);
-  const recentTimeline = timeline.slice(0, 12);
+  // P3 follow-up: 12 was too tight — for engaged members (baba ran
+  // ~76 events in 7d alone) the timeline looked thin compared to
+  // their real activity. 30 fits a typical week of dense use without
+  // turning the consolidated section back into a tall scroll-block.
+  const TIMELINE_CAP = 30;
+  const recentTimeline = timeline.slice(0, TIMELINE_CAP);
+  const timelineTruncated = timeline.length > TIMELINE_CAP;
 
   return (
     <div className="space-y-6">
@@ -374,11 +380,19 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
             No activity recorded in the last 30 days.
           </p>
         ) : (
-          <ol className="mt-4 space-y-2 border-t border-border/40 pt-4">
-            {recentTimeline.map((entry, idx) => (
-              <EventRow key={`${entry.timestamp ?? idx}-${idx}`} entry={entry} />
-            ))}
-          </ol>
+          <>
+            <ol className="mt-4 space-y-2 border-t border-border/40 pt-4">
+              {recentTimeline.map((entry, idx) => (
+                <EventRow key={`${entry.timestamp ?? idx}-${idx}`} entry={entry} />
+              ))}
+            </ol>
+            {timelineTruncated && (
+              <p className="mt-3 text-center font-mono text-[11px] text-muted-foreground">
+                Showing {TIMELINE_CAP} of {timeline.length} events · full log
+                in the Activity tab
+              </p>
+            )}
+          </>
         )}
       </section>
     </div>

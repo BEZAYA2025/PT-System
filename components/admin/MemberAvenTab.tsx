@@ -127,11 +127,33 @@ function parseConversationsResponse(data: unknown): AvenConversationSummary[] {
     hits?: AvenSearchHit[];
     messages?: AvenSearchHit[];
   };
-  if (Array.isArray(obj.conversations)) return obj.conversations;
-  if (Array.isArray(obj.items)) return obj.items;
-  if (Array.isArray(obj.results)) return obj.results;
-  if (Array.isArray(obj.hits)) return groupHits(obj.hits);
-  if (Array.isArray(obj.messages)) return groupHits(obj.messages);
+  // Pauls P6 round 2: try every shape and use the first NON-EMPTY one
+  // — earlier we returned the first present-but-empty key (e.g. when
+  // backend ships {conversations: [], hits: [...32 messages]}, we used
+  // to render the empty conversations array and never reach the
+  // groupable hits). Now we walk through each candidate and only
+  // commit if it contains items.
+  const candidates: Array<() => AvenConversationSummary[]> = [
+    () => (Array.isArray(obj.conversations) ? obj.conversations : []),
+    () => (Array.isArray(obj.items) ? obj.items : []),
+    () => (Array.isArray(obj.results) ? obj.results : []),
+    () => (Array.isArray(obj.hits) ? groupHits(obj.hits) : []),
+    () => (Array.isArray(obj.messages) ? groupHits(obj.messages) : []),
+  ];
+  for (const tryParse of candidates) {
+    const list = tryParse();
+    if (list.length > 0) return list;
+  }
+  // All paths empty — log the raw shape once so the next debug round
+  // has something to point at (dev-mode only; production users never
+  // see this).
+  if (process.env.NODE_ENV !== "production") {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[MemberAvenTab] /aven/conversations/search returned no parseable list",
+      { keys: Object.keys(obj) },
+    );
+  }
   return [];
 }
 
@@ -289,7 +311,9 @@ export function MemberAvenTab({ member }: Props) {
           <p className="mt-4 text-sm text-muted-foreground">
             {query.trim()
               ? "No conversations match this search."
-              : "No Aven conversations yet for this member."}
+              : member.total_conversations && member.total_conversations > 0
+                ? `Member has ${member.total_conversations} conversation${member.total_conversations === 1 ? "" : "s"} on record but the search endpoint didn't return them — likely a backend indexing gap.`
+                : "No Aven conversations yet for this member."}
           </p>
         ) : (
           <ul className="mt-4 space-y-2">
