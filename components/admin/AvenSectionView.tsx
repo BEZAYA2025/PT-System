@@ -6,6 +6,7 @@ import { AvenSearchTab } from "./AvenSearchTab";
 import { AvenCurriculumTab } from "./AvenCurriculumTab";
 import { AvenTokenUsageTab } from "./AvenTokenUsageTab";
 import { AvenDriftLogTab } from "./AvenDriftLogTab";
+import { AvenVkbTab } from "./AvenVkbTab";
 
 type TabKey =
   | "live"
@@ -102,17 +103,8 @@ export function AvenSectionView() {
         {activeTab === "curriculum" && <AvenCurriculumTab />}
         {activeTab === "tokens" && <AvenTokenUsageTab />}
         {activeTab === "drift" && <AvenDriftLogTab />}
-        {activeTab === "vkb" && <TabPlaceholder name="VKB" />}
+        {activeTab === "vkb" && <AvenVkbTab />}
       </section>
-    </div>
-  );
-}
-
-function TabPlaceholder({ name }: { name: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted-foreground">
-      The <strong className="text-foreground">{name}</strong> tab lands in
-      a follow-up commit.
     </div>
   );
 }
