@@ -30,6 +30,7 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin/business", label: "Business", icon: IconChartLine },
   { href: "/admin/system", label: "System", icon: IconActivity },
   { href: "/admin/configurations", label: "Configurations", icon: IconAdjustments },
+  { href: "/admin/communications", label: "Communications", icon: IconMail },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
 ];
 
@@ -38,7 +39,6 @@ const COMING_SOON: Array<{
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
 }> = [
   { label: "Trading Ops", icon: IconChartCandle },
-  { label: "Communications", icon: IconMail },
 ];
 
 interface Props {
