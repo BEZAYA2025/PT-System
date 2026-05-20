@@ -55,6 +55,30 @@ function deviceLabel(entry: LoginHistoryEntry): string {
   return entry.user_agent_parsed?.device ?? "Desktop";
 }
 
+// Backend ships exchange_type lowercased (binance / bybit / bitunix /
+// okx / etc). Surface it with proper-case branding + an "(unknown)"
+// hint when the column came back null but the member is otherwise
+// flagged as having an exchange — that mismatch is itself useful info
+// (most likely a stale connection where the type field was cleared).
+function formatExchangeName(type: string | null | undefined): string {
+  if (!type) return "Exchange (unknown)";
+  const lower = type.toLowerCase();
+  const map: Record<string, string> = {
+    binance: "Binance",
+    bybit: "Bybit",
+    bitunix: "Bitunix",
+    okx: "OKX",
+    bitget: "Bitget",
+    kucoin: "KuCoin",
+    mexc: "MEXC",
+    gateio: "Gate.io",
+    "gate.io": "Gate.io",
+    htx: "HTX",
+    coinbase: "Coinbase",
+  };
+  return map[lower] ?? lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
 export function MemberActivityTab({ member, loginHistory }: Props) {
   const exchangeConnected = Boolean(
     member.exchange_connected ??
@@ -198,7 +222,7 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             connected={exchangeConnected}
             detail={
               exchangeConnected
-                ? `${member.exchange_type ?? "Connected"}${
+                ? `${formatExchangeName(member.exchange_type)} API${
                     (member.exchange_api_added_at ??
                       member.binance_api_key_added_at)
                       ? ` · since ${formatDate(member.exchange_api_added_at ?? member.binance_api_key_added_at)}`

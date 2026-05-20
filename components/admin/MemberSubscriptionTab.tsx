@@ -58,6 +58,43 @@ function stripeSubscriptionUrl(subId: string): string {
   return `https://dashboard.stripe.com/subscriptions/${encodeURIComponent(subId)}`;
 }
 
+// Pill colour for the tier badge — VIP gets the same emerald
+// treatment as the list view + detail header, Standard stays neutral.
+function tierBadgeClass(tier: string | null | undefined): string {
+  return (tier ?? "").toLowerCase() === "vip"
+    ? "border-emerald/30 bg-emerald/[0.08] text-emerald"
+    : "border-border bg-surface text-muted-foreground";
+}
+
+// §27 O4 chain: effective_status > display > is_trial→"trialing"
+// > raw. The raw subscription_status reads "active" even for trial
+// members (the DB stores trial_started_at separately), so reading
+// it directly here surfaced bezaya as "active" instead of "trialing".
+function effectiveStatusOf(member: MemberDetail): string {
+  return (
+    member.effective_status ??
+    member.subscription_status_display ??
+    (member.is_trial ? "trialing" : null) ??
+    member.subscription_status ??
+    member.status ??
+    "—"
+  );
+}
+
+// Status pill colour — mirrors the list-view statusBadgeClass so the
+// detail view reads in the same colour language wherever the member
+// appears.
+function statusPillClass(status: string): string {
+  const s = status.toLowerCase();
+  if (s === "active" || s === "past_due")
+    return "border-emerald/30 bg-emerald/[0.08] text-emerald";
+  if (s === "trial" || s === "trialing")
+    return "border-sky-400/30 bg-sky-400/[0.08] text-sky-300";
+  if (s === "suspended" || s === "canceled" || s === "cancelled")
+    return "border-red-400/40 bg-red-500/[0.08] text-red-300";
+  return "border-border bg-surface text-muted-foreground";
+}
+
 function invoiceStatusClass(status: string | null | undefined): string {
   const s = (status ?? "").toLowerCase();
   if (s === "paid")
@@ -210,17 +247,43 @@ export function MemberSubscriptionTab({ member }: Props) {
     <div className="space-y-6">
       {/* Plan card */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
-        <header className="flex items-baseline justify-between gap-3">
+        <header className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
             Plan
           </h2>
-          <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-            {(member.tier ?? "standard").toUpperCase()} ·{" "}
-            {member.billing_interval ?? "—"}
-          </p>
+          <div className="flex items-center gap-1.5">
+            <span
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tierBadgeClass(member.tier)}`}
+            >
+              {(member.tier ?? "standard").toUpperCase()}
+            </span>
+            {member.billing_interval && (
+              <span className="inline-flex items-center rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                {member.billing_interval}
+              </span>
+            )}
+          </div>
         </header>
         <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Row label="Status" value={(member.status ?? "—").toString()} />
+          {/* Status as a coloured pill matching the list view —
+              uses the §27 O4 effective_status chain so trialing
+              members read as "trialing", not the raw "active"
+              that the DB column carries for trials. */}
+          {(() => {
+            const status = effectiveStatusOf(member);
+            return (
+              <Row
+                label="Status"
+                value={
+                  <span
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusPillClass(status)}`}
+                  >
+                    {status}
+                  </span>
+                }
+              />
+            );
+          })()}
           <Row
             label={
               trialLeft !== null && trialLeft >= 0
