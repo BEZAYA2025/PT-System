@@ -333,7 +333,7 @@ export function MemberTradesTab({ member }: Props) {
                 <tbody>
                   {closed.map((t) => {
                     const pnl = t.pnl_usd ?? 0;
-                    const roi = t.roi_pct ?? t.pnl_pct ?? null;
+                    const roi = t.margin_roi_pct ?? t.roi_pct ?? t.pnl_pct ?? null;
                     const tone = pnl >= 0 ? "text-emerald" : "text-red-300";
                     return (
                       <tr
@@ -529,7 +529,7 @@ function OpenTradeCard({
           {formatSignedUSD(trade.pnl_usd)}
         </span>
         <span className={`font-mono text-xs ${tone}`}>
-          {formatPct(trade.roi_pct ?? trade.pnl_pct)}
+          {formatPct(trade.margin_roi_pct ?? trade.roi_pct ?? trade.pnl_pct)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs">
@@ -604,7 +604,7 @@ function TradeDetail({
           label="ROI"
           value={
             <span className={`font-mono ${tone}`}>
-              {formatPct(trade.roi_pct ?? trade.pnl_pct)}
+              {formatPct(trade.margin_roi_pct ?? trade.roi_pct ?? trade.pnl_pct)}
             </span>
           }
         />

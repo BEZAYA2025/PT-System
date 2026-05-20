@@ -367,6 +367,10 @@ export interface MemberTrade {
   tp_price?: number | null;
   pnl_usd?: number | null;
   pnl_pct?: number | null;
+  /** Margin-ROI (leverage-aware) — preferred field after the
+   *  backend ROI fix. `roi_pct` is kept as a fallback for any
+   *  cached / pre-fix responses. */
+  margin_roi_pct?: number | null;
   roi_pct?: number | null;
   status?: "open" | "closed" | string | null;
   opened_at?: string | null;

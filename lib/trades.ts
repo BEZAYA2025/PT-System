@@ -287,8 +287,15 @@ function shapeCommon(raw: unknown, fallbackId: string): CommonTrade | null {
     mark: status === "open" ? mark : null,
     exit: status === "closed" ? exit : null,
     pnlPct:
-      num(readField(t, ["realized_pnl_pct", "roi_pct", "pnl_pct", "roi"])) ??
-      0,
+      num(
+        readField(t, [
+          "margin_roi_pct",
+          "realized_pnl_pct",
+          "roi_pct",
+          "pnl_pct",
+          "roi",
+        ]),
+      ) ?? 0,
     slPrice,
     tpPrice,
     slDistancePct:
@@ -393,7 +400,7 @@ function shapePaulEndpointOne(
     entry,
     mark: null, // endpoint doesn't expose live mark price
     exit: status === "closed" ? exit : null,
-    pnlPct: num(t.roi_pct) ?? 0,
+    pnlPct: num(t.margin_roi_pct) ?? num(t.roi_pct) ?? 0,
     pnlR: null,
     slPrice: sl,
     tpPrice: tp,
@@ -601,6 +608,7 @@ function shapeMyEndpointOne(
     // none of the percent fields ship at all.
     pnlPct:
       num(t.unrealized_pnl_pct) ??
+      num(t.margin_roi_pct) ??
       num(t.roi_pct) ??
       num(t.realized_pnl_pct) ??
       num(t.unrealizedPnlPct) ??
