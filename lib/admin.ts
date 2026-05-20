@@ -286,11 +286,17 @@ export interface MemberDetail extends AdminMembersListEntry {
   // plus these audit / engagement / notes fields. All optional —
   // older backend deploys silently degrade rather than 500ing.
   /** Backend §25 (post-audit): nested engagement object with the
-   *  authoritative `activity_7d_total` (union count). Prefer this
-   *  over the row-level `activity_7d` when present — the row
-   *  flattener may eventually be removed. */
+   *  authoritative `activity_7d_total` (union count) plus per-source
+   *  7d breakdowns. §25.B-2 (post-baba-audit) confirmed
+   *  `aven_messages_count_7d` is canonically nested here — FE prefers
+   *  the nested path then falls back to the top-level alias. Prefer
+   *  this whole shape over the row-level `activity_7d` when
+   *  present; the row flattener may eventually be removed. */
   engagement?: {
     activity_7d_total?: number | null;
+    aven_messages_count_7d?: number | null;
+    trades_count_7d?: number | null;
+    brief_views_count_7d?: number | null;
     score?: number | null;
   } | null;
   /** Backend §25 Auftrag G: nested trades roll-up. Prefer

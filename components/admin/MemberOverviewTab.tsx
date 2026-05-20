@@ -198,6 +198,13 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
     member.aven_messages ??
     null;
   const tradesTotal = member.total_trades ?? null;
+  // §25.B-2: total_pnl_usd is on the detail endpoint as a top-level
+  // field. Backend may also expose it under trades_summary; read both.
+  const totalPnl =
+    member.total_pnl_usd ??
+    member.trades_summary?.total_pnl_usd ??
+    member.total_pnl ??
+    null;
   // Backend §25 Auftrag G: trades_summary.win_rate (0..1) is the new
   // canonical home; trades_summary.win_rate_pct (0..100) is an
   // alternate shape. Older deploys ship the top-level win_rate.
@@ -252,9 +259,20 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
           label="Total Trades"
           value={tradesTotal !== null ? tradesTotal.toLocaleString() : "—"}
           hint={
-            winRate !== null
-              ? `${formatPct(winRate)} win-rate`
-              : "Lifetime trades"
+            // Pack win-rate + PnL into the hint so both surface at a
+            // glance without breaking the 2x2 KPI grid. Either field
+            // can be missing — render whichever is present. formatUSD
+            // already emits "-$310" for negatives; positives get a "+"
+            // prepended so the sign is always explicit.
+            (() => {
+              const parts: string[] = [];
+              if (winRate !== null) parts.push(`${formatPct(winRate)} win`);
+              if (totalPnl !== null) {
+                const prefix = totalPnl > 0 ? "+" : "";
+                parts.push(`PnL ${prefix}${formatUSD(totalPnl)}`);
+              }
+              return parts.length > 0 ? parts.join(" · ") : "Lifetime trades";
+            })()
           }
         />
         <KPICard

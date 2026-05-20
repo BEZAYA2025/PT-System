@@ -36,6 +36,66 @@ function truncate(s: string | null | undefined, max = 110): string {
   return `${s.slice(0, max).trimEnd()}…`;
 }
 
+// Backend §25.B-2 (post-baba-audit): /aven/conversations/search ships
+// {total, hits[]} where `hits` are INDIVIDUAL MESSAGES, not pre-grouped
+// conversation summaries. Group them client-side by conversation_id so
+// the UI gets one card per conversation (baba: 32 hits → 6 convs).
+// Legacy {conversations} / {items} / raw-array shapes are still
+// accepted as fallbacks — single source of truth for response shape.
+interface AvenSearchHit {
+  conversation_id?: string | null;
+  message_id?: string | null;
+  role?: string | null;
+  content?: string | null;
+  snippet?: string | null;
+  timestamp?: string | null;
+  created_at?: string | null;
+}
+
+function groupHits(hits: AvenSearchHit[]): AvenConversationSummary[] {
+  const groups = new Map<string, AvenSearchHit[]>();
+  for (const hit of hits) {
+    const cid = hit.conversation_id;
+    if (!cid) continue;
+    const arr = groups.get(cid) ?? [];
+    arr.push(hit);
+    groups.set(cid, arr);
+  }
+  return Array.from(groups.entries()).map(([cid, hs]) => {
+    const sorted = [...hs].sort((a, b) => {
+      const at = Date.parse(a.timestamp ?? a.created_at ?? "") || 0;
+      const bt = Date.parse(b.timestamp ?? b.created_at ?? "") || 0;
+      return at - bt;
+    });
+    const earliest = sorted[0];
+    const firstUser = sorted.find((h) => {
+      const r = (h.role ?? "").toLowerCase();
+      return r === "user" || r === "member";
+    });
+    return {
+      id: cid,
+      started_at: earliest?.timestamp ?? earliest?.created_at ?? null,
+      first_user_message: firstUser?.content ?? firstUser?.snippet ?? null,
+      snippet: earliest?.snippet ?? null,
+      message_count: hs.length,
+    };
+  });
+}
+
+function parseConversationsResponse(data: unknown): AvenConversationSummary[] {
+  if (Array.isArray(data)) return data as AvenConversationSummary[];
+  if (!data || typeof data !== "object") return [];
+  const obj = data as {
+    conversations?: AvenConversationSummary[];
+    items?: AvenConversationSummary[];
+    hits?: AvenSearchHit[];
+  };
+  if (Array.isArray(obj.conversations)) return obj.conversations;
+  if (Array.isArray(obj.items)) return obj.items;
+  if (Array.isArray(obj.hits)) return groupHits(obj.hits);
+  return [];
+}
+
 export function MemberAvenTab({ member }: Props) {
   const [query, setQuery] = useState("");
   const [conversations, setConversations] = useState<
@@ -61,18 +121,7 @@ export function MemberAvenTab({ member }: Props) {
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: unknown = await res.json().catch(() => null);
-        // Backend §25 may wrap under `conversations`, `items`, or
-        // ship a raw array — read all three so a per-deploy shape
-        // drift doesn't blank the tab (root cause of the empty-Aven
-        // bug Paul hit on baba's profile).
-        const list = Array.isArray(data)
-          ? (data as AvenConversationSummary[])
-          : data && typeof data === "object"
-            ? ((data as { conversations?: AvenConversationSummary[] })
-                .conversations ??
-              (data as { items?: AvenConversationSummary[] }).items ??
-              [])
-            : [];
+        const list = parseConversationsResponse(data);
         // Default order: most recent first.
         list.sort((a, b) => {
           const at = Date.parse(a.started_at ?? "") || 0;
@@ -119,11 +168,16 @@ export function MemberAvenTab({ member }: Props) {
       return acc;
     }, 0);
     const avg = conversationsCount > 0 ? totalMessages / conversationsCount : 0;
+    // §25.B-2: canonical 7d count is engagement.aven_messages_count_7d.
+    // baba shows 16 there; the top-level alias is the legacy shape.
+    const messages7d =
+      member.engagement?.aven_messages_count_7d ??
+      member.aven_messages_count_7d ??
+      listMessages7d;
     return {
       total: conversationsCount,
       totalMessages,
-      messages7d:
-        member.aven_messages_count_7d ?? listMessages7d,
+      messages7d,
       avg,
     };
   }, [conversations, member]);
