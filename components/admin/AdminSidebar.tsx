@@ -26,6 +26,7 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin/briefings", label: "Briefings", icon: IconClipboardCheck },
   { href: "/admin/members", label: "Members", icon: IconUsers },
   { href: "/admin/aven", label: "Aven Insights", icon: IconBrain },
+  { href: "/admin/business", label: "Business", icon: IconChartLine },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
 ];
 
@@ -33,7 +34,6 @@ const COMING_SOON: Array<{
   label: string;
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
 }> = [
-  { label: "Business Metrics", icon: IconChartLine },
   { label: "System Health", icon: IconActivity },
   { label: "Trading Ops", icon: IconChartCandle },
   { label: "Communications", icon: IconMail },
