@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -25,7 +25,6 @@ const signInSchema = z.object({
 type SignInInput = z.infer<typeof signInSchema>;
 
 export function SignInForm() {
-  const router = useRouter();
   const search = useSearchParams();
   const redirectTo = search.get("redirect") ?? "/dashboard";
   // `?reset=1` after a successful /reset-password submit — surface a
@@ -34,6 +33,13 @@ export function SignInForm() {
   const resetConfirmed = search.get("reset") === "1";
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // LOGIN-1: react-hook-form's isSubmitting drops back to false as soon
+  // as our async onSubmit returns — but `router.replace()` is fire-and-
+  // forget, so the button snapped back to "Sign in" while the actual
+  // navigation was still in flight. Track a local `redirecting` flag
+  // that stays true through the navigation so the spinner + disabled
+  // state survive until the page unmounts.
+  const [redirecting, setRedirecting] = useState(false);
 
   const {
     register,
@@ -73,12 +79,26 @@ export function SignInForm() {
 
       // Cookie is set by the proxy. Send the user where they were headed.
       const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
-      router.replace(safeRedirect);
-      router.refresh();
+      setRedirecting(true);
+      // LOGIN-3: a soft router.replace raced with the cookie commit on
+      // some clients — the RSC fetch for /dashboard occasionally ran
+      // before the Set-Cookie response was fully applied, so the
+      // server-rendered dashboard came back unauthenticated and the
+      // browser sat on a blank screen until a hard reload. A hard
+      // navigation guarantees the cookie is committed before the next
+      // request goes out.
+      window.location.replace(safeRedirect);
     } catch {
       setSubmitError("Connection issue. Please try again.");
     }
   };
+
+  const busy = isSubmitting || redirecting;
+  const buttonLabel = redirecting
+    ? "Redirecting…"
+    : isSubmitting
+      ? "Signing in…"
+      : "Sign in";
 
   return (
     <form
@@ -151,10 +171,10 @@ export function SignInForm() {
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={busy}
         className={`${buttonPrimaryClasses} w-full`}
       >
-        {isSubmitting ? "Signing in…" : "Sign in"}
+        {buttonLabel}
       </button>
     </form>
   );
