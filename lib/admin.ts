@@ -224,6 +224,14 @@ export interface MemberDetail extends AdminMembersListEntry {
   current_period_end?: string | null;
   telegram_username?: string | null;
   binance_api_key_added_at?: string | null;
+  payment_method?: {
+    brand?: string | null;
+    last_4?: string | number | null;
+    last4?: string | number | null;
+    exp_month?: number | null;
+    exp_year?: number | null;
+    updated_at?: string | null;
+  } | null;
 }
 
 export async function fetchAdminMemberDetail(
@@ -314,9 +322,14 @@ export interface MemberTrade {
   id: string;
   symbol?: string | null;
   side?: "long" | "short" | string | null;
+  leverage?: number | null;
   entry?: number | null;
   exit?: number | null;
   mark_price?: number | null;
+  // Backend §13.14 uses `sl` / `tp`; older payloads kept `_price`.
+  // Accept both so the column reads from whichever the response carries.
+  sl?: number | null;
+  tp?: number | null;
   sl_price?: number | null;
   tp_price?: number | null;
   pnl_usd?: number | null;
@@ -325,12 +338,17 @@ export interface MemberTrade {
   status?: "open" | "closed" | string | null;
   opened_at?: string | null;
   closed_at?: string | null;
+  duration?: number | string | null;
   duration_seconds?: number | null;
+  exit_reason?: string | null;
+  score?: number | null;
 }
 
-export interface MemberTradesResponse {
-  open: MemberTrade[];
-  closed: MemberTrade[];
+export interface MemberTradesPage {
+  items: MemberTrade[];
+  page?: number | null;
+  pages?: number | null;
+  total?: number | null;
 }
 
 export interface MemberEvent {

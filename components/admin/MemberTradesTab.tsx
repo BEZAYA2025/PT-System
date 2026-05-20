@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   IconAlertCircle,
   IconChartCandle,
@@ -14,7 +14,7 @@ import type {
   MemberDetail,
   MemberTrade,
   MemberTradeStats,
-  MemberTradesResponse,
+  MemberTradesPage,
 } from "@/lib/admin";
 
 interface Props {
@@ -58,14 +58,37 @@ function formatDate(iso: string | null | undefined): string {
   });
 }
 
-function formatDuration(seconds: number | null | undefined): string {
-  if (!seconds || seconds <= 0) return "—";
+function formatDuration(
+  duration: number | string | null | undefined,
+  fallbackSeconds: number | null | undefined,
+): string {
+  // §13.14 carries `duration` (likely seconds, sometimes a pre-
+  // formatted string). Old payloads kept `duration_seconds`. Accept
+  // either; coerce numeric to a compact display.
+  let seconds: number | null = null;
+  if (typeof duration === "number") seconds = duration;
+  else if (typeof duration === "string") {
+    const n = Number(duration);
+    if (Number.isFinite(n)) seconds = n;
+    else return duration;
+  } else if (typeof fallbackSeconds === "number") {
+    seconds = fallbackSeconds;
+  }
+  if (seconds === null || seconds <= 0) return "—";
   const days = Math.floor(seconds / 86400);
   if (days > 0) return `${days}d`;
   const hrs = Math.floor(seconds / 3600);
   if (hrs > 0) return `${hrs}h`;
   const min = Math.floor(seconds / 60);
   return `${min}m`;
+}
+
+function slOf(t: MemberTrade): number | string {
+  return t.sl ?? t.sl_price ?? "—";
+}
+
+function tpOf(t: MemberTrade): number | string {
+  return t.tp ?? t.tp_price ?? "—";
 }
 
 const PAGE_SIZE = 25;
@@ -75,12 +98,16 @@ export function MemberTradesTab({ member }: Props) {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
 
-  const [trades, setTrades] = useState<MemberTradesResponse | null>(null);
-  const [tradesLoading, setTradesLoading] = useState(true);
-  const [tradesPending, setTradesPending] = useState(false);
+  const [open, setOpen] = useState<MemberTrade[]>([]);
+  const [openLoading, setOpenLoading] = useState(true);
+
+  const [closed, setClosed] = useState<MemberTrade[]>([]);
+  const [closedPage, setClosedPage] = useState(1);
+  const [closedPages, setClosedPages] = useState(1);
+  const [closedTotal, setClosedTotal] = useState<number | null>(null);
+  const [closedLoading, setClosedLoading] = useState(true);
   const [tradesError, setTradesError] = useState<string | null>(null);
 
-  const [page, setPage] = useState(0);
   const [detail, setDetail] = useState<MemberTrade | null>(null);
 
   useEffect(() => {
@@ -112,47 +139,61 @@ export function MemberTradesTab({ member }: Props) {
     };
   }, [member.id]);
 
+  // Open trades: pull a single bigger page since open positions
+  // rarely exceed a handful.
   useEffect(() => {
     let cancelled = false;
     fetch(
-      `/api/proxy/admin/members/${encodeURIComponent(member.id)}/trades`,
+      `/api/proxy/admin/members/${encodeURIComponent(member.id)}/trades?status=open&limit=50`,
       { cache: "no-store" },
     )
       .then(async (r) => {
-        // Endpoint A is rolling out in parallel. A clean 404 from the
-        // upstream means "deploy lands shortly" — show a pending pill,
-        // don't surface as an error.
-        if (r.status === 404) {
-          if (!cancelled) setTradesPending(true);
-          return null;
-        }
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
       .then((data: unknown) => {
-        if (cancelled || data === null) return;
-        const norm = normalizeTrades(data);
-        setTrades(norm);
+        if (cancelled) return;
+        setOpen(extractItems(data));
       })
       .catch((err: Error) => {
         if (!cancelled) setTradesError(err.message);
       })
       .finally(() => {
-        if (!cancelled) setTradesLoading(false);
+        if (!cancelled) setOpenLoading(false);
       });
     return () => {
       cancelled = true;
     };
   }, [member.id]);
 
-  const closed = trades?.closed ?? [];
-  const open = trades?.open ?? [];
-  const totalPages = Math.max(1, Math.ceil(closed.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages - 1);
-  const pagedClosed = closed.slice(
-    safePage * PAGE_SIZE,
-    safePage * PAGE_SIZE + PAGE_SIZE,
+  // Closed trades: server-side paginated.
+  const loadClosedPage = useCallback(
+    async (p: number) => {
+      setClosedLoading(true);
+      try {
+        const res = await fetch(
+          `/api/proxy/admin/members/${encodeURIComponent(member.id)}/trades?status=closed&limit=${PAGE_SIZE}&page=${p}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data: unknown = await res.json().catch(() => null);
+        const page = extractPage(data);
+        setClosed(page.items);
+        setClosedPages(page.pages ?? 1);
+        setClosedTotal(page.total ?? null);
+        setTradesError(null);
+      } catch (err) {
+        setTradesError(err instanceof Error ? err.message : "Network error");
+      } finally {
+        setClosedLoading(false);
+      }
+    },
+    [member.id],
   );
+
+  useEffect(() => {
+    void loadClosedPage(1);
+  }, [loadClosedPage]);
 
   return (
     <div className="space-y-6">
@@ -181,16 +222,12 @@ export function MemberTradesTab({ member }: Props) {
           />
           <StatCard
             label="Avg R-Multiple"
-            value={
-              statsLoading ? "—" : formatRMultiple(stats?.avg_r_multiple)
-            }
+            value={statsLoading ? "—" : formatRMultiple(stats?.avg_r_multiple)}
           />
           <StatCard
             label="Total PnL"
             value={statsLoading ? "—" : formatSignedUSD(stats?.total_pnl_usd)}
-            tone={
-              (stats?.total_pnl_usd ?? 0) >= 0 ? "emerald" : "red"
-            }
+            tone={(stats?.total_pnl_usd ?? 0) >= 0 ? "emerald" : "red"}
           />
           <StatCard
             label="Best / Worst"
@@ -205,13 +242,32 @@ export function MemberTradesTab({ member }: Props) {
       </section>
 
       {/* Open trades */}
-      {!tradesPending && open.length > 0 && (
-        <section className="rounded-2xl border border-border bg-surface/40 p-5">
-          <header className="flex items-baseline justify-between gap-3">
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">
-              Open trades · {open.length}
-            </h2>
-          </header>
+      <section className="rounded-2xl border border-border bg-surface/40 p-5">
+        <header className="flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            Open trades
+          </h2>
+          {!openLoading && (
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {open.length} open
+            </p>
+          )}
+        </header>
+        {openLoading ? (
+          <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <IconLoader2
+              size={12}
+              stroke={2}
+              className="animate-spin"
+              aria-hidden
+            />
+            Loading…
+          </p>
+        ) : open.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No open positions right now.
+          </p>
+        ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
             {open.map((t) => (
               <OpenTradeCard
@@ -221,8 +277,8 @@ export function MemberTradesTab({ member }: Props) {
               />
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       {/* Closed trades */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
@@ -230,15 +286,14 @@ export function MemberTradesTab({ member }: Props) {
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
             Closed trades
           </h2>
-          {!tradesLoading && !tradesPending && (
+          {!closedLoading && closedTotal !== null && (
             <p className="font-mono text-[11px] text-muted-foreground">
-              {closed.length.toLocaleString()} trade
-              {closed.length === 1 ? "" : "s"}
+              {closedTotal.toLocaleString()} total · page {closedPage} of {closedPages}
             </p>
           )}
         </header>
 
-        {tradesLoading ? (
+        {closedLoading && closed.length === 0 ? (
           <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
             <IconLoader2
               size={12}
@@ -246,19 +301,8 @@ export function MemberTradesTab({ member }: Props) {
               className="animate-spin"
               aria-hidden
             />
-            Loading trades…
+            Loading…
           </p>
-        ) : tradesPending ? (
-          <div className="mt-4 rounded-lg border border-amber-500/30 bg-amber-500/[0.05] px-4 py-3 text-sm">
-            <p className="font-medium text-amber-200">
-              Endpoint deploying…
-            </p>
-            <p className="mt-1 text-xs text-amber-200/80">
-              The per-member trades endpoint goes live shortly. The
-              stats row above is already live — refresh in a minute
-              to populate this section.
-            </p>
-          </div>
         ) : tradesError ? (
           <p className="mt-4 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
             <IconAlertCircle size={12} stroke={1.75} aria-hidden />
@@ -280,16 +324,17 @@ export function MemberTradesTab({ member }: Props) {
                     <th className="px-3 py-2 font-medium text-right">Exit</th>
                     <th className="px-3 py-2 font-medium text-right">ROI%</th>
                     <th className="px-3 py-2 font-medium text-right">PnL</th>
+                    <th className="px-3 py-2 font-medium">Score</th>
                     <th className="px-3 py-2 font-medium">Duration</th>
+                    <th className="px-3 py-2 font-medium">Exit reason</th>
                     <th className="px-3 py-2 font-medium">Closed</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedClosed.map((t) => {
+                  {closed.map((t) => {
                     const pnl = t.pnl_usd ?? 0;
                     const roi = t.roi_pct ?? t.pnl_pct ?? null;
-                    const tone =
-                      pnl >= 0 ? "text-emerald" : "text-red-300";
+                    const tone = pnl >= 0 ? "text-emerald" : "text-red-300";
                     return (
                       <tr
                         key={t.id}
@@ -298,6 +343,11 @@ export function MemberTradesTab({ member }: Props) {
                       >
                         <td className="px-3 py-2 font-mono text-foreground">
                           {t.symbol ?? "—"}
+                          {t.leverage ? (
+                            <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                              {t.leverage}×
+                            </span>
+                          ) : null}
                         </td>
                         <td className="px-3 py-2 font-mono text-xs uppercase text-muted-foreground">
                           {t.side ?? "—"}
@@ -314,8 +364,14 @@ export function MemberTradesTab({ member }: Props) {
                         <td className={`px-3 py-2 text-right font-mono text-xs ${tone}`}>
                           {formatSignedUSD(t.pnl_usd)}
                         </td>
+                        <td className="px-3 py-2 font-mono text-xs text-muted-foreground">
+                          {t.score ?? "—"}
+                        </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">
-                          {formatDuration(t.duration_seconds)}
+                          {formatDuration(t.duration, t.duration_seconds)}
+                        </td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">
+                          {t.exit_reason ?? "—"}
                         </td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">
                           {formatDate(t.closed_at)}
@@ -326,24 +382,32 @@ export function MemberTradesTab({ member }: Props) {
                 </tbody>
               </table>
             </div>
-            {totalPages > 1 && (
+            {closedPages > 1 && (
               <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
                 <p>
-                  Page {safePage + 1} of {totalPages}
+                  Page {closedPage} of {closedPages}
                 </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    disabled={safePage === 0}
-                    onClick={() => setPage(safePage - 1)}
+                    disabled={closedPage === 1 || closedLoading}
+                    onClick={() => {
+                      const next = closedPage - 1;
+                      setClosedPage(next);
+                      void loadClosedPage(next);
+                    }}
                     className="inline-flex h-8 items-center rounded-md border border-border bg-surface px-3 text-foreground disabled:opacity-40"
                   >
                     Previous
                   </button>
                   <button
                     type="button"
-                    disabled={safePage >= totalPages - 1}
-                    onClick={() => setPage(safePage + 1)}
+                    disabled={closedPage >= closedPages || closedLoading}
+                    onClick={() => {
+                      const next = closedPage + 1;
+                      setClosedPage(next);
+                      void loadClosedPage(next);
+                    }}
                     className="inline-flex h-8 items-center rounded-md border border-border bg-surface px-3 text-foreground disabled:opacity-40"
                   >
                     Next
@@ -360,24 +424,36 @@ export function MemberTradesTab({ member }: Props) {
   );
 }
 
-function normalizeTrades(data: unknown): MemberTradesResponse {
+function extractItems(data: unknown): MemberTrade[] {
+  if (Array.isArray(data)) return data as MemberTrade[];
+  if (data && typeof data === "object") {
+    const items = (data as { items?: unknown }).items;
+    if (Array.isArray(items)) return items as MemberTrade[];
+    const open = (data as { open?: unknown }).open;
+    if (Array.isArray(open)) return open as MemberTrade[];
+  }
+  return [];
+}
+
+function extractPage(data: unknown): MemberTradesPage {
   if (Array.isArray(data)) {
-    const open: MemberTrade[] = [];
-    const closed: MemberTrade[] = [];
-    for (const t of data as MemberTrade[]) {
-      if ((t.status ?? "").toLowerCase() === "open") open.push(t);
-      else closed.push(t);
-    }
-    return { open, closed };
+    return { items: data as MemberTrade[], page: 1, pages: 1, total: data.length };
   }
   if (data && typeof data === "object") {
-    const d = data as { open?: MemberTrade[]; closed?: MemberTrade[] };
+    const d = data as {
+      items?: MemberTrade[];
+      page?: number;
+      pages?: number;
+      total?: number;
+    };
     return {
-      open: Array.isArray(d.open) ? d.open : [],
-      closed: Array.isArray(d.closed) ? d.closed : [],
+      items: Array.isArray(d.items) ? d.items : [],
+      page: d.page ?? 1,
+      pages: d.pages ?? 1,
+      total: d.total ?? null,
     };
   }
-  return { open: [], closed: [] };
+  return { items: [], page: 1, pages: 1, total: 0 };
 }
 
 function StatCard({
@@ -424,7 +500,10 @@ function OpenTradeCard({
 }) {
   const pnl = trade.pnl_usd ?? 0;
   const tone = pnl >= 0 ? "text-emerald" : "text-red-300";
-  const SideIcon = (trade.side ?? "").toLowerCase() === "long" ? IconTrendingUp : IconTrendingDown;
+  const SideIcon =
+    (trade.side ?? "").toLowerCase() === "long"
+      ? IconTrendingUp
+      : IconTrendingDown;
   return (
     <button
       type="button"
@@ -435,6 +514,11 @@ function OpenTradeCard({
         <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-foreground">
           <SideIcon size={14} stroke={1.75} aria-hidden />
           {trade.symbol ?? "—"}
+          {trade.leverage ? (
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {trade.leverage}×
+            </span>
+          ) : null}
         </span>
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           {trade.side ?? "—"}
@@ -445,13 +529,16 @@ function OpenTradeCard({
           {formatSignedUSD(trade.pnl_usd)}
         </span>
         <span className={`font-mono text-xs ${tone}`}>
-          {formatPct(trade.pnl_pct ?? trade.roi_pct)}
+          {formatPct(trade.roi_pct ?? trade.pnl_pct)}
         </span>
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs">
         <Mini label="Entry" value={trade.entry ?? "—"} />
         <Mini label="Mark" value={trade.mark_price ?? "—"} />
-        <Mini label="SL · TP" value={`${trade.sl_price ?? "—"} · ${trade.tp_price ?? "—"}`} />
+        <Mini
+          label="SL · TP"
+          value={`${slOf(trade)} · ${tpOf(trade)}`}
+        />
       </div>
     </button>
   );
@@ -488,6 +575,7 @@ function TradeDetail({
           {trade.symbol ?? "Trade"}
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
             {trade.side ?? "—"}
+            {trade.leverage ? ` · ${trade.leverage}×` : ""}
           </span>
           {(trade.status ?? "").toLowerCase() === "open" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.08] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald">
@@ -502,8 +590,8 @@ function TradeDetail({
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <Field label="Entry" value={trade.entry ?? "—"} />
         <Field label="Exit" value={trade.exit ?? "—"} />
-        <Field label="SL" value={trade.sl_price ?? "—"} />
-        <Field label="TP" value={trade.tp_price ?? "—"} />
+        <Field label="SL" value={slOf(trade)} />
+        <Field label="TP" value={tpOf(trade)} />
         <Field
           label="PnL"
           value={
@@ -520,11 +608,13 @@ function TradeDetail({
             </span>
           }
         />
+        <Field label="Score" value={trade.score ?? "—"} />
+        <Field label="Exit reason" value={trade.exit_reason ?? "—"} />
         <Field label="Opened" value={formatDate(trade.opened_at)} />
         <Field label="Closed" value={formatDate(trade.closed_at)} />
         <Field
           label="Duration"
-          value={formatDuration(trade.duration_seconds)}
+          value={formatDuration(trade.duration, trade.duration_seconds)}
         />
       </dl>
     </Modal>

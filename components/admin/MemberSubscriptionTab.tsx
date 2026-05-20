@@ -78,6 +78,11 @@ export function MemberSubscriptionTab({ member }: Props) {
   const [refundReason, setRefundReason] = useState("");
   const [refundBusy, setRefundBusy] = useState(false);
 
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelImmediate, setCancelImmediate] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -251,41 +256,62 @@ export function MemberSubscriptionTab({ member }: Props) {
         </dl>
       </section>
 
-      {/* Payment method — productive fallback to Stripe */}
+      {/* Payment method */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
         <header className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
             Payment method
           </h2>
         </header>
-        <div className="mt-4 flex items-start gap-3 rounded-lg border border-border/60 bg-background px-4 py-3">
-          <span
-            aria-hidden
-            className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-surface text-muted-foreground"
-          >
-            <IconCreditCard size={16} stroke={1.75} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm text-foreground">
-              Card details aren&apos;t surfaced through the admin API.
-            </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              View the saved payment method directly in the Stripe
-              customer page.
-            </p>
-          </div>
-          {cusId && (
-            <a
-              href={stripeCustomerUrl(cusId)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:border-emerald/40"
+        {member.payment_method ? (
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-border/60 bg-background px-4 py-3">
+            <span
+              aria-hidden
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-emerald/[0.08] text-emerald"
             >
-              View in Stripe
-              <IconArrowUpRight size={11} stroke={2} aria-hidden />
-            </a>
-          )}
-        </div>
+              <IconCreditCard size={16} stroke={1.75} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-foreground">
+                {(member.payment_method.brand ?? "Card").toUpperCase()} ·
+                ····{" "}
+                {member.payment_method.last_4 ??
+                  member.payment_method.last4 ??
+                  "????"}
+              </p>
+              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                {member.payment_method.exp_month &&
+                member.payment_method.exp_year
+                  ? `Expires ${String(member.payment_method.exp_month).padStart(2, "0")}/${String(member.payment_method.exp_year).slice(-2)}`
+                  : "Expiry unavailable"}
+                {member.payment_method.updated_at && (
+                  <> · updated {formatDate(member.payment_method.updated_at)}</>
+                )}
+              </p>
+            </div>
+            {cusId && (
+              <a
+                href={stripeCustomerUrl(cusId)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-border bg-surface px-3 text-xs font-medium text-foreground hover:border-emerald/40"
+              >
+                View in Stripe
+                <IconArrowUpRight size={11} stroke={2} aria-hidden />
+              </a>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center gap-3 rounded-lg border border-border/60 bg-background px-4 py-3 text-sm text-muted-foreground">
+            <span
+              aria-hidden
+              className="inline-flex size-9 shrink-0 items-center justify-center rounded-md bg-surface"
+            >
+              <IconCreditCard size={16} stroke={1.75} />
+            </span>
+            No card on file.
+          </div>
+        )}
       </section>
 
       {/* Invoice history */}
@@ -399,31 +425,14 @@ export function MemberSubscriptionTab({ member }: Props) {
             <IconReceiptRefund size={13} stroke={1.75} />
             Refund last invoice
           </button>
-          {cusId ? (
-            <a
-              href={`${stripeCustomerUrl(cusId)}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground hover:border-red-400/40"
-            >
-              Cancel in Stripe
-              <IconArrowUpRight size={11} stroke={2} aria-hidden />
-            </a>
-          ) : (
-            <button
-              type="button"
-              disabled
-              title="Backend endpoint pending"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-muted-foreground opacity-60 disabled:cursor-not-allowed"
-            >
-              Cancel subscription
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setCancelOpen(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-400/40 bg-red-500/[0.08] px-3 text-xs font-semibold text-red-200 hover:bg-red-500/[0.14]"
+          >
+            Cancel subscription
+          </button>
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Cancel in Stripe is a deep-link fallback — the in-app
-          cancel endpoint lands shortly and will replace this button.
-        </p>
       </section>
 
       <Modal
@@ -470,6 +479,126 @@ export function MemberSubscriptionTab({ member }: Props) {
                 />
               )}
               Refund
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={cancelOpen}
+        onClose={() => !cancelBusy && setCancelOpen(false)}
+        title="Cancel subscription?"
+        description="Defaults to cancel-at-period-end so the member keeps access through the current billing cycle."
+        size="sm"
+      >
+        <div className="space-y-4 text-sm text-foreground">
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+              Reason (optional)
+            </span>
+            <textarea
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. member requested refund, fraud, etc."
+              className="mt-1 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-emerald focus:outline-none"
+            />
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 rounded-md border border-border bg-background px-3 py-2">
+            <input
+              type="checkbox"
+              checked={cancelImmediate}
+              onChange={(e) => setCancelImmediate(e.target.checked)}
+              className="mt-0.5 size-4"
+            />
+            <span>
+              <span className="block text-sm text-foreground">
+                Cancel immediately
+              </span>
+              <span className="block text-xs text-muted-foreground">
+                Revokes access right away and may trigger a prorated
+                refund. Default is cancel-at-period-end.
+              </span>
+            </span>
+          </label>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCancelOpen(false)}
+              disabled={cancelBusy}
+              className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (cancelBusy) return;
+                setCancelBusy(true);
+                try {
+                  const res = await fetch(
+                    `/api/proxy/admin/members/${encodeURIComponent(member.id)}/cancel-subscription`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        ...(cancelReason.trim()
+                          ? { reason: cancelReason.trim() }
+                          : {}),
+                        immediate: cancelImmediate,
+                      }),
+                    },
+                  );
+                  const data = (await res.json().catch(() => null)) as {
+                    effective_date?: string;
+                    refund_amount_usd?: number | null;
+                    message?: string;
+                    error?: string;
+                  } | null;
+                  if (!res.ok) {
+                    throw new Error(
+                      data?.message ?? data?.error ?? `HTTP ${res.status}`,
+                    );
+                  }
+                  const eff = data?.effective_date
+                    ? ` (effective ${formatDate(data.effective_date)})`
+                    : "";
+                  const refund =
+                    typeof data?.refund_amount_usd === "number" &&
+                    data.refund_amount_usd > 0
+                      ? ` · ${formatUSD(data.refund_amount_usd)} refunded`
+                      : "";
+                  setToast({
+                    message: `Subscription cancelled${eff}${refund}`,
+                    tone: "success",
+                  });
+                  setCancelOpen(false);
+                  setCancelReason("");
+                  setCancelImmediate(false);
+                } catch (err) {
+                  setToast({
+                    message:
+                      err instanceof Error
+                        ? `Cancel failed · ${err.message}`
+                        : "Cancel failed",
+                    tone: "error",
+                  });
+                } finally {
+                  setCancelBusy(false);
+                }
+              }}
+              disabled={cancelBusy}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-red-400/40 bg-red-500/[0.08] px-3 text-sm font-semibold text-red-200 hover:bg-red-500/[0.14] disabled:opacity-60"
+            >
+              {cancelBusy && (
+                <IconLoader2
+                  size={14}
+                  stroke={2}
+                  className="animate-spin"
+                  aria-hidden
+                />
+              )}
+              Cancel subscription
             </button>
           </div>
         </div>
