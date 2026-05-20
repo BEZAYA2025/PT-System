@@ -208,7 +208,11 @@ export function MemberAvenTab({ member }: Props) {
                 : "No Aven conversations yet for this member."}
           </p>
         ) : (
-          <div className="mt-5">
+          // Match the live Dashboard AvenChat's scroll container so
+          // the transcript can't push the page indefinitely — bubbles
+          // scroll within their own box, sized identically on mobile
+          // (480px) and sm+ (360px) to the member-facing live chat.
+          <div className="relative mt-5 max-h-[480px] overflow-y-auto sm:max-h-[360px]">
             <ChatBubbleList messages={messages} />
           </div>
         )}
