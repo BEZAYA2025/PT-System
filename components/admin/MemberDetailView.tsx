@@ -418,12 +418,12 @@ export function MemberDetailView({
 
       <nav
         aria-label="Member detail tabs"
-        // Horizontal-scroll affordance only on narrow viewports — on
-        // sm+ the six tabs comfortably fit the max-w-6xl container.
-        // Background uses the theme `background` token so the sticky
-        // nav blends with the surrounding page; the previous hardcoded
-        // #0a0a0a/95 sat off-shade against the admin chrome.
-        className="sticky top-0 z-20 -mx-4 overflow-x-auto border-b border-border bg-background/95 px-4 backdrop-blur sm:-mx-6 sm:overflow-visible sm:px-6 md:-mx-8 md:px-8"
+        // Minimal: tab headings only, active one carries the emerald
+        // underline marker. No sticky positioning, no row-level
+        // background or border — Paul wants the headings to read as
+        // text, not as a chrome strip. Mobile still gets horizontal
+        // scroll so six tabs don't squish; desktop flexes naturally.
+        className="overflow-x-auto sm:overflow-visible"
       >
         <ul className="flex min-w-max gap-1 sm:min-w-0">
           {TABS.map(({ key, label, star }) => {
