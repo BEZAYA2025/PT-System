@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { IconCheck, IconChevronRight, IconCircle } from "@tabler/icons-react";
 import { Toast, type ToastState } from "@/components/Toast";
 import { cardClasses } from "@/lib/ui";
+import { track } from "@/lib/track";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
 
@@ -95,6 +96,7 @@ export function SetupProgressCard({
   };
 
   const handleStepClick = (kind: SetupStepKind) => {
+    track("setup_click", { step: kind });
     if (kind === "telegram") setOpenModal("telegram");
     else if (kind === "exchange") setOpenModal("exchange");
   };

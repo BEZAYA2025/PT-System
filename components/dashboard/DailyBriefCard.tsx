@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import {
   IconArrowRight,
@@ -11,6 +11,7 @@ import { Modal } from "@/components/Modal";
 import { BriefAvatar } from "./BriefAvatar";
 import { BriefingFullView } from "./BriefingFullView";
 import { timeAgo } from "@/lib/format";
+import { track } from "@/lib/track";
 import type { DailyBriefView } from "@/lib/daily-brief";
 import type { BiasTone } from "@/lib/briefing-parser";
 
@@ -109,7 +110,19 @@ export function DailyBriefCard({
   const bias = parsed?.primaryBias ?? null;
   const setup = parsed?.setup ?? null;
 
-  const openModal = () => setOpen(true);
+  // Fire brief_read once the modal opens for a given brief — repeat
+  // expands of the same brief by the same member don't re-count.
+  const readFiredRef = useRef<string | null>(null);
+  const openModal = () => {
+    setOpen(true);
+    if (readFiredRef.current !== brief.generatedAt) {
+      readFiredRef.current = brief.generatedAt;
+      track("brief_read", {
+        briefing_generated_at: brief.generatedAt,
+        is_stale: brief.isStale,
+      });
+    }
+  };
   const onCardKey = (e: KeyboardEvent<HTMLElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();

@@ -1,13 +1,21 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
+  IconActivity,
+  IconAlertCircle,
   IconBrandTelegram,
   IconChartCandle,
   IconCircleCheck,
   IconCircleX,
+  IconLoader2,
   IconLogin,
 } from "@tabler/icons-react";
-import type { LoginHistoryEntry, MemberDetail } from "@/lib/admin";
+import type {
+  LoginHistoryEntry,
+  MemberDetail,
+  MemberEvent,
+} from "@/lib/admin";
 
 interface Props {
   member: MemberDetail;
@@ -52,6 +60,44 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
       member.has_exchange_connection ??
       member.binance_api_key_connected,
   );
+
+  // In-app activity events (page_view / brief_read / setup_click /
+  // etc.) come from the events feed filtered to event_type=activity.
+  // Lazy-loaded after first paint so the tab opens instantly even on
+  // members with a deep event history.
+  const [events, setEvents] = useState<MemberEvent[] | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(
+      `/api/proxy/admin/members/${encodeURIComponent(member.id)}/events?event_type=activity&days=30`,
+      { cache: "no-store" },
+    )
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((data: unknown) => {
+        if (cancelled) return;
+        const list = Array.isArray(data)
+          ? (data as MemberEvent[])
+          : data && typeof data === "object"
+            ? ((data as { events?: MemberEvent[] }).events ?? [])
+            : [];
+        setEvents(list);
+      })
+      .catch((err: Error) => {
+        if (!cancelled) setEventsError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setEventsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [member.id]);
 
   return (
     <div className="space-y-6">
@@ -139,17 +185,92 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
         </dl>
       </section>
 
-      {/* Sprint 3: Page-Views, Setup-Clicks, Brief-Open-History will
-          land here once the tracking pipeline is live. Leaving the
-          placeholder visible so the gap is honest rather than hidden. */}
-      <section className="rounded-2xl border border-dashed border-border bg-surface/20 px-5 py-6">
-        <p className="text-xs text-muted-foreground">
-          <strong className="text-foreground">Coming in Sprint 3:</strong>{" "}
-          page views, setup-flow clicks, and brief open history land
-          here once the tracking pipeline ships.
-        </p>
+      {/* In-app activity events — page_view / brief_read / setup_click /
+          etc. Fed by the tracker library which fires from the dashboard
+          chrome and key cards. */}
+      <section className="rounded-2xl border border-border bg-surface/40 p-5">
+        <header className="flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold tracking-tight text-foreground">
+            In-app activity · last 30 days
+          </h2>
+          {events && (
+            <p className="font-mono text-[11px] text-muted-foreground">
+              {events.length} event{events.length === 1 ? "" : "s"}
+            </p>
+          )}
+        </header>
+        {eventsLoading ? (
+          <p className="mt-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+            <IconLoader2
+              size={12}
+              stroke={2}
+              className="animate-spin"
+              aria-hidden
+            />
+            Loading events…
+          </p>
+        ) : eventsError ? (
+          <p className="mt-4 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+            <IconAlertCircle size={12} stroke={1.75} aria-hidden />
+            Couldn&apos;t load events · {eventsError}
+          </p>
+        ) : !events || events.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No in-app events captured in the last 30 days.
+          </p>
+        ) : (
+          <ol className="mt-4 space-y-2">
+            {events.slice(0, 50).map((e, idx) => (
+              <ActivityEventRow
+                key={`${e.timestamp ?? idx}-${idx}`}
+                event={e}
+              />
+            ))}
+          </ol>
+        )}
       </section>
     </div>
+  );
+}
+
+function ActivityEventRow({ event }: { event: MemberEvent }) {
+  const ts = event.timestamp ?? event.created_at;
+  const path =
+    event.metadata && typeof event.metadata.path === "string"
+      ? (event.metadata.path as string)
+      : null;
+  const step =
+    event.metadata && typeof event.metadata.step === "string"
+      ? (event.metadata.step as string)
+      : null;
+  const briefId =
+    event.metadata && typeof event.metadata.briefing_generated_at === "string"
+      ? (event.metadata.briefing_generated_at as string)
+      : null;
+  const subtitle = path ?? step ?? briefId ?? null;
+  return (
+    <li className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5">
+      <span
+        aria-hidden
+        className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald/[0.10] text-emerald"
+      >
+        <IconActivity size={13} stroke={1.75} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-foreground">
+          {event.description ?? event.event_type ?? "Event"}
+          {event.event_type && !event.description && (
+            <span className="ml-1 font-mono text-[11px] text-muted-foreground">
+              · {event.event_type}
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+          {formatDate(ts)}
+          {subtitle && <> · {subtitle}</>}
+        </p>
+      </div>
+    </li>
   );
 }
 
