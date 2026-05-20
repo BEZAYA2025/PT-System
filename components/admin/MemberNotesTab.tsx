@@ -23,6 +23,14 @@ interface Props {
   member: MemberDetail;
 }
 
+// Backend §27 P8: notes may surface text under any of these keys.
+// Always read via this helper so an existing-note Edit click can't
+// land `undefined` into the controlled textarea (the source of the
+// "Something glitched on the admin panel" render-crash Paul caught).
+function noteContentOf(n: MemberNote): string {
+  return n.content ?? n.body ?? n.text ?? n.note ?? "";
+}
+
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   const t = Date.parse(iso);
@@ -454,7 +462,7 @@ export function MemberNotesTab({ member }: Props) {
                       type="button"
                       onClick={() => {
                         setEditing(n);
-                        setDraft(n.content);
+                        setDraft(noteContentOf(n));
                       }}
                       className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground"
                       aria-label="Edit note"
@@ -472,7 +480,7 @@ export function MemberNotesTab({ member }: Props) {
                   </span>
                 </header>
                 <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
-                  {n.content}
+                  {noteContentOf(n)}
                 </p>
               </li>
             ))}

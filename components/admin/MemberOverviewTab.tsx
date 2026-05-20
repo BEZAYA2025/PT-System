@@ -1,9 +1,12 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import {
   IconActivity,
   IconBolt,
   IconChartCandle,
+  IconChevronDown,
+  IconChevronRight,
   IconClipboardCheck,
   IconHeartbeat,
   IconLogin,
@@ -15,6 +18,7 @@ import type {
   MemberDetail,
   MemberEvent,
 } from "@/lib/admin";
+import { bucketByDay, formatDayHeader } from "@/lib/admin-format";
 
 interface Props {
   member: MemberDetail;
@@ -235,13 +239,32 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
   // login-history payload so the timeline still has content for
   // members whose events row is sparse.
   const timeline = events.length > 0 ? events : loginsAsEvents(loginHistory);
-  // P3 follow-up: 12 was too tight — for engaged members (baba ran
-  // ~76 events in 7d alone) the timeline looked thin compared to
-  // their real activity. 30 fits a typical week of dense use without
-  // turning the consolidated section back into a tall scroll-block.
-  const TIMELINE_CAP = 30;
-  const recentTimeline = timeline.slice(0, TIMELINE_CAP);
-  const timelineTruncated = timeline.length > TIMELINE_CAP;
+
+  // P3 v2: log-style sections drown the page. Default collapsed,
+  // optional event-type filter, group by day. Distinct event_type
+  // values get extracted into a dropdown so the founder can isolate
+  // (e.g.) "trade" from a noisy login stream.
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [eventTypeFilter, setEventTypeFilter] = useState<string>("all");
+  const eventTypes = useMemo(() => {
+    const seen = new Set<string>();
+    for (const e of timeline) {
+      if (e.event_type) seen.add(e.event_type);
+    }
+    return Array.from(seen).sort();
+  }, [timeline]);
+  const filteredTimeline = useMemo(
+    () =>
+      eventTypeFilter === "all"
+        ? timeline
+        : timeline.filter((e) => e.event_type === eventTypeFilter),
+    [timeline, eventTypeFilter],
+  );
+  const timelineByDay = useMemo(
+    () =>
+      bucketByDay(filteredTimeline, (e) => e.timestamp ?? e.created_at),
+    [filteredTimeline],
+  );
 
   return (
     <div className="space-y-6">
@@ -328,69 +351,115 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
         </div>
       </section>
 
-      {/* Activity — P3: 7d summary + 30d timeline collapsed into ONE
-          section. Header shows the 7d total at a glance; a thin
-          two-tone bar surfaces the Aven/Trades split when backend
-          ships the breakdown. Below, the same merged events feed
-          (capped at 12 most-recent) provides the deep-look context
-          without making the founder scroll through two scroll-bound
-          panels. */}
+      {/* Activity — P3 v2: collapsed by default (it's a log, not a
+          headline metric). Header shows the 7d total + 30d count so
+          the founder doesn't need to expand to see the shape. When
+          expanded: optional event-type filter, day-grouped timeline. */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
-        <header className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Activity
-          </h2>
+        <button
+          type="button"
+          onClick={() => setActivityOpen((v) => !v)}
+          aria-expanded={activityOpen}
+          className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+        >
+          <span className="flex items-center gap-1.5">
+            {activityOpen ? (
+              <IconChevronDown size={14} stroke={1.75} aria-hidden />
+            ) : (
+              <IconChevronRight size={14} stroke={1.75} aria-hidden />
+            )}
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              Activity
+            </h2>
+          </span>
           <p className="font-mono text-[11px] text-muted-foreground">
             <span className="text-foreground">{activity.total}</span> in 7d ·
-            last 30d below
+            <span className="text-foreground"> {timeline.length}</span> in 30d
           </p>
-        </header>
+        </button>
 
-        {activity.hasBreakdown && stackSum > 0 && (
-          <div className="mt-3">
-            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-background">
-              <div
-                aria-label={`${aven7} Aven messages`}
-                className="h-full bg-emerald"
-                style={{ width: `${avenPct}%` }}
-              />
-              <div
-                aria-label={`${trades7} trades`}
-                className="h-full bg-sky-400"
-                style={{ width: `${tradesPct}%` }}
-              />
-            </div>
-            <ul className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-              <li className="inline-flex items-center gap-1.5">
-                <span aria-hidden className="size-1.5 rounded-full bg-emerald" />
-                Aven{" "}
-                <span className="font-mono text-foreground">{aven7}</span>
-              </li>
-              <li className="inline-flex items-center gap-1.5">
-                <span aria-hidden className="size-1.5 rounded-full bg-sky-400" />
-                Trades{" "}
-                <span className="font-mono text-foreground">{trades7}</span>
-              </li>
-            </ul>
-          </div>
-        )}
-
-        {recentTimeline.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            No activity recorded in the last 30 days.
-          </p>
-        ) : (
+        {activityOpen && (
           <>
-            <ol className="mt-4 space-y-2 border-t border-border/40 pt-4">
-              {recentTimeline.map((entry, idx) => (
-                <EventRow key={`${entry.timestamp ?? idx}-${idx}`} entry={entry} />
-              ))}
-            </ol>
-            {timelineTruncated && (
-              <p className="mt-3 text-center font-mono text-[11px] text-muted-foreground">
-                Showing {TIMELINE_CAP} of {timeline.length} events · full log
-                in the Activity tab
+            {activity.hasBreakdown && stackSum > 0 && (
+              <div className="mt-3">
+                <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-background">
+                  <div
+                    aria-label={`${aven7} Aven messages`}
+                    className="h-full bg-emerald"
+                    style={{ width: `${avenPct}%` }}
+                  />
+                  <div
+                    aria-label={`${trades7} trades`}
+                    className="h-full bg-sky-400"
+                    style={{ width: `${tradesPct}%` }}
+                  />
+                </div>
+                <ul className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                  <li className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className="size-1.5 rounded-full bg-emerald" />
+                    Aven{" "}
+                    <span className="font-mono text-foreground">{aven7}</span>
+                  </li>
+                  <li className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className="size-1.5 rounded-full bg-sky-400" />
+                    Trades{" "}
+                    <span className="font-mono text-foreground">{trades7}</span>
+                  </li>
+                </ul>
+              </div>
+            )}
+
+            {eventTypes.length > 0 && (
+              <div className="mt-3 flex items-center gap-2">
+                <label
+                  htmlFor="event-type-filter"
+                  className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
+                >
+                  Filter
+                </label>
+                <select
+                  id="event-type-filter"
+                  value={eventTypeFilter}
+                  onChange={(e) => setEventTypeFilter(e.target.value)}
+                  className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground focus:border-emerald focus:outline-none"
+                >
+                  <option value="all">All event types</option>
+                  {eventTypes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {filteredTimeline.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                {eventTypeFilter === "all"
+                  ? "No activity recorded in the last 30 days."
+                  : `No "${eventTypeFilter}" events in the last 30 days.`}
               </p>
+            ) : (
+              <div className="mt-4 space-y-4 border-t border-border/40 pt-4">
+                {timelineByDay.map(([day, dayEvents]) => (
+                  <div key={day}>
+                    <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                      {formatDayHeader(day)}
+                      <span className="ml-2 text-muted-foreground/70">
+                        · {dayEvents.length}
+                      </span>
+                    </h3>
+                    <ol className="space-y-2">
+                      {dayEvents.map((entry, idx) => (
+                        <EventRow
+                          key={`${entry.timestamp ?? idx}-${idx}`}
+                          entry={entry}
+                        />
+                      ))}
+                    </ol>
+                  </div>
+                ))}
+              </div>
             )}
           </>
         )}

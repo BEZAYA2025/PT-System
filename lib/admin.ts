@@ -198,9 +198,15 @@ export interface AdminSignupsPayload {
   new_7d?: number | null;
   new_30d?: number | null;
   active?: number | null;
-  /** Backend §27 O1: 30d total may live nested under `totals.total`
-   *  on the new endpoint shape. Read both. */
-  totals?: { total?: number | null } | null;
+  /** Backend §27 O1: 30d totals — `total` is the all-tier sum,
+   *  `standard` / `vip` break it down per-tier so the New-Members
+   *  card can honour its tier-filter without going back to the
+   *  member-list. */
+  totals?: {
+    total?: number | null;
+    standard?: number | null;
+    vip?: number | null;
+  } | null;
   /** Newly exposed per Auftrag G §27 — top-level subscription
    *  counters Paul wants to surface on the dashboard. */
   active_trials?: number | null;
@@ -299,7 +305,15 @@ export async function fetchAdminSystemHealth(): Promise<SystemHealthResponse | n
 
 export interface MemberNote {
   id: string;
-  content: string;
+  /** Backend §27 P8: backend accepts ANY of `content`, `body`, `text`,
+   *  `note` on write. On read it usually ships `content` but a stale
+   *  row could expose `body`. Read sites must defensively chain through
+   *  noteContentOf() so an existing-note OPEN doesn't crash on
+   *  `undefined.value` in the textarea. */
+  content?: string | null;
+  body?: string | null;
+  text?: string | null;
+  note?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
   author_id?: string | null;

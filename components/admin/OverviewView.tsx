@@ -125,12 +125,27 @@ export function OverviewView({
 
   const newCount = useMemo(() => {
     const w = NEW_WINDOWS.find((x) => x.key === newWindow)!;
+    // §27 O1: when the toggle is on 30d AND backend has shipped the
+    // signups payload (fetched server-side with ?window=30d), trust
+    // the backend total over our client-side member-list filter. The
+    // list-filter approach undercounted whenever a member's
+    // joined_at was null or pre-dated the local hydration; per
+    // Pauls curl-verification backend's `total=3` is the truth.
+    // Other windows (today / 7d) have no dedicated backend counter
+    // yet — keep the local filter for those.
+    if (newWindow === "30d" && signups) {
+      if (newTier === "all") {
+        return signups.total ?? signups.totals?.total ?? 0;
+      }
+      if (newTier === "standard") return signups.totals?.standard ?? 0;
+      if (newTier === "vip") return signups.totals?.vip ?? 0;
+    }
     return list
       .filter(
         (m) => newTier === "all" || (m.tier ?? "standard") === newTier,
       )
       .filter((m) => withinDays(m.joined_at ?? m.created_at, w.days)).length;
-  }, [list, newWindow, newTier]);
+  }, [list, newWindow, newTier, signups]);
 
   const activeCount = useMemo(() => {
     const w = ACTIVE_WINDOWS.find((x) => x.key === activeWindow)!;
@@ -336,20 +351,37 @@ export function OverviewView({
             }
           />
 
-          {/* Trial → Paid */}
+          {/* Trial → Paid — §27 O3a: prefer the new top-level
+              active_trials / active_paying counters when backend
+              ships them (post-Auftrag G). They give the founder the
+              actual subscription split as the headline; the funnel
+              conversion-rate becomes the supporting hint. Falls back
+              to the old funnel-only display on older deploys. */}
           <KpiCard
             href="/admin/business?tab=funnel"
             icon={IconArrowRight}
             label="Trial → paid"
-            value={trialConversion ? formatPct(trialConversion.rate) : "—"}
+            value={
+              typeof signups?.active_trials === "number" ||
+              typeof signups?.active_paying === "number"
+                ? `${formatNumber(signups?.active_trials ?? 0)} / ${formatNumber(signups?.active_paying ?? 0)}`
+                : trialConversion
+                  ? formatPct(trialConversion.rate)
+                  : "—"
+            }
             hint={
-              trialConversion &&
-              trialConversion.converted !== null &&
-              trialConversion.started !== null
-                ? `${formatNumber(trialConversion.converted)} of ${formatNumber(trialConversion.started)} trials converted`
-                : funnel === null
-                  ? "Funnel data unavailable"
-                  : "No trials yet"
+              typeof signups?.active_trials === "number" ||
+              typeof signups?.active_paying === "number"
+                ? trialConversion
+                  ? `Trial · Paying · ${formatPct(trialConversion.rate)} conversion`
+                  : "Trial · Paying"
+                : trialConversion &&
+                    trialConversion.converted !== null &&
+                    trialConversion.started !== null
+                  ? `${formatNumber(trialConversion.converted)} of ${formatNumber(trialConversion.started)} trials converted`
+                  : funnel === null
+                    ? "Funnel data unavailable"
+                    : "No trials yet"
             }
           />
         </div>
