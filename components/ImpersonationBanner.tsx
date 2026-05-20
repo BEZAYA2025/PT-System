@@ -85,10 +85,17 @@ export function ImpersonationBanner() {
     }
   };
 
+  // NOT sticky — the dashboard and admin layouts both have their
+  // own `sticky top-0` chrome (DashboardHeader / AdminShell mobile
+  // bar / member-detail tab nav). Stacking a second sticky on top
+  // either covers the chrome or requires per-layout `top` offsets.
+  // Banner sits in normal flow at the top of the page; the loud
+  // amber colour keeps it noticeable on first paint, and every
+  // route change re-paints it via the layout.
   return (
     <div
       role="alert"
-      className="sticky top-0 z-50 border-b border-amber-500/40 bg-amber-500/[0.10] text-amber-200 backdrop-blur"
+      className="border-b border-amber-500/40 bg-amber-500/[0.10] text-amber-200"
     >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm sm:px-6 md:px-8">
         <span className="inline-flex items-center gap-2 font-medium">

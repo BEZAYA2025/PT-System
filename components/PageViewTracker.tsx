@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { track } from "@/lib/track";
 
-// Embed once per layout. Fires a `page_view` event on every route
-// change (pathname + search params). Renders nothing.
-export function PageViewTracker() {
+// Inner component reads useSearchParams — per Next.js docs, any
+// client component using that hook must sit inside a Suspense
+// boundary so the rest of the tree can still prerender. The outer
+// PageViewTracker provides the boundary so callers don't have to.
+
+function PageViewTrackerInner() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const qs = searchParams.toString();
@@ -21,4 +24,12 @@ export function PageViewTracker() {
   }, [pathname, qs]);
 
   return null;
+}
+
+export function PageViewTracker() {
+  return (
+    <Suspense fallback={null}>
+      <PageViewTrackerInner />
+    </Suspense>
+  );
 }
