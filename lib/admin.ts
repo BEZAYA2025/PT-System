@@ -45,6 +45,9 @@ export interface AdminMembersListEntry {
   /** Sprint 2 alias for has_exchange_connection — the spec uses
    *  this shorter name; we accept either to stay compatible. */
   exchange_connected?: boolean;
+  /** Per-exchange label (e.g. "binance"/"bitunix"). Optional on the
+   *  list endpoint — adoption breakdown groups by this when present. */
+  exchange_type?: string | null;
   tags?: string[] | null;
 }
 
@@ -164,6 +167,69 @@ export interface SystemService {
 export interface SystemHealthResponse {
   services: SystemService[];
   overall: SystemHealthTone;
+}
+
+export interface AdminSignupsPayload {
+  total?: number | null;
+  new_7d?: number | null;
+  new_30d?: number | null;
+  active?: number | null;
+}
+
+export async function fetchAdminSignups(): Promise<AdminSignupsPayload | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>("/api/admin/metrics/signups", {
+    method: "GET",
+    token,
+  });
+  if (!res.ok) return null;
+  return (res.data ?? {}) as AdminSignupsPayload;
+}
+
+export interface AdminFunnelPayload {
+  visitors?: number | null;
+  signups?: number | null;
+  trials_started?: number | null;
+  trials_converted?: number | null;
+  conversion_rate?: number | null;
+}
+
+export async function fetchAdminFunnel(): Promise<AdminFunnelPayload | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>("/api/admin/metrics/funnel", {
+    method: "GET",
+    token,
+  });
+  if (!res.ok) return null;
+  return (res.data ?? {}) as AdminFunnelPayload;
+}
+
+export interface AdminDriftEntry {
+  id?: string | null;
+  severity?: string | null;
+  pattern_matched?: string | null;
+  created_at?: string | null;
+}
+
+export async function fetchAdminCriticalDriftToday(): Promise<
+  AdminDriftEntry[] | null
+> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>(
+    "/api/admin/aven/drift-log?severity=critical&days=1&limit=20",
+    { method: "GET", token },
+  );
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as AdminDriftEntry[];
+  if (d && typeof d === "object") {
+    const arr = (d as { entries?: unknown }).entries;
+    if (Array.isArray(arr)) return arr as AdminDriftEntry[];
+  }
+  return [];
 }
 
 export async function fetchAdminSystemHealth(): Promise<SystemHealthResponse | null> {
