@@ -33,18 +33,21 @@ export function SignInForm() {
   const resetConfirmed = search.get("reset") === "1";
 
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // LOGIN-1: react-hook-form's isSubmitting drops back to false as soon
-  // as our async onSubmit returns — but `router.replace()` is fire-and-
-  // forget, so the button snapped back to "Sign in" while the actual
-  // navigation was still in flight. Track a local `redirecting` flag
-  // that stays true through the navigation so the spinner + disabled
-  // state survive until the page unmounts.
-  const [redirecting, setRedirecting] = useState(false);
+
+  // LOGIN-1 (v2): one source of truth instead of mixing
+  // react-hook-form's isSubmitting with a separate `redirecting` flag —
+  // the two flags batched differently across renders and the button
+  // could briefly flash back to "Sign in" between submitting and
+  // redirecting. A single phase variable that we control end-to-end
+  // means the label only ever moves forward through the sequence
+  // idle → submitting → redirecting, never back.
+  type Phase = "idle" | "submitting" | "redirecting";
+  const [phase, setPhase] = useState<Phase>("idle");
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting },
+    formState: { errors },
   } = useForm<SignInInput>({
     resolver: zodResolver(signInSchema),
     defaultValues: { email: "", password: "" },
@@ -52,6 +55,7 @@ export function SignInForm() {
 
   const onSubmit = async (values: SignInInput) => {
     setSubmitError(null);
+    setPhase("submitting");
     try {
       const res = await fetch("/api/proxy/auth/signin", {
         method: "POST",
@@ -62,10 +66,12 @@ export function SignInForm() {
 
       if (res.status === 401) {
         setSubmitError("Invalid email or password.");
+        setPhase("idle");
         return;
       }
       if (res.status === 429) {
         setSubmitError("Too many attempts. Please try again later.");
+        setPhase("idle");
         return;
       }
       if (!res.ok) {
@@ -74,31 +80,36 @@ export function SignInForm() {
             ? data.message
             : "Sign-in failed. Please try again.",
         );
+        setPhase("idle");
         return;
       }
 
       // Cookie is set by the proxy. Send the user where they were headed.
       const safeRedirect = redirectTo.startsWith("/") ? redirectTo : "/dashboard";
-      setRedirecting(true);
+      setPhase("redirecting");
       // LOGIN-3: a soft router.replace raced with the cookie commit on
       // some clients — the RSC fetch for /dashboard occasionally ran
       // before the Set-Cookie response was fully applied, so the
       // server-rendered dashboard came back unauthenticated and the
       // browser sat on a blank screen until a hard reload. A hard
       // navigation guarantees the cookie is committed before the next
-      // request goes out.
+      // request goes out. The page is about to unmount so we don't
+      // reset `phase` after this — the button stays "Redirecting…"
+      // until the new page takes over.
       window.location.replace(safeRedirect);
     } catch {
       setSubmitError("Connection issue. Please try again.");
+      setPhase("idle");
     }
   };
 
-  const busy = isSubmitting || redirecting;
-  const buttonLabel = redirecting
-    ? "Redirecting…"
-    : isSubmitting
-      ? "Signing in…"
-      : "Sign in";
+  const busy = phase !== "idle";
+  const buttonLabel =
+    phase === "redirecting"
+      ? "Redirecting…"
+      : phase === "submitting"
+        ? "Signing in…"
+        : "Sign in";
 
   return (
     <form
