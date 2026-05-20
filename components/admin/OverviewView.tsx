@@ -8,6 +8,7 @@ import {
   IconCircleDot,
   IconClipboardCheck,
   IconExclamationCircle,
+  IconHelpCircle,
   IconLockSquare,
   IconUserPlus,
   IconUsers,
@@ -205,12 +206,18 @@ export function OverviewView({
         ? "warning"
         : "success";
 
+  // Status-Strip "Today's briefing" surfaces SINGLE status, no count
+  // — Paul wants to know what's happening with today's briefing, not
+  // how many are backed up. The pending-count signal we have here
+  // can distinguish two of the three target states; the "None yet"
+  // case needs a dedicated backend flag (currently grouped under
+  // "Approved" — see Sprint-8 backlog).
   const todayBriefingLabel =
     pendingBriefingsCount === null
       ? "—"
       : pendingBriefingsCount > 0
-        ? `${pendingBriefingsCount} pending review`
-        : "All caught up";
+        ? "Pending review"
+        : "Approved";
 
   return (
     <div className="space-y-8">
@@ -265,7 +272,7 @@ export function OverviewView({
             icon={IconUsers}
             label="Active members"
             value={formatNumber(activeCount)}
-            hint="Login, Aven message, or trade in window"
+            tooltipHint="Login, Aven message, or trade in the selected window"
             filters={
               <TogglePills
                 options={ACTIVE_WINDOWS}
@@ -434,21 +441,27 @@ function SectionHeader({
 }
 
 // Uniform card across Membership row + Adoption row. Vertical
-// structure is fixed so cards visually line up regardless of which
-// optional slots they fill:
-//   [top]    header (label + icon)
-//   [top+1]  filters area (reserved height; filters render here when
-//                          present so the toggle row sits at the same
-//                          y-coordinate across every card in the row)
-//   [middle] value + hint, centered, all values rendered at the same
-//            text size (no `prominent` size-up — Pauls call for
-//            row-uniformity beats individual prominence)
+// structure has FIXED-height zones so cards visually line up
+// regardless of which optional slots they fill:
+//   header  (h-6)   label + icon + optional (?) tooltip
+//   filters (h-14)  ALWAYS reserved — accommodates the 2-toggle
+//                   stack in New-Members so the value baseline is
+//                   identical across every card whether filters
+//                   are present or not
+//   value   (text-3xl, centered)
+//   hint    (min-h-5)   inline data sub-line (always reserved, so
+//                       cards with/without a hint line still align
+//                       at the bottom). Explanatory text (vs data)
+//                       goes into `tooltipHint` (renders as a "?"
+//                       icon in the header) — keeps the card body
+//                       clean per Pauls "uniformity" call.
 function KpiCard({
   href,
   icon: Icon,
   label,
   value,
   hint,
+  tooltipHint,
   filters,
   tone,
 }: {
@@ -457,6 +470,7 @@ function KpiCard({
   label: string;
   value: string;
   hint?: string;
+  tooltipHint?: string;
   filters?: React.ReactNode;
   tone?: "emerald" | "red";
 }) {
@@ -471,29 +485,38 @@ function KpiCard({
       href={href}
       className="group flex h-full flex-col rounded-xl border border-border bg-surface/50 p-4 transition-colors hover:border-emerald/40"
     >
-      <header className="flex items-center justify-between gap-2">
-        <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-          {label}
-        </p>
+      <header className="flex h-6 items-center justify-between gap-2">
+        <div className="flex items-center gap-1">
+          <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+            {label}
+          </p>
+          {tooltipHint && (
+            <span
+              className="text-muted-foreground/70 hover:text-muted-foreground"
+              title={tooltipHint}
+              aria-label={tooltipHint}
+            >
+              <IconHelpCircle size={11} stroke={1.75} />
+            </span>
+          )}
+        </div>
         <span className="text-muted-foreground">
           <Icon size={14} stroke={1.75} />
         </span>
       </header>
-      {/* Filter slot — always reserved so cards with + without
-          filters align vertically. min-h matches a TogglePills row. */}
       <div
-        className="mt-3 min-h-7"
+        className="mt-3 h-14"
         onClick={(e) => e.preventDefault()}
       >
         {filters ?? null}
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 py-2 text-center">
+      <div className="mt-auto flex flex-col items-center gap-1 text-center">
         <p className={`text-3xl font-semibold tracking-tight ${toneClass}`}>
           {value}
         </p>
-        {hint && (
-          <p className="text-xs text-muted-foreground">{hint}</p>
-        )}
+        <p className="min-h-5 text-xs text-muted-foreground">
+          {hint ?? " "}
+        </p>
       </div>
     </Link>
   );

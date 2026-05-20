@@ -424,13 +424,27 @@ export function MemberTradesTab({ member }: Props) {
   );
 }
 
+// Backend §25 ships open trades under different wrapper keys depending
+// on the endpoint:
+//   /trades?status=open   → {items: [...]} OR {trades: [...]} OR {open: [...]}
+//   /trades?status=closed → {items: [...]} OR {trades: [...]} OR {closed: [...]}
+// (raw arrays at the response root are also still accepted for the
+// pre-spec endpoints). Read all four so a backend wrapper rename
+// doesn't blank the tab — discovered the hard way when baba's detail
+// page showed no trades despite the API returning the data.
 function extractItems(data: unknown): MemberTrade[] {
   if (Array.isArray(data)) return data as MemberTrade[];
   if (data && typeof data === "object") {
-    const items = (data as { items?: unknown }).items;
-    if (Array.isArray(items)) return items as MemberTrade[];
-    const open = (data as { open?: unknown }).open;
-    if (Array.isArray(open)) return open as MemberTrade[];
+    const d = data as {
+      items?: unknown;
+      trades?: unknown;
+      open?: unknown;
+      closed?: unknown;
+    };
+    if (Array.isArray(d.items)) return d.items as MemberTrade[];
+    if (Array.isArray(d.trades)) return d.trades as MemberTrade[];
+    if (Array.isArray(d.open)) return d.open as MemberTrade[];
+    if (Array.isArray(d.closed)) return d.closed as MemberTrade[];
   }
   return [];
 }
@@ -442,12 +456,21 @@ function extractPage(data: unknown): MemberTradesPage {
   if (data && typeof data === "object") {
     const d = data as {
       items?: MemberTrade[];
+      trades?: MemberTrade[];
+      closed?: MemberTrade[];
       page?: number;
       pages?: number;
       total?: number;
     };
+    const items = Array.isArray(d.items)
+      ? d.items
+      : Array.isArray(d.trades)
+        ? d.trades
+        : Array.isArray(d.closed)
+          ? d.closed
+          : [];
     return {
-      items: Array.isArray(d.items) ? d.items : [],
+      items,
       page: d.page ?? 1,
       pages: d.pages ?? 1,
       total: d.total ?? null,

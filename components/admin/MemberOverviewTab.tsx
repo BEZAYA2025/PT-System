@@ -62,10 +62,15 @@ function timeAgo(iso: string | null | undefined): string {
 
 type HealthTone = "healthy" | "at-risk" | "inactive";
 
-// Backend §25 ships `engagement.activity_7d_total` as the authoritative
-// union count. Older deploys (and the row-level shape) expose the
-// per-source breakdown — read both so the health blurb stays meaningful
-// whichever shape is live.
+// Backend §25 Auftrag G: engagement-block on the detail endpoint is
+// nested ({ engagement: { score, activity_7d_total } }) where the list
+// endpoint keeps the row-level `engagement_score` / `activity_7d`
+// shape. Prefer the nested values, fall back to flat — single helper
+// so every read site stays consistent.
+function engagementScoreOf(member: MemberDetail): number | null {
+  return member.engagement?.score ?? member.engagement_score ?? null;
+}
+
 function activity7dParts(member: MemberDetail): {
   total: number;
   avenMessages: number | null;
@@ -104,7 +109,7 @@ function deriveHealth(member: MemberDetail): {
   label: string;
   reason: string;
 } {
-  const score = member.engagement_score ?? null;
+  const score = engagementScoreOf(member);
   const lastActiveDays = daysSince(member.last_active_at);
   const { total: activityTotal } = activity7dParts(member);
 
@@ -187,9 +192,10 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
   const health = deriveHealth(member);
   const healthClasses = HEALTH_CLASSES[health.tone];
 
+  const engScore = engagementScoreOf(member);
   const avenTotal =
-    member.aven_messages ??
     member.total_aven_messages ??
+    member.aven_messages ??
     null;
   const tradesTotal = member.total_trades ?? null;
   // Backend §25 Auftrag G: trades_summary.win_rate (0..1) is the new
@@ -238,12 +244,7 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
         <KPICard
           icon={IconBolt}
           label="Engagement Score"
-          value={
-            member.engagement_score !== null &&
-            member.engagement_score !== undefined
-              ? `${member.engagement_score}/100`
-              : "—"
-          }
+          value={engScore !== null ? `${engScore}/100` : "—"}
           hint={health.label.replace(/[^A-Za-z- ]/g, "").trim()}
         />
         <KPICard

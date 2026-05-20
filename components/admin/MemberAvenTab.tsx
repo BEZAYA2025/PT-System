@@ -61,11 +61,17 @@ export function MemberAvenTab({ member }: Props) {
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: unknown = await res.json().catch(() => null);
+        // Backend §25 may wrap under `conversations`, `items`, or
+        // ship a raw array — read all three so a per-deploy shape
+        // drift doesn't blank the tab (root cause of the empty-Aven
+        // bug Paul hit on baba's profile).
         const list = Array.isArray(data)
           ? (data as AvenConversationSummary[])
           : data && typeof data === "object"
             ? ((data as { conversations?: AvenConversationSummary[] })
-                .conversations ?? [])
+                .conversations ??
+              (data as { items?: AvenConversationSummary[] }).items ??
+              [])
             : [];
         // Default order: most recent first.
         list.sort((a, b) => {
