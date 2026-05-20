@@ -25,6 +25,7 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin", label: "Overview", icon: IconLayoutDashboard },
   { href: "/admin/briefings", label: "Briefings", icon: IconClipboardCheck },
   { href: "/admin/members", label: "Members", icon: IconUsers },
+  { href: "/admin/aven", label: "Aven Insights", icon: IconBrain },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
 ];
 
@@ -34,7 +35,6 @@ const COMING_SOON: Array<{
 }> = [
   { label: "Business Metrics", icon: IconChartLine },
   { label: "System Health", icon: IconActivity },
-  { label: "Aven Insights", icon: IconBrain },
   { label: "Trading Ops", icon: IconChartCandle },
   { label: "Communications", icon: IconMail },
 ];
