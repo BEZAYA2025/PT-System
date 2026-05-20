@@ -31,15 +31,14 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin/system", label: "System", icon: IconActivity },
   { href: "/admin/configurations", label: "Configurations", icon: IconAdjustments },
   { href: "/admin/communications", label: "Communications", icon: IconMail },
+  { href: "/admin/trading", label: "Trading", icon: IconChartCandle },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
 ];
 
 const COMING_SOON: Array<{
   label: string;
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
-}> = [
-  { label: "Trading Ops", icon: IconChartCandle },
-];
+}> = [];
 
 interface Props {
   displayName: string;
@@ -118,25 +117,29 @@ export function AdminSidebar({ displayName, onNavigate }: Props) {
           })}
         </ul>
 
-        <p className="mt-6 px-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
-          Coming soon
-        </p>
-        <ul className="mt-2 space-y-0.5">
-          {COMING_SOON.map(({ label, icon: Icon }) => (
-            <li key={label}>
-              <span
-                aria-disabled
-                className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground/50"
-              >
-                <Icon size={16} stroke={1.5} />
-                <span className="flex-1 truncate">{label}</span>
-                <span className="rounded-full bg-surface px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70">
-                  Soon
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
+        {COMING_SOON.length > 0 && (
+          <>
+            <p className="mt-6 px-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground/60">
+              Coming soon
+            </p>
+            <ul className="mt-2 space-y-0.5">
+              {COMING_SOON.map(({ label, icon: Icon }) => (
+                <li key={label}>
+                  <span
+                    aria-disabled
+                    className="flex cursor-not-allowed items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground/50"
+                  >
+                    <Icon size={16} stroke={1.5} />
+                    <span className="flex-1 truncate">{label}</span>
+                    <span className="rounded-full bg-surface px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-muted-foreground/70">
+                      Soon
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </nav>
 
       <div className="border-t border-border px-3 py-3">
