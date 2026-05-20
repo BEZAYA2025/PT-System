@@ -17,6 +17,7 @@
 //     undefined-from-backend render-crash class Paul caught earlier.
 
 import { Fragment } from "react";
+import { IconBrandTelegram, IconDeviceLaptop } from "@tabler/icons-react";
 
 // Wide message shape that fits both:
 //   · the member-Live ChatMessage (id, ts, content, role)
@@ -37,6 +38,14 @@ export interface ChatBubbleListMessage {
   ts?: string | null;
   timestamp?: string | null;
   created_at?: string | null;
+  // Channel-of-origin signal: backend SSE emits `channel`, REST emits
+  // `source`, others might surface `via` / `platform`. Normalised to
+  // "telegram" | "web" by messageSource() — anything unrecognised
+  // falls back to "web" so the icon stays meaningful.
+  source?: string | null;
+  channel?: string | null;
+  via?: string | null;
+  platform?: string | null;
 }
 
 // Helpers exported so the live-chat caller can reuse exactly the same
@@ -56,6 +65,19 @@ export function messageRole(m: ChatBubbleListMessage): string {
 export function isUserMessage(m: ChatBubbleListMessage): boolean {
   const r = messageRole(m);
   return r === "user" || r === "member";
+}
+
+export type MessageSource = "telegram" | "web";
+
+export function messageSource(m: ChatBubbleListMessage): MessageSource {
+  const raw = (
+    m.source ??
+    m.channel ??
+    m.via ??
+    m.platform ??
+    ""
+  ).toString().toLowerCase();
+  return raw === "telegram" || raw === "tg" ? "telegram" : "web";
 }
 
 // WhatsApp-style day label. "Today" / "Yesterday" for the recent two
@@ -151,6 +173,32 @@ function formatTime(iso: string | null): string {
 // stays a plain visual — same colour language as the live ChatBubble
 // (emerald-tinted for the member, surface-elevated for Aven) so the
 // member and admin views read as one product.
+// Channel-of-origin pill. Renders for BOTH member-sent and Aven
+// replies so the admin transcript shows whether the conversation
+// happened in the dashboard chat or via the Telegram bridge.
+export function SourceTag({ source }: { source: MessageSource }) {
+  if (source === "telegram") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-emerald"
+        title="Sent via Telegram"
+      >
+        <IconBrandTelegram size={11} stroke={1.75} aria-hidden />
+        Telegram
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-muted-foreground/70"
+      title="Sent via the web dashboard"
+    >
+      <IconDeviceLaptop size={11} stroke={1.75} aria-hidden />
+      Web
+    </span>
+  );
+}
+
 function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
   const isUser = isUserMessage(message);
   const tone = isUser
@@ -158,6 +206,7 @@ function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
     : "rounded-tl-sm bg-surface-elevated text-foreground";
   const ts = messageTimestamp(message);
   const body = messageContent(message);
+  const source = messageSource(message);
   return (
     <div
       className={[
@@ -181,6 +230,8 @@ function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
             <span suppressHydrationWarning>{formatTime(ts)}</span>
           </>
         )}
+        <span aria-hidden>·</span>
+        <SourceTag source={source} />
       </div>
     </div>
   );
