@@ -13,3 +13,13 @@ export async function GET(
     requireAuth: true,
   });
 }
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  return proxyToBackend(req, `/api/admin/briefings/${encodeURIComponent(id)}`, {
+    requireAuth: true,
+  });
+}
