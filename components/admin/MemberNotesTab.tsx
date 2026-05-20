@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   IconAlertCircle,
   IconLoader2,
@@ -17,6 +17,7 @@ import type {
   MemberDetail,
   MemberNote,
 } from "@/lib/admin";
+import { bucketByDay, formatDayHeader } from "@/lib/admin-format";
 
 interface Props {
   member: MemberDetail;
@@ -50,6 +51,12 @@ export function MemberNotesTab({ member }: Props) {
   const [auditLoading, setAuditLoading] = useState(true);
   const [auditError, setAuditError] = useState<string | null>(null);
   const [auditFilter, setAuditFilter] = useState<string>("");
+
+  const auditByDay = useMemo(
+    () =>
+      bucketByDay(audit ?? [], (e) => e.timestamp ?? e.created_at),
+    [audit],
+  );
 
   const [editing, setEditing] = useState<MemberNote | null>(null);
   const [draft, setDraft] = useState("");
@@ -517,32 +524,44 @@ export function MemberNotesTab({ member }: Props) {
             No admin actions yet for this member.
           </p>
         ) : (
-          <ol className="mt-4 space-y-2">
-            {audit.map((entry, idx) => {
-              const ts = entry.timestamp ?? entry.created_at;
-              return (
-                <li
-                  key={`${ts ?? idx}-${idx}`}
-                  className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm text-foreground">
-                      {entry.description ?? entry.action_type ?? "Action"}
-                    </p>
-                    <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                      {formatDateTime(ts)}
-                      {entry.actor && <> · {entry.actor}</>}
-                    </p>
-                  </div>
-                  {entry.action_type && (
-                    <span className="inline-flex shrink-0 items-center rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                      {entry.action_type}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
+          <div className="mt-4 space-y-4">
+            {auditByDay.map(([day, dayEntries]) => (
+              <div key={day}>
+                <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {formatDayHeader(day)}
+                  <span className="ml-2 text-muted-foreground/70">
+                    · {dayEntries.length}
+                  </span>
+                </h3>
+                <ol className="space-y-2">
+                  {dayEntries.map((entry, idx) => {
+                    const ts = entry.timestamp ?? entry.created_at;
+                    return (
+                      <li
+                        key={`${ts ?? idx}-${idx}`}
+                        className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-foreground">
+                            {entry.description ?? entry.action_type ?? "Action"}
+                          </p>
+                          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                            {formatDateTime(ts)}
+                            {entry.actor && <> · {entry.actor}</>}
+                          </p>
+                        </div>
+                        {entry.action_type && (
+                          <span className="inline-flex shrink-0 items-center rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                            {entry.action_type}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ol>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 

@@ -72,6 +72,45 @@ export function relativeShort(iso: string | null | undefined): string {
   return `${yr}y ago`;
 }
 
+// Group items by UTC calendar day. Items are bucketed into [day, items[]]
+// pairs sorted newest-first; items without a parseable timestamp are
+// dropped (caller is responsible for showing an "undated" tail if it
+// wants one). Used by feed-style tabs (Activity, Audit-Log) so a long
+// flat list becomes day-headed chunks the eye can scan.
+export function bucketByDay<T>(
+  items: readonly T[],
+  getTs: (item: T) => string | null | undefined,
+): Array<[string, T[]]> {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const ts = getTs(item);
+    if (!ts) continue;
+    const t = Date.parse(ts);
+    if (!Number.isFinite(t)) continue;
+    const day = new Date(t).toISOString().slice(0, 10);
+    const arr = map.get(day) ?? [];
+    arr.push(item);
+    map.set(day, arr);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => (a < b ? 1 : -1));
+}
+
+export function formatDayHeader(day: string): string {
+  const todayIso = new Date().toISOString().slice(0, 10);
+  if (day === todayIso) return "Today";
+  const yesterdayIso = new Date(Date.now() - 86_400_000)
+    .toISOString()
+    .slice(0, 10);
+  if (day === yesterdayIso) return "Yesterday";
+  const dt = new Date(`${day}T00:00:00Z`);
+  const sameYear = dt.getUTCFullYear() === new Date().getUTCFullYear();
+  return dt.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
 export function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return "";
   const s = String(value);

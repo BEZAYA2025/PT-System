@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   IconActivity,
   IconAlertCircle,
@@ -16,6 +16,7 @@ import type {
   MemberDetail,
   MemberEvent,
 } from "@/lib/admin";
+import { bucketByDay, formatDayHeader } from "@/lib/admin-format";
 
 interface Props {
   member: MemberDetail;
@@ -68,6 +69,15 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
   const [events, setEvents] = useState<MemberEvent[] | null>(null);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventsError, setEventsError] = useState<string | null>(null);
+
+  const eventsByDay = useMemo(
+    () =>
+      bucketByDay(
+        (events ?? []).slice(0, 50),
+        (e) => e.timestamp ?? e.created_at,
+      ),
+    [events],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -219,14 +229,26 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             No in-app events captured in the last 30 days.
           </p>
         ) : (
-          <ol className="mt-4 space-y-2">
-            {events.slice(0, 50).map((e, idx) => (
-              <ActivityEventRow
-                key={`${e.timestamp ?? idx}-${idx}`}
-                event={e}
-              />
+          <div className="mt-4 space-y-4">
+            {eventsByDay.map(([day, dayEvents]) => (
+              <div key={day}>
+                <h3 className="mb-2 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {formatDayHeader(day)}
+                  <span className="ml-2 text-muted-foreground/70">
+                    · {dayEvents.length}
+                  </span>
+                </h3>
+                <ol className="space-y-2">
+                  {dayEvents.map((e, idx) => (
+                    <ActivityEventRow
+                      key={`${e.timestamp ?? idx}-${idx}`}
+                      event={e}
+                    />
+                  ))}
+                </ol>
+              </div>
             ))}
-          </ol>
+          </div>
         )}
       </section>
     </div>

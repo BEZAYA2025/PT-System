@@ -103,6 +103,7 @@ function signupsByDay(
 
 type NewMembersWindow = "today" | "7d" | "30d";
 type ActiveMembersWindow = "24h" | "7d" | "30d";
+type TierFilter = "all" | "standard" | "vip";
 
 const NEW_WINDOWS: ReadonlyArray<{ key: NewMembersWindow; label: string; days: number }> = [
   { key: "today", label: "Today", days: 1 },
@@ -120,6 +121,12 @@ const ACTIVE_WINDOWS: ReadonlyArray<{
   { key: "30d", label: "30d", hours: 24 * 30 },
 ];
 
+const TIER_FILTERS: ReadonlyArray<{ key: TierFilter; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "standard", label: "Std" },
+  { key: "vip", label: "VIP" },
+];
+
 export function OverviewView({
   displayName,
   members,
@@ -132,15 +139,19 @@ export function OverviewView({
   criticalDriftCount,
 }: Props) {
   const [newWindow, setNewWindow] = useState<NewMembersWindow>("today");
+  const [newTier, setNewTier] = useState<TierFilter>("all");
   const [activeWindow, setActiveWindow] = useState<ActiveMembersWindow>("24h");
 
   const list = members ?? [];
 
   const newCount = useMemo(() => {
     const w = NEW_WINDOWS.find((x) => x.key === newWindow)!;
-    return list.filter((m) => withinDays(m.joined_at ?? m.created_at, w.days))
-      .length;
-  }, [list, newWindow]);
+    return list
+      .filter(
+        (m) => newTier === "all" || (m.tier ?? "standard") === newTier,
+      )
+      .filter((m) => withinDays(m.joined_at ?? m.created_at, w.days)).length;
+  }, [list, newWindow, newTier]);
 
   const activeCount = useMemo(() => {
     const w = ACTIVE_WINDOWS.find((x) => x.key === activeWindow)!;
@@ -241,7 +252,14 @@ export function OverviewView({
 
       {/* ROW 1 — Membership */}
       <section aria-label="Membership">
-        <SectionHeader title="Membership" />
+        <SectionHeader
+          title="Membership"
+          subtitle={
+            list.length > 0
+              ? `${formatNumber(list.length)} total members`
+              : undefined
+          }
+        />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {/* New Members */}
           <KpiCard
@@ -250,11 +268,18 @@ export function OverviewView({
             label="New members"
             value={formatNumber(newCount)}
             toggle={
-              <TogglePills
-                options={NEW_WINDOWS}
-                value={newWindow}
-                onChange={setNewWindow}
-              />
+              <div className="space-y-1">
+                <TogglePills
+                  options={NEW_WINDOWS}
+                  value={newWindow}
+                  onChange={setNewWindow}
+                />
+                <TogglePills
+                  options={TIER_FILTERS}
+                  value={newTier}
+                  onChange={setNewTier}
+                />
+              </div>
             }
             footer={<Sparkline values={sparkline} />}
           />
@@ -293,6 +318,7 @@ export function OverviewView({
                   : "red"
                 : undefined
             }
+            prominent
           />
 
           {/* Trial → Paid */}
@@ -306,7 +332,9 @@ export function OverviewView({
               trialConversion.converted !== null &&
               trialConversion.started !== null
                 ? `${formatNumber(trialConversion.converted)} of ${formatNumber(trialConversion.started)} trials converted`
-                : undefined
+                : funnel === null
+                  ? "Funnel data unavailable"
+                  : "No trials yet"
             }
           />
         </div>
@@ -440,6 +468,7 @@ function KpiCard({
   toggle,
   footer,
   tone,
+  prominent,
 }: {
   href: string;
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
@@ -449,6 +478,7 @@ function KpiCard({
   toggle?: React.ReactNode;
   footer?: React.ReactNode;
   tone?: "emerald" | "red";
+  prominent?: boolean;
 }) {
   const toneClass =
     tone === "emerald"
@@ -456,6 +486,12 @@ function KpiCard({
       : tone === "red"
         ? "text-red-300"
         : "text-foreground";
+  const valueClass = prominent
+    ? "text-center text-4xl sm:text-5xl font-semibold tracking-tight"
+    : "text-3xl font-semibold tracking-tight";
+  const hintClass = prominent
+    ? "text-center text-xs text-muted-foreground"
+    : "text-xs text-muted-foreground";
   return (
     <Link
       href={href}
@@ -469,13 +505,15 @@ function KpiCard({
           <Icon size={14} stroke={1.75} />
         </span>
       </header>
-      <div className="mt-3 flex flex-col gap-1">
-        <p
-          className={`text-3xl font-semibold tracking-tight ${toneClass}`}
-        >
-          {value}
-        </p>
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <div
+        className={
+          prominent
+            ? "flex flex-1 flex-col items-center justify-center gap-1.5 py-2"
+            : "mt-3 flex flex-col gap-1"
+        }
+      >
+        <p className={`${valueClass} ${toneClass}`}>{value}</p>
+        {hint && <p className={hintClass}>{hint}</p>}
       </div>
       {toggle && (
         <div className="mt-3" onClick={(e) => e.preventDefault()}>
