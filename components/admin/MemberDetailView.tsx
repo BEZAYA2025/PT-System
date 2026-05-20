@@ -4,7 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
+  IconActivity,
   IconArrowLeft,
+  IconCalendar,
+  IconClock,
   IconCopy,
   IconLoader2,
   IconLockSquare,
@@ -18,6 +21,7 @@ import type {
   MemberDetail,
   MemberEvent,
 } from "@/lib/admin";
+import { formatDate, relativeShort } from "@/lib/admin-format";
 import { ActionsMenu } from "./ActionsMenu";
 import { MemberOverviewTab } from "./MemberOverviewTab";
 import { MemberSubscriptionTab } from "./MemberSubscriptionTab";
@@ -257,6 +261,52 @@ export function MemberDetailView({
                   {copied ? "Copied" : "Copy"}
                 </button>
               </p>
+              {/* Quick facts — mirror the at-a-glance columns from
+                  the Members list (Joined, Last Active, Activity 7d)
+                  so the detail page surfaces the same headline
+                  values without making the founder hunt for them
+                  across tabs. Empty values still render as "—" so
+                  the row is positionally consistent across members. */}
+              <dl className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
+                <div className="inline-flex items-center gap-1">
+                  <IconCalendar size={11} stroke={1.75} aria-hidden />
+                  <dt className="font-mono uppercase tracking-wider">
+                    Joined
+                  </dt>
+                  <dd className="text-foreground">
+                    {formatDate(
+                      member.joined ??
+                        member.joined_at ??
+                        member.created_at,
+                    )}
+                  </dd>
+                </div>
+                <div className="inline-flex items-center gap-1">
+                  <IconClock size={11} stroke={1.75} aria-hidden />
+                  <dt className="font-mono uppercase tracking-wider">
+                    Last active
+                  </dt>
+                  <dd className="text-foreground">
+                    {relativeShort(member.last_active_at)}
+                  </dd>
+                </div>
+                <div
+                  className="inline-flex items-center gap-1"
+                  title="Union count of Aven messages, trades and brief views (last 7d)"
+                >
+                  <IconActivity size={11} stroke={1.75} aria-hidden />
+                  <dt className="font-mono uppercase tracking-wider">
+                    Activity 7d
+                  </dt>
+                  <dd className="font-mono text-foreground">
+                    {member.engagement?.activity_7d_total ??
+                      member.activity_7d ??
+                      (member.aven_messages_count_7d ?? 0) +
+                        (member.trades_count_7d ?? 0) +
+                        (member.brief_views_count_7d ?? 0)}
+                  </dd>
+                </div>
+              </dl>
               {member.tags && member.tags.length > 0 && (
                 <div className="mt-3 flex flex-wrap items-center gap-1.5">
                   {member.tags.map((tag) => (

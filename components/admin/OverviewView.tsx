@@ -79,28 +79,6 @@ function isImpersonationActive(s: ImpersonationSession): boolean {
   return true;
 }
 
-// Bucket signups into per-day counts over a rolling N-day window
-// (most-recent-day last). Used for the sparkline under "New Members".
-function signupsByDay(
-  members: AdminMembersListEntry[],
-  days: number,
-): number[] {
-  const buckets = new Array<number>(days).fill(0);
-  const dayMs = 24 * 60 * 60 * 1000;
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const baseT = todayStart.getTime() - (days - 1) * dayMs;
-  for (const m of members) {
-    const raw = m.joined_at ?? m.created_at;
-    if (!raw) continue;
-    const t = Date.parse(raw);
-    if (!Number.isFinite(t)) continue;
-    const idx = Math.floor((t - baseT) / dayMs);
-    if (idx >= 0 && idx < days) buckets[idx] += 1;
-  }
-  return buckets;
-}
-
 type NewMembersWindow = "today" | "7d" | "30d";
 type ActiveMembersWindow = "24h" | "7d" | "30d";
 type TierFilter = "all" | "standard" | "vip";
@@ -157,8 +135,6 @@ export function OverviewView({
     const w = ACTIVE_WINDOWS.find((x) => x.key === activeWindow)!;
     return list.filter((m) => withinHours(m.last_active_at, w.hours)).length;
   }, [list, activeWindow]);
-
-  const sparkline = useMemo(() => signupsByDay(list, 30), [list]);
 
   // Adoption rates — denominator is paid members (active subscriptions).
   const adoption = useMemo(() => {
@@ -267,7 +243,7 @@ export function OverviewView({
             icon={IconUserPlus}
             label="New members"
             value={formatNumber(newCount)}
-            toggle={
+            filters={
               <div className="space-y-1">
                 <TogglePills
                   options={NEW_WINDOWS}
@@ -281,7 +257,6 @@ export function OverviewView({
                 />
               </div>
             }
-            footer={<Sparkline values={sparkline} />}
           />
 
           {/* Active Members */}
@@ -291,7 +266,7 @@ export function OverviewView({
             label="Active members"
             value={formatNumber(activeCount)}
             hint="Login, Aven message, or trade in window"
-            toggle={
+            filters={
               <TogglePills
                 options={ACTIVE_WINDOWS}
                 value={activeWindow}
@@ -318,7 +293,6 @@ export function OverviewView({
                   : "red"
                 : undefined
             }
-            prominent
           />
 
           {/* Trial → Paid */}
@@ -459,26 +433,32 @@ function SectionHeader({
   );
 }
 
+// Uniform card across Membership row + Adoption row. Vertical
+// structure is fixed so cards visually line up regardless of which
+// optional slots they fill:
+//   [top]    header (label + icon)
+//   [top+1]  filters area (reserved height; filters render here when
+//                          present so the toggle row sits at the same
+//                          y-coordinate across every card in the row)
+//   [middle] value + hint, centered, all values rendered at the same
+//            text size (no `prominent` size-up — Pauls call for
+//            row-uniformity beats individual prominence)
 function KpiCard({
   href,
   icon: Icon,
   label,
   value,
   hint,
-  toggle,
-  footer,
+  filters,
   tone,
-  prominent,
 }: {
   href: string;
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
   label: string;
   value: string;
   hint?: string;
-  toggle?: React.ReactNode;
-  footer?: React.ReactNode;
+  filters?: React.ReactNode;
   tone?: "emerald" | "red";
-  prominent?: boolean;
 }) {
   const toneClass =
     tone === "emerald"
@@ -486,16 +466,10 @@ function KpiCard({
       : tone === "red"
         ? "text-red-300"
         : "text-foreground";
-  const valueClass = prominent
-    ? "text-center text-4xl sm:text-5xl font-semibold tracking-tight"
-    : "text-3xl font-semibold tracking-tight";
-  const hintClass = prominent
-    ? "text-center text-xs text-muted-foreground"
-    : "text-xs text-muted-foreground";
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col justify-between rounded-xl border border-border bg-surface/50 p-4 transition-colors hover:border-emerald/40"
+      className="group flex h-full flex-col rounded-xl border border-border bg-surface/50 p-4 transition-colors hover:border-emerald/40"
     >
       <header className="flex items-center justify-between gap-2">
         <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
@@ -505,22 +479,22 @@ function KpiCard({
           <Icon size={14} stroke={1.75} />
         </span>
       </header>
+      {/* Filter slot — always reserved so cards with + without
+          filters align vertically. min-h matches a TogglePills row. */}
       <div
-        className={
-          prominent
-            ? "flex flex-1 flex-col items-center justify-center gap-1.5 py-2"
-            : "mt-3 flex flex-col gap-1"
-        }
+        className="mt-3 min-h-7"
+        onClick={(e) => e.preventDefault()}
       >
-        <p className={`${valueClass} ${toneClass}`}>{value}</p>
-        {hint && <p className={hintClass}>{hint}</p>}
+        {filters ?? null}
       </div>
-      {toggle && (
-        <div className="mt-3" onClick={(e) => e.preventDefault()}>
-          {toggle}
-        </div>
-      )}
-      {footer && <div className="mt-3">{footer}</div>}
+      <div className="flex flex-1 flex-col items-center justify-center gap-1 py-2 text-center">
+        <p className={`text-3xl font-semibold tracking-tight ${toneClass}`}>
+          {value}
+        </p>
+        {hint && (
+          <p className="text-xs text-muted-foreground">{hint}</p>
+        )}
+      </div>
     </Link>
   );
 }
@@ -563,24 +537,12 @@ function TogglePills<T extends string>({
   );
 }
 
-function Sparkline({ values }: { values: number[] }) {
-  const max = Math.max(1, ...values);
-  return (
-    <div
-      className="flex h-6 items-end gap-[1px]"
-      aria-label={`${values.length}-day sparkline`}
-    >
-      {values.map((v, i) => (
-        <span
-          key={i}
-          className="block flex-1 rounded-sm bg-emerald/40"
-          style={{ height: `${Math.max(8, (v / max) * 100)}%` }}
-        />
-      ))}
-    </div>
-  );
-}
-
+// Adoption cards mirror KpiCard's vertical rhythm so rows 1 and 2
+// read as one family: header at top, optional filter spacer for
+// alignment, centered value with hint. The "/ denom" denominator
+// lives on the value line as a quieter sibling so the headline
+// count + percentage are at the same text size as Membership-row
+// KPIs.
 function AdoptionCard({
   href,
   label,
@@ -598,22 +560,31 @@ function AdoptionCard({
   return (
     <Link
       href={href}
-      className="group flex h-full flex-col gap-2 rounded-xl border border-border bg-surface/50 p-4 transition-colors hover:border-emerald/40"
+      className="group flex h-full flex-col rounded-xl border border-border bg-surface/50 p-4 transition-colors hover:border-emerald/40"
     >
-      <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </p>
-      <p className="text-2xl font-semibold tracking-tight text-foreground">
-        {formatNumber(count)}
+      <header>
+        <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+      </header>
+      <div className="flex flex-1 flex-col items-center justify-center gap-1 py-2 text-center">
+        <p className="text-3xl font-semibold tracking-tight text-foreground">
+          {formatNumber(count)}
+          {denom > 0 && (
+            <span className="ml-1 text-base font-normal text-muted-foreground">
+              /{formatNumber(denom)}
+            </span>
+          )}
+        </p>
         {pct !== null && (
-          <span className="ml-2 font-mono text-sm text-emerald">
-            ({pct.toFixed(0)}%)
-          </span>
+          <p className="font-mono text-xs text-emerald">
+            {pct.toFixed(0)}%
+          </p>
         )}
-      </p>
-      {sub && (
-        <p className="text-[11px] text-muted-foreground">{sub}</p>
-      )}
+        {sub && (
+          <p className="text-[11px] text-muted-foreground">{sub}</p>
+        )}
+      </div>
     </Link>
   );
 }
