@@ -606,9 +606,17 @@ function shapeMyEndpointOne(
     // trades whose unrealized_pnl_pct is missing/null still reach the
     // closed-trade alias. Mark-based fallback handles the case where
     // none of the percent fields ship at all.
+    // Sprint 7 ROI fix v2: margin_roi_pct must lead the stack —
+    // backend may ship BOTH unrealized_pnl_pct (legacy asset-ROI,
+    // pre-leverage) AND margin_roi_pct (leverage-aware). The v1
+    // ordering put margin_roi_pct second, so the legacy field
+    // won and the per-trade card rendered asset-ROI while the
+    // top-card (which computes pnl_usd / margin_usd) stayed
+    // correct. Mark-based fallback at the end still handles the
+    // case where no per-trade percent ships at all.
     pnlPct:
-      num(t.unrealized_pnl_pct) ??
       num(t.margin_roi_pct) ??
+      num(t.unrealized_pnl_pct) ??
       num(t.roi_pct) ??
       num(t.realized_pnl_pct) ??
       num(t.unrealizedPnlPct) ??
