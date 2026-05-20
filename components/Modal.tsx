@@ -13,13 +13,17 @@ interface ModalProps {
   title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 const SIZE: Record<NonNullable<ModalProps["size"]>, string> = {
   sm: "max-w-md",
   md: "max-w-lg",
   lg: "max-w-2xl",
+  // xl is the chat-replay workhorse — wide enough for many bubbles
+  // side-by-side on desktop while still staying within phone width
+  // (max-w- is a ceiling, not a fixed width).
+  xl: "max-w-4xl",
 };
 
 // Round-20: on phones the modal content can overflow the viewport

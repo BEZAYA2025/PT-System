@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  IconChevronLeft,
+  IconChevronRight,
   IconCopy,
   IconLoader2,
   IconMessage,
@@ -18,7 +20,10 @@ import {
 } from "@/lib/admin-helpers";
 
 // Shared transcript modal used by:
-//   · MemberAvenTab (conversation list)
+//   · MemberAvenTab (conversation list — Pauls primary research tool;
+//                    rendered with prev/next navigation so the founder
+//                    can ride through a member's history without
+//                    closing and re-opening)
 //   · AvenSearchTab (global search results)
 //   · AvenDriftLogTab (drift-detail → "View conversation")
 //
@@ -42,6 +47,11 @@ interface SummaryContext {
 interface Props {
   conversation: SummaryContext | null;
   onClose: () => void;
+  /** Optional prev/next walkers — when present, modal shows
+   *  navigation chevrons in the header for stepping through the
+   *  calling list (MemberAvenTab's research flow). */
+  onPrev?: (() => void) | null;
+  onNext?: (() => void) | null;
 }
 
 function formatDateTime(iso: string | null | undefined): string {
@@ -89,7 +99,12 @@ function sentimentTone(s: string | null): string {
   return "text-muted-foreground";
 }
 
-export function ConversationTranscriptModal({ conversation, onClose }: Props) {
+export function ConversationTranscriptModal({
+  conversation,
+  onClose,
+  onPrev,
+  onNext,
+}: Props) {
   const [messages, setMessages] = useState<AvenMessage[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
@@ -170,12 +185,36 @@ export function ConversationTranscriptModal({ conversation, onClose }: Props) {
       onClose={onClose}
       title={
         <span className="flex items-center gap-2">
+          {onPrev !== undefined && (
+            <span className="flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => onPrev?.()}
+                disabled={!onPrev}
+                aria-label="Previous conversation"
+                title="Previous conversation"
+                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-40"
+              >
+                <IconChevronLeft size={14} stroke={2} aria-hidden />
+              </button>
+              <button
+                type="button"
+                onClick={() => onNext?.()}
+                disabled={!onNext}
+                aria-label="Next conversation"
+                title="Next conversation"
+                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-surface hover:text-foreground disabled:opacity-40"
+              >
+                <IconChevronRight size={14} stroke={2} aria-hidden />
+              </button>
+            </span>
+          )}
           <IconMessage size={14} stroke={1.75} aria-hidden />
           {headerLabel}
         </span>
       }
       description={description}
-      size="lg"
+      size="xl"
     >
       <div className="space-y-4 text-sm">
         {loading && (
@@ -191,6 +230,11 @@ export function ConversationTranscriptModal({ conversation, onClose }: Props) {
         )}
 
         {hasFullTranscript ? (
+          // Chat-replay layout — bubbles flank a center axis with a
+          // small avatar circle outside each bubble (M = Member, A =
+          // Aven) so the speaker is obvious even on a quick scan.
+          // Right-aligned Member bubbles match the affordance the
+          // member saw inside the dashboard.
           <div className="space-y-3">
             {messages.map((m, i) => {
               const user = isUserMessage(m.role);
@@ -201,44 +245,65 @@ export function ConversationTranscriptModal({ conversation, onClose }: Props) {
               return (
                 <div
                   key={i}
-                  className={
-                    user
-                      ? "ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right"
-                      : "mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3"
-                  }
+                  className={[
+                    "flex items-start gap-2",
+                    user ? "flex-row-reverse" : "flex-row",
+                  ].join(" ")}
                 >
+                  <span
+                    aria-hidden
+                    className={[
+                      "inline-flex size-7 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold uppercase tracking-wider",
+                      user
+                        ? "border border-border bg-surface text-muted-foreground"
+                        : "border border-emerald/30 bg-emerald/[0.10] text-emerald",
+                    ].join(" ")}
+                  >
+                    {user ? "M" : "A"}
+                  </span>
                   <div
                     className={[
-                      "flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider",
-                      user ? "justify-end text-muted-foreground" : "text-emerald/80",
+                      "min-w-0 max-w-[85%] rounded-xl px-4 py-3 sm:max-w-[78%]",
+                      user
+                        ? "border border-border bg-surface text-right"
+                        : "border border-emerald/20 bg-emerald/[0.04]",
                     ].join(" ")}
                   >
-                    <span>
-                      {user ? "Member" : "Aven"}
-                      {ts ? ` · ${formatDateTime(ts)}` : ""}
-                    </span>
-                    {!user && typeof score === "number" && (
-                      <span className="inline-flex items-center rounded-full border border-emerald/30 bg-emerald/[0.10] px-1.5 text-emerald">
-                        Q{score}/10
+                    <div
+                      className={[
+                        "flex items-center gap-2 font-mono text-[10px] uppercase tracking-wider",
+                        user
+                          ? "justify-end text-muted-foreground"
+                          : "text-emerald/80",
+                      ].join(" ")}
+                    >
+                      <span>
+                        {user ? "Member" : "Aven"}
+                        {ts ? ` · ${formatDateTime(ts)}` : ""}
                       </span>
-                    )}
-                    {!user && SentimentIcon && (
-                      <SentimentIcon
-                        size={11}
-                        stroke={1.75}
-                        className={sentimentTone(sentiment)}
-                        aria-label={sentiment ?? undefined}
-                      />
-                    )}
+                      {!user && typeof score === "number" && (
+                        <span className="inline-flex items-center rounded-full border border-emerald/30 bg-emerald/[0.10] px-1.5 text-emerald">
+                          Q{score}/10
+                        </span>
+                      )}
+                      {!user && SentimentIcon && (
+                        <SentimentIcon
+                          size={11}
+                          stroke={1.75}
+                          className={sentimentTone(sentiment)}
+                          aria-label={sentiment ?? undefined}
+                        />
+                      )}
+                    </div>
+                    <p
+                      className={[
+                        "mt-1 whitespace-pre-wrap text-foreground",
+                        user ? "text-right" : "",
+                      ].join(" ")}
+                    >
+                      {m.content ?? ""}
+                    </p>
                   </div>
-                  <p
-                    className={[
-                      "mt-1 whitespace-pre-wrap text-foreground",
-                      user ? "text-right" : "",
-                    ].join(" ")}
-                  >
-                    {m.content ?? ""}
-                  </p>
                 </div>
               );
             })}

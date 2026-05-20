@@ -223,6 +223,18 @@ export function MemberAvenTab({ member }: Props) {
       <ConversationTranscriptModal
         conversation={selected}
         onClose={() => setSelected(null)}
+        onPrev={(() => {
+          if (!selected || !conversations) return null;
+          const idx = conversations.findIndex((c) => c.id === selected.id);
+          if (idx <= 0) return null;
+          return () => setSelected(conversations[idx - 1]);
+        })()}
+        onNext={(() => {
+          if (!selected || !conversations) return null;
+          const idx = conversations.findIndex((c) => c.id === selected.id);
+          if (idx < 0 || idx >= conversations.length - 1) return null;
+          return () => setSelected(conversations[idx + 1]);
+        })()}
       />
     </div>
   );
