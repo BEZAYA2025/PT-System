@@ -1,0 +1,14 @@
+#
+# Catches the class of bug that broke prod on 2026-05-19 — a
+# runtime import from a "server-only" module into a client
+# component. TypeScript was fine with it; only `next build`
+# noticed. Running the full build pre-push catches that, plus
+# any other bundler-only regression, before main ever sees the
+# bad commit.
+#
+# ~30–60s per push. Worth it. If you ever genuinely need to
+# bypass (force-push a half-broken state to a personal branch),
+# use `git push --no-verify` — but never to main.
+#
+echo "[pre-push] running 'npm run build' — catches server-only / bundler regressions"
+npm run build
