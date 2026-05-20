@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   IconActivity,
+  IconAdjustments,
   IconBrain,
   IconChartCandle,
   IconChartLine,
@@ -28,6 +29,7 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin/aven", label: "Aven Insights", icon: IconBrain },
   { href: "/admin/business", label: "Business", icon: IconChartLine },
   { href: "/admin/system", label: "System", icon: IconActivity },
+  { href: "/admin/configurations", label: "Configurations", icon: IconAdjustments },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
 ];
 
