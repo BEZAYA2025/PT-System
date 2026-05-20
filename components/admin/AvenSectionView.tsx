@@ -6,6 +6,7 @@ import { AvenSearchTab } from "./AvenSearchTab";
 import { AvenCurriculumTab } from "./AvenCurriculumTab";
 import { AvenTokenUsageTab } from "./AvenTokenUsageTab";
 import { AvenDriftLogTab } from "./AvenDriftLogTab";
+import { AvenVoiceNotesTab } from "./AvenVoiceNotesTab";
 import { AvenVkbTab } from "./AvenVkbTab";
 
 type TabKey =
@@ -14,6 +15,7 @@ type TabKey =
   | "curriculum"
   | "tokens"
   | "drift"
+  | "voice-notes"
   | "vkb";
 
 const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
@@ -22,6 +24,7 @@ const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
   { key: "curriculum", label: "Curriculum" },
   { key: "tokens", label: "Token Usage" },
   { key: "drift", label: "Drift Log" },
+  { key: "voice-notes", label: "Voice Notes" },
   { key: "vkb", label: "VKB" },
 ];
 
@@ -32,6 +35,7 @@ function isTabKey(v: string | null): v is TabKey {
     v === "curriculum" ||
     v === "tokens" ||
     v === "drift" ||
+    v === "voice-notes" ||
     v === "vkb"
   );
 }
@@ -103,6 +107,7 @@ export function AvenSectionView() {
         {activeTab === "curriculum" && <AvenCurriculumTab />}
         {activeTab === "tokens" && <AvenTokenUsageTab />}
         {activeTab === "drift" && <AvenDriftLogTab />}
+        {activeTab === "voice-notes" && <AvenVoiceNotesTab />}
         {activeTab === "vkb" && <AvenVkbTab />}
       </section>
     </div>
