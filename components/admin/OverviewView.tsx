@@ -237,10 +237,17 @@ export function OverviewView({
       <section aria-label="Membership">
         <SectionHeader
           title="Membership"
-          subtitle={
-            list.length > 0
-              ? `${formatNumber(list.length)} total members`
-              : undefined
+          rightSlot={
+            list.length > 0 ? (
+              <span className="inline-flex items-baseline gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1 text-emerald">
+                <span className="font-mono text-[10px] uppercase tracking-wider opacity-80">
+                  Total
+                </span>
+                <span className="font-mono text-sm font-semibold">
+                  {formatNumber(list.length)}
+                </span>
+              </span>
+            ) : undefined
           }
         />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -422,20 +429,24 @@ export function OverviewView({
 function SectionHeader({
   title,
   subtitle,
+  rightSlot,
 }: {
   title: string;
   subtitle?: string;
+  rightSlot?: React.ReactNode;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
+    <div className="flex items-center justify-between gap-3">
       <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
-      {subtitle && (
+      {rightSlot ? (
+        rightSlot
+      ) : subtitle ? (
         <p className="font-mono text-[11px] text-muted-foreground">
           {subtitle}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -344,13 +344,17 @@ export function MemberTradesTab({ member }: Props) {
                         <td className="px-3 py-2 font-mono text-foreground">
                           {t.symbol ?? "—"}
                           {t.leverage ? (
-                            <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                            <span className="ml-1.5 rounded border border-border bg-surface px-1 font-mono text-[10px] text-muted-foreground">
                               {t.leverage}×
                             </span>
                           ) : null}
                         </td>
-                        <td className="px-3 py-2 font-mono text-xs uppercase text-muted-foreground">
-                          {t.side ?? "—"}
+                        <td className="px-3 py-2">
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${sideBadgeClass(t.side)}`}
+                          >
+                            {t.side ?? "—"}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-xs text-foreground">
                           {t.entry ?? "—"}
@@ -514,6 +518,26 @@ function StatCard({
   );
 }
 
+// P4: Long = emerald, Short = red, matching the colour language the
+// member sees on the dashboard. Side badge sits on the right and
+// carries the colour + direction icon together so the eye reads it
+// even before scanning the PnL line.
+function sideBadgeClass(side: string | null | undefined): string {
+  const s = (side ?? "").toLowerCase();
+  if (s === "long")
+    return "border-emerald/30 bg-emerald/[0.10] text-emerald";
+  if (s === "short")
+    return "border-red-400/40 bg-red-500/[0.08] text-red-300";
+  return "border-border bg-surface text-muted-foreground";
+}
+
+// P5 defensive: §25 ships `mark_price` for open positions, but the
+// rename audit may end up using `current_price`. Read both so the
+// Mark cell doesn't go to "—" mid-rollout.
+function markPriceOf(trade: MemberTrade): number | null {
+  return trade.mark_price ?? trade.current_price ?? null;
+}
+
 function OpenTradeCard({
   trade,
   onClick,
@@ -523,10 +547,9 @@ function OpenTradeCard({
 }) {
   const pnl = trade.pnl_usd ?? 0;
   const tone = pnl >= 0 ? "text-emerald" : "text-red-300";
-  const SideIcon =
-    (trade.side ?? "").toLowerCase() === "long"
-      ? IconTrendingUp
-      : IconTrendingDown;
+  const side = (trade.side ?? "").toLowerCase();
+  const SideIcon = side === "long" ? IconTrendingUp : IconTrendingDown;
+  const mark = markPriceOf(trade);
   return (
     <button
       type="button"
@@ -535,7 +558,6 @@ function OpenTradeCard({
     >
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-foreground">
-          <SideIcon size={14} stroke={1.75} aria-hidden />
           {trade.symbol ?? "—"}
           {trade.leverage ? (
             <span className="font-mono text-[10px] text-muted-foreground">
@@ -543,7 +565,10 @@ function OpenTradeCard({
             </span>
           ) : null}
         </span>
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+        <span
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${sideBadgeClass(trade.side)}`}
+        >
+          <SideIcon size={10} stroke={2} aria-hidden />
           {trade.side ?? "—"}
         </span>
       </div>
@@ -557,7 +582,7 @@ function OpenTradeCard({
       </div>
       <div className="grid grid-cols-3 gap-2 text-xs">
         <Mini label="Entry" value={trade.entry ?? "—"} />
-        <Mini label="Mark" value={trade.mark_price ?? "—"} />
+        <Mini label="Mark" value={mark ?? "—"} />
         <Mini
           label="SL · TP"
           value={`${slOf(trade)} · ${tpOf(trade)}`}

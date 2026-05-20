@@ -481,6 +481,9 @@ export interface MemberTrade {
   entry?: number | null;
   exit?: number | null;
   mark_price?: number | null;
+  /** Backend §25 alias under audit (P5 follow-up). Read both so a
+   *  rename doesn't blank the Mark column. */
+  current_price?: number | null;
   // Backend §13.14 uses `sl` / `tp`; older payloads kept `_price`.
   // Accept both so the column reads from whichever the response carries.
   sl?: number | null;

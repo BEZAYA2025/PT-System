@@ -260,19 +260,32 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
           value={tradesTotal !== null ? tradesTotal.toLocaleString() : "—"}
           hint={
             // Pack win-rate + PnL into the hint so both surface at a
-            // glance without breaking the 2x2 KPI grid. Either field
-            // can be missing — render whichever is present. formatUSD
-            // already emits "-$310" for negatives; positives get a "+"
-            // prepended so the sign is always explicit.
-            (() => {
-              const parts: string[] = [];
-              if (winRate !== null) parts.push(`${formatPct(winRate)} win`);
-              if (totalPnl !== null) {
-                const prefix = totalPnl > 0 ? "+" : "";
-                parts.push(`PnL ${prefix}${formatUSD(totalPnl)}`);
-              }
-              return parts.length > 0 ? parts.join(" · ") : "Lifetime trades";
-            })()
+            // glance without breaking the 2x2 KPI grid. PnL gets a
+            // sign-aware colour (P1) — emerald for profit, red for
+            // loss, muted for break-even / unknown. Win-rate stays
+            // muted alongside.
+            winRate !== null || totalPnl !== null ? (
+              <>
+                {winRate !== null && <>{formatPct(winRate)} win</>}
+                {winRate !== null && totalPnl !== null && " · "}
+                {totalPnl !== null && (
+                  <span
+                    className={
+                      totalPnl > 0
+                        ? "font-semibold text-emerald"
+                        : totalPnl < 0
+                          ? "font-semibold text-red-300"
+                          : ""
+                    }
+                  >
+                    PnL {totalPnl > 0 ? "+" : ""}
+                    {formatUSD(totalPnl)}
+                  </span>
+                )}
+              </>
+            ) : (
+              "Lifetime trades"
+            )
           }
         />
         <KPICard
@@ -305,26 +318,27 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
         </div>
       </section>
 
-      {/* Activity Last 7d — backend §25 (post-audit) ships the union
-          count via engagement.activity_7d_total; older deploys expose
-          the per-source breakdown which we use to colour the stacked
-          bar when present. */}
+      {/* Activity — P3: 7d summary + 30d timeline collapsed into ONE
+          section. Header shows the 7d total at a glance; a thin
+          two-tone bar surfaces the Aven/Trades split when backend
+          ships the breakdown. Below, the same merged events feed
+          (capped at 12 most-recent) provides the deep-look context
+          without making the founder scroll through two scroll-bound
+          panels. */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Activity · Last 7 days
+            Activity
           </h2>
           <p className="font-mono text-[11px] text-muted-foreground">
-            {activity.total} total event{activity.total === 1 ? "" : "s"}
+            <span className="text-foreground">{activity.total}</span> in 7d ·
+            last 30d below
           </p>
         </header>
-        {activity.total === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
-            No activity in the last 7 days.
-          </p>
-        ) : activity.hasBreakdown && stackSum > 0 ? (
-          <>
-            <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-background">
+
+        {activity.hasBreakdown && stackSum > 0 && (
+          <div className="mt-3">
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-background">
               <div
                 aria-label={`${aven7} Aven messages`}
                 className="h-full bg-emerald"
@@ -336,45 +350,27 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
                 style={{ width: `${tradesPct}%` }}
               />
             </div>
-            <ul className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-              <li className="flex items-center gap-2">
-                <span aria-hidden className="size-2 rounded-full bg-emerald" />
-                <span className="text-muted-foreground">Aven messages</span>
-                <span className="ml-auto font-mono text-foreground">{aven7}</span>
+            <ul className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+              <li className="inline-flex items-center gap-1.5">
+                <span aria-hidden className="size-1.5 rounded-full bg-emerald" />
+                Aven{" "}
+                <span className="font-mono text-foreground">{aven7}</span>
               </li>
-              <li className="flex items-center gap-2">
-                <span aria-hidden className="size-2 rounded-full bg-sky-400" />
-                <span className="text-muted-foreground">Trades</span>
-                <span className="ml-auto font-mono text-foreground">{trades7}</span>
+              <li className="inline-flex items-center gap-1.5">
+                <span aria-hidden className="size-1.5 rounded-full bg-sky-400" />
+                Trades{" "}
+                <span className="font-mono text-foreground">{trades7}</span>
               </li>
             </ul>
-          </>
-        ) : (
-          <p className="mt-4 text-sm text-muted-foreground">
-            Union count across logins, Aven messages, trades and brief reads.
-          </p>
+          </div>
         )}
-      </section>
 
-      {/* Recent activity timeline — driven by the events feed
-          (merged logins / trades / Aven / brief signals). Falls back
-          to raw login-history when the events endpoint returns an
-          empty array. */}
-      <section className="rounded-2xl border border-border bg-surface/40 p-5">
-        <header>
-          <h2 className="text-sm font-semibold tracking-tight text-foreground">
-            Recent activity
-          </h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            Last 30 days · logins, trades, Aven conversations, brief reads.
-          </p>
-        </header>
         {recentTimeline.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
             No activity recorded in the last 30 days.
           </p>
         ) : (
-          <ol className="mt-4 space-y-3">
+          <ol className="mt-4 space-y-2 border-t border-border/40 pt-4">
             {recentTimeline.map((entry, idx) => (
               <EventRow key={`${entry.timestamp ?? idx}-${idx}`} entry={entry} />
             ))}
@@ -462,7 +458,9 @@ function KPICard({
   icon: React.ComponentType<{ size?: number; stroke?: number }>;
   label: string;
   value: string;
-  hint?: string;
+  // ReactNode so callers can colour individual hint fragments (P1
+  // wants PnL emerald/red while the rest stays muted).
+  hint?: React.ReactNode;
 }) {
   return (
     <article className="rounded-xl border border-border bg-surface/50 p-5">

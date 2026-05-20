@@ -44,18 +44,53 @@ function truncate(s: string | null | undefined, max = 110): string {
 // accepted as fallbacks — single source of truth for response shape.
 interface AvenSearchHit {
   conversation_id?: string | null;
+  conv_id?: string | null;
+  chat_id?: string | null;
+  conversationId?: string | null;
   message_id?: string | null;
   role?: string | null;
+  speaker?: string | null;
+  author?: string | null;
   content?: string | null;
+  message?: string | null;
+  text?: string | null;
   snippet?: string | null;
   timestamp?: string | null;
   created_at?: string | null;
+  ts?: string | null;
+}
+
+// Pull the conversation-id off a hit defensively — backend §25.B-2 uses
+// `conversation_id` but earlier deploys / drift could ship any of the
+// camel/snake variants. Without this read, all 32 baba hits fall into
+// the "no cid → skip" branch and the conversation list comes back
+// empty even though the stats above it correctly report 6/32.
+function hitConvId(h: AvenSearchHit): string | null {
+  return (
+    h.conversation_id ??
+    h.conv_id ??
+    h.chat_id ??
+    h.conversationId ??
+    null
+  );
+}
+
+function hitContent(h: AvenSearchHit): string | null {
+  return h.content ?? h.message ?? h.text ?? h.snippet ?? null;
+}
+
+function hitTimestamp(h: AvenSearchHit): string | null {
+  return h.timestamp ?? h.created_at ?? h.ts ?? null;
+}
+
+function hitRole(h: AvenSearchHit): string {
+  return (h.role ?? h.speaker ?? h.author ?? "").toLowerCase();
 }
 
 function groupHits(hits: AvenSearchHit[]): AvenConversationSummary[] {
   const groups = new Map<string, AvenSearchHit[]>();
   for (const hit of hits) {
-    const cid = hit.conversation_id;
+    const cid = hitConvId(hit);
     if (!cid) continue;
     const arr = groups.get(cid) ?? [];
     arr.push(hit);
@@ -63,19 +98,19 @@ function groupHits(hits: AvenSearchHit[]): AvenConversationSummary[] {
   }
   return Array.from(groups.entries()).map(([cid, hs]) => {
     const sorted = [...hs].sort((a, b) => {
-      const at = Date.parse(a.timestamp ?? a.created_at ?? "") || 0;
-      const bt = Date.parse(b.timestamp ?? b.created_at ?? "") || 0;
+      const at = Date.parse(hitTimestamp(a) ?? "") || 0;
+      const bt = Date.parse(hitTimestamp(b) ?? "") || 0;
       return at - bt;
     });
     const earliest = sorted[0];
     const firstUser = sorted.find((h) => {
-      const r = (h.role ?? "").toLowerCase();
+      const r = hitRole(h);
       return r === "user" || r === "member";
     });
     return {
       id: cid,
-      started_at: earliest?.timestamp ?? earliest?.created_at ?? null,
-      first_user_message: firstUser?.content ?? firstUser?.snippet ?? null,
+      started_at: earliest ? hitTimestamp(earliest) : null,
+      first_user_message: firstUser ? hitContent(firstUser) : null,
       snippet: earliest?.snippet ?? null,
       message_count: hs.length,
     };
@@ -88,11 +123,15 @@ function parseConversationsResponse(data: unknown): AvenConversationSummary[] {
   const obj = data as {
     conversations?: AvenConversationSummary[];
     items?: AvenConversationSummary[];
+    results?: AvenConversationSummary[];
     hits?: AvenSearchHit[];
+    messages?: AvenSearchHit[];
   };
   if (Array.isArray(obj.conversations)) return obj.conversations;
   if (Array.isArray(obj.items)) return obj.items;
+  if (Array.isArray(obj.results)) return obj.results;
   if (Array.isArray(obj.hits)) return groupHits(obj.hits);
+  if (Array.isArray(obj.messages)) return groupHits(obj.messages);
   return [];
 }
 
