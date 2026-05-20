@@ -1,8 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-// Per ADMIN_API_SPEC §13: GET returns the full entry, PATCH accepts
-// JSON metadata, DELETE removes. PATCH stays JSON-only here — file
-// re-upload happens through a separate flow.
+// Per ADMIN_API_SPEC §13: GET returns the full entry, DELETE
+// removes. PATCH now accepts BOTH content-types per the
+// Phase-3b/commit abe249c update:
+//   · application/json — metadata-only edit (existing path)
+//   · multipart/form-data — optional file re-upload + metadata,
+//     tags as CSV (string), empty-string clears a field
+// The route inspects Content-Type and pipes the body bytes
+// through verbatim either way.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,9 +18,9 @@ function getToken(req: NextRequest): string | null {
   return req.cookies.get("access_token")?.value ?? null;
 }
 
-async function jsonRelay(
+async function relay(
   req: NextRequest,
-  method: string,
+  method: "GET" | "PATCH" | "DELETE",
   url: string,
 ): Promise<Response> {
   const token = getToken(req);
@@ -25,17 +30,30 @@ async function jsonRelay(
       { status: 401 },
     );
   }
-  let body: string | undefined;
+
+  const contentType = req.headers.get("content-type") ?? "";
+  const isMultipart = contentType.toLowerCase().startsWith("multipart/");
+  let body: BodyInit | undefined;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+  };
+
   if (method !== "GET" && method !== "DELETE") {
-    body = await req.text();
+    if (isMultipart) {
+      // Pass through the raw bytes + original Content-Type so the
+      // upstream parser sees the original boundary.
+      body = await req.arrayBuffer();
+      headers["Content-Type"] = contentType;
+    } else {
+      body = await req.text();
+      headers["Content-Type"] = "application/json";
+    }
   }
+
   try {
     const upstream = await fetch(url, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body,
       cache: "no-store",
     });
@@ -57,7 +75,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return jsonRelay(
+  return relay(
     req,
     "GET",
     `${VPS}/api/admin/vkb/entries/${encodeURIComponent(id)}`,
@@ -69,7 +87,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return jsonRelay(
+  return relay(
     req,
     "PATCH",
     `${VPS}/api/admin/vkb/entries/${encodeURIComponent(id)}`,
@@ -81,7 +99,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return jsonRelay(
+  return relay(
     req,
     "DELETE",
     `${VPS}/api/admin/vkb/entries/${encodeURIComponent(id)}`,

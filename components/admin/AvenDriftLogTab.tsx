@@ -10,6 +10,7 @@ import {
   IconShieldCheck,
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
+import { ConversationTranscriptModal } from "./ConversationTranscriptModal";
 
 interface DriftEntry {
   id: string;
@@ -83,6 +84,7 @@ export function AvenDriftLogTab() {
   const [endDate, setEndDate] = useState("");
 
   const [detail, setDetail] = useState<DriftEntry | null>(null);
+  const [transcript, setTranscript] = useState<DriftEntry | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -283,7 +285,26 @@ export function AvenDriftLogTab() {
         </div>
       )}
 
-      <DriftDetailModal entry={detail} onClose={() => setDetail(null)} />
+      <DriftDetailModal
+        entry={detail}
+        onClose={() => setDetail(null)}
+        onViewConversation={(e) => {
+          setTranscript(e);
+          setDetail(null);
+        }}
+      />
+      <ConversationTranscriptModal
+        conversation={
+          transcript && transcript.conversation_id
+            ? {
+                id: transcript.conversation_id,
+                member_id: transcript.member_id ?? null,
+                member_email: transcript.member_email ?? null,
+              }
+            : null
+        }
+        onClose={() => setTranscript(null)}
+      />
     </div>
   );
 }
@@ -320,9 +341,11 @@ function StatCard({
 function DriftDetailModal({
   entry,
   onClose,
+  onViewConversation,
 }: {
   entry: DriftEntry | null;
   onClose: () => void;
+  onViewConversation: (entry: DriftEntry) => void;
 }) {
   if (!entry) return null;
   const tone = severityTone(entry.severity);
@@ -379,7 +402,18 @@ function DriftDetailModal({
           </pre>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-between gap-2">
+          {entry.conversation_id ? (
+            <button
+              type="button"
+              onClick={() => onViewConversation(entry)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald/40 bg-emerald/[0.08] px-3 text-xs font-semibold text-emerald hover:bg-emerald/[0.14]"
+            >
+              View conversation
+            </button>
+          ) : (
+            <span />
+          )}
           <button
             type="button"
             onClick={onClose}

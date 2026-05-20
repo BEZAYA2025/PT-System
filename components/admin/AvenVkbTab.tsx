@@ -464,20 +464,37 @@ function VkbAddOrEditModal({
     setError(null);
     try {
       if (isEdit && entry) {
-        // PATCH metadata — JSON. File re-upload happens via a future
-        // dedicated multipart endpoint.
-        const res = await fetch(
-          `/api/proxy/admin/vkb/entries/${encodeURIComponent(entry.id)}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              title: title.trim(),
-              description: description.trim() || null,
-              tags: parseTagsInput(tagsInput),
-            }),
-          },
-        );
+        // PATCH: multipart when the user picked a new file (file
+        // optional re-upload supported by backend commit abe249c),
+        // JSON otherwise. Tags shape differs per content-type:
+        // JSON wants the array, multipart wants the CSV string per
+        // spec.
+        const tagsList = parseTagsInput(tagsInput);
+        let res: Response;
+        if (file) {
+          const fd = new FormData();
+          fd.append("title", title.trim());
+          fd.append("description", description.trim());
+          fd.append("tags", tagsList.join(","));
+          fd.append("file", file);
+          res = await fetch(
+            `/api/proxy/admin/vkb/entries/${encodeURIComponent(entry.id)}`,
+            { method: "PATCH", body: fd },
+          );
+        } else {
+          res = await fetch(
+            `/api/proxy/admin/vkb/entries/${encodeURIComponent(entry.id)}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: title.trim(),
+                description: description.trim() || null,
+                tags: tagsList,
+              }),
+            },
+          );
+        }
         if (!res.ok) {
           const data = (await res.json().catch(() => null)) as {
             message?: string;
@@ -526,7 +543,7 @@ function VkbAddOrEditModal({
       title={isEdit ? "Edit entry" : "Add VKB entry"}
       description={
         isEdit
-          ? "Metadata only — file re-upload arrives in a follow-up."
+          ? "Update metadata, or pick a new file to replace the chart."
           : undefined
       }
       size="md"
@@ -573,19 +590,23 @@ function VkbAddOrEditModal({
           />
         </label>
 
-        {!isEdit && (
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              Chart image
-            </p>
-            <div
-              onDrop={(e) => {
-                e.preventDefault();
-                onFiles(e.dataTransfer.files);
-              }}
-              onDragOver={(e) => e.preventDefault()}
-              className="mt-1 flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center"
-            >
+        <div>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Chart image
+            {isEdit && (
+              <span className="ml-1 normal-case tracking-normal text-muted-foreground/70">
+                (optional — leave empty to keep current)
+              </span>
+            )}
+          </p>
+          <div
+            onDrop={(e) => {
+              e.preventDefault();
+              onFiles(e.dataTransfer.files);
+            }}
+            onDragOver={(e) => e.preventDefault()}
+            className="mt-1 flex flex-col items-center gap-2 rounded-lg border border-dashed border-border bg-background px-4 py-6 text-center"
+          >
               {file ? (
                 <>
                   <span className="inline-flex items-center gap-2 font-mono text-xs text-foreground">
@@ -630,7 +651,6 @@ function VkbAddOrEditModal({
               )}
             </div>
           </div>
-        )}
 
         {error && (
           <p className="rounded-md border border-red-400/30 bg-red-500/[0.06] px-3 py-2 text-xs text-red-200">

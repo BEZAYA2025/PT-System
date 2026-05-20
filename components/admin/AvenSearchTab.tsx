@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import {
   IconAlertCircle,
-  IconCopy,
   IconLoader2,
   IconMessage,
   IconSearch,
 } from "@tabler/icons-react";
-import { Modal } from "@/components/Modal";
-import { parseAvenMessages, type AvenMessage } from "@/lib/admin-helpers";
 import type { AvenConversationSummary } from "@/lib/admin";
+import { ConversationTranscriptModal } from "./ConversationTranscriptModal";
 
 function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
@@ -228,7 +225,7 @@ export function AvenSearchTab() {
         </ul>
       ) : null}
 
-      <TranscriptModal
+      <ConversationTranscriptModal
         conversation={selected}
         onClose={() => setSelected(null)}
       />
@@ -253,205 +250,3 @@ function FilterField({
   );
 }
 
-function TranscriptModal({
-  conversation,
-  onClose,
-}: {
-  conversation: AvenConversationSummary | null;
-  onClose: () => void;
-}) {
-  const [messages, setMessages] = useState<AvenMessage[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [unavailable, setUnavailable] = useState(false);
-
-  useEffect(() => {
-    if (!conversation) return;
-    let cancelled = false;
-    setLoading(true);
-    setUnavailable(false);
-    setMessages(null);
-    fetch(
-      `/api/proxy/admin/aven/conversations/${encodeURIComponent(conversation.id)}`,
-      { cache: "no-store" },
-    )
-      .then(async (r) => {
-        if (r.status === 404) {
-          if (!cancelled) setUnavailable(true);
-          return null;
-        }
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      })
-      .then((data: unknown) => {
-        if (cancelled || data === null) return;
-        setMessages(parseAvenMessages(data));
-      })
-      .catch(() => {
-        if (!cancelled) setUnavailable(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [conversation]);
-
-  if (!conversation) return null;
-
-  const copy = async () => {
-    let body: string;
-    if (messages && messages.length > 0) {
-      body = messages
-        .map((m) => `${m.role ?? "?"}: ${m.content ?? ""}`)
-        .join("\n\n");
-    } else {
-      body = [
-        `Conversation · ${formatDateTime(conversation.started_at)}`,
-        `Member: ${conversation.member_name ?? conversation.member_email ?? conversation.member_id}`,
-        `Messages: ${conversation.message_count ?? 0}`,
-        "",
-        "First message:",
-        conversation.first_user_message ?? "(none)",
-        "",
-        "Snippet:",
-        conversation.snippet ?? "(none)",
-      ].join("\n");
-    }
-    try {
-      await navigator.clipboard.writeText(body);
-    } catch {
-      // ignore
-    }
-  };
-
-  const hasFullTranscript = messages !== null && messages.length > 0;
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={
-        <span className="flex items-center gap-2">
-          <IconMessage size={14} stroke={1.75} aria-hidden />
-          {conversation.member_name ?? conversation.member_email ?? "Conversation"}
-        </span>
-      }
-      description={`${conversation.message_count ?? 0} messages · ${formatDateTime(conversation.started_at)}`}
-      size="lg"
-    >
-      <div className="space-y-4 text-sm">
-        {loading && (
-          <p className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-            <IconLoader2
-              size={12}
-              stroke={2}
-              className="animate-spin"
-              aria-hidden
-            />
-            Loading transcript…
-          </p>
-        )}
-
-        {hasFullTranscript ? (
-          <div className="space-y-3">
-            {messages.map((m, i) => {
-              const role = (m.role ?? "").toLowerCase();
-              const isUser = role === "user" || role === "member";
-              return (
-                <div
-                  key={i}
-                  className={
-                    isUser
-                      ? "ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right"
-                      : "mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3"
-                  }
-                >
-                  <p
-                    className={
-                      isUser
-                        ? "font-mono text-[10px] uppercase tracking-wider text-muted-foreground"
-                        : "font-mono text-[10px] uppercase tracking-wider text-emerald/80"
-                    }
-                  >
-                    {isUser ? "Member" : "Aven"}
-                    {m.timestamp || m.ts || m.created_at
-                      ? ` · ${formatDateTime(m.timestamp ?? m.ts ?? m.created_at)}`
-                      : ""}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-foreground">
-                    {m.content ?? ""}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <>
-            {conversation.first_user_message && (
-              <div className="ml-auto max-w-[80%] rounded-xl border border-border bg-surface px-4 py-3 text-right">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                  Member · first message
-                </p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">
-                  {conversation.first_user_message}
-                </p>
-              </div>
-            )}
-            {conversation.snippet && (
-              <div className="mr-auto max-w-[85%] rounded-xl border border-emerald/20 bg-emerald/[0.04] px-4 py-3">
-                <p className="font-mono text-[10px] uppercase tracking-wider text-emerald/80">
-                  Aven · matched snippet
-                </p>
-                <p
-                  className="mt-1 whitespace-pre-wrap text-foreground"
-                  dangerouslySetInnerHTML={{ __html: conversation.snippet }}
-                />
-              </div>
-            )}
-            {unavailable && !loading && (
-              <div className="rounded-md border border-dashed border-border bg-background px-3 py-2 text-xs text-muted-foreground">
-                Full transcript endpoint not available yet — auto-
-                upgrades the moment{" "}
-                <code className="font-mono text-[11px]">
-                  /api/admin/aven/conversations/&lt;id&gt;
-                </code>{" "}
-                ships.
-              </div>
-            )}
-          </>
-        )}
-
-        <div className="flex flex-wrap justify-between gap-2 pt-2">
-          {conversation.member_id ? (
-            <Link
-              href={`/admin/members/${conversation.member_id}?tab=aven`}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground hover:border-emerald/40"
-            >
-              Open member detail
-            </Link>
-          ) : (
-            <span />
-          )}
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={copy}
-              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-background px-3 text-xs font-medium text-foreground hover:border-emerald/40"
-            >
-              <IconCopy size={12} stroke={1.75} aria-hidden />
-              Copy
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-9 items-center rounded-md bg-emerald px-3 text-xs font-semibold text-background hover:bg-emerald-hover"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      </div>
-    </Modal>
-  );
-}

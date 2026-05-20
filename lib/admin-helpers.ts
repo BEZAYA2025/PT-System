@@ -4,12 +4,19 @@
 // shim chain that goes with them — `import "server-only"` in
 // lib/admin.ts → lib/backend.ts / lib/dal.ts).
 
+export interface AvenMessageMeta {
+  quality_score?: number | null;
+  qualityScore?: number | null;
+  sentiment?: "positive" | "neutral" | "negative" | string | null;
+}
+
 export interface AvenMessage {
-  role?: "user" | "aven" | string | null;
+  role?: "user" | "aven" | "assistant" | string | null;
   content?: string | null;
   timestamp?: string | null;
   ts?: string | null;
   created_at?: string | null;
+  meta?: AvenMessageMeta | null;
 }
 
 export function parseAvenMessages(data: unknown): AvenMessage[] {
