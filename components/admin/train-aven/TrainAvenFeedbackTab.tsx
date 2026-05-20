@@ -20,6 +20,10 @@ import { formatDateTime } from "@/lib/admin-format";
 //   2. drift-log filtered to severity=critical
 // Both are merged into a single chronological review queue.
 
+// Backend §25.F Auftrag G Nachtrag (Migration 0064): once a queue
+// item has had a verdict submitted with a curriculum link, the upstream
+// now denormalises `curriculum_topic_name` onto the row so the
+// reviewer UI can label it inline without a second lookup.
 interface QualityCritical {
   id?: string | null;
   timestamp?: string | null;
@@ -28,6 +32,8 @@ interface QualityCritical {
   conversation_id?: string | null;
   member_id?: string | null;
   member_email?: string | null;
+  curriculum_topic_id?: string | null;
+  curriculum_topic_name?: string | null;
 }
 
 interface DriftEntry {
@@ -40,6 +46,8 @@ interface DriftEntry {
   member_id?: string | null;
   member_email?: string | null;
   created_at?: string | null;
+  curriculum_topic_id?: string | null;
+  curriculum_topic_name?: string | null;
 }
 
 type ReviewItem =
@@ -52,6 +60,7 @@ type ReviewItem =
       memberId: string | null;
       memberEmail: string | null;
       conversationId: string | null;
+      curriculumTopicName: string | null;
     }
   | {
       kind: "drift";
@@ -63,6 +72,7 @@ type ReviewItem =
       memberId: string | null;
       memberEmail: string | null;
       conversationId: string | null;
+      curriculumTopicName: string | null;
     };
 
 export function TrainAvenFeedbackTab() {
@@ -111,6 +121,7 @@ export function TrainAvenFeedbackTab() {
             memberId: q.member_id ?? null,
             memberEmail: q.member_email ?? null,
             conversationId: q.conversation_id ?? null,
+            curriculumTopicName: q.curriculum_topic_name ?? null,
           })),
           ...driftList.map<ReviewItem>((d, idx) => ({
             kind: "drift",
@@ -122,6 +133,7 @@ export function TrainAvenFeedbackTab() {
             memberId: d.member_id ?? null,
             memberEmail: d.member_email ?? null,
             conversationId: d.conversation_id ?? null,
+            curriculumTopicName: d.curriculum_topic_name ?? null,
           })),
         ];
         merged.sort((a, b) => {
@@ -247,6 +259,15 @@ export function TrainAvenFeedbackTab() {
                   {item.pattern && (
                     <span className="font-mono text-[11px] text-muted-foreground">
                       {item.pattern}
+                    </span>
+                  )}
+                  {item.curriculumTopicName && (
+                    <span
+                      className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.08] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald"
+                      title="Already linked to curriculum"
+                    >
+                      <IconSchool size={10} stroke={1.75} aria-hidden />
+                      {item.curriculumTopicName}
                     </span>
                   )}
                   <span className="font-mono text-[11px] text-muted-foreground">

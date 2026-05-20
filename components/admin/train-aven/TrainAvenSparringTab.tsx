@@ -529,11 +529,16 @@ function CurriculumLinkForm({
       </div>
     );
   }
+  // Backend §25.F Auftrag G Nachtrag (Migration 0064): curriculum_topic_id
+  // is now persisted, and the upstream returns 400 on unknown/invalid
+  // IDs. Defensive check against the live topics list before submit so
+  // a stale dropdown state can't shape an invalid request.
+  const valid = topicId && topics.some((t) => t.id === topicId);
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (topicId) onSubmit(topicId);
+        if (valid) onSubmit(topicId);
       }}
       className="space-y-4"
     >
@@ -564,7 +569,7 @@ function CurriculumLinkForm({
         </button>
         <button
           type="submit"
-          disabled={!topicId}
+          disabled={!valid}
           className="inline-flex h-9 items-center rounded-md bg-emerald px-3 text-sm font-semibold text-background hover:bg-emerald-hover disabled:opacity-60"
         >
           Link
