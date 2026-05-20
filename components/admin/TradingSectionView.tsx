@@ -56,9 +56,9 @@ export function TradingSectionView() {
 
       <nav
         aria-label="Trading tabs"
-        className="-mx-4 overflow-x-auto border-b border-border bg-[#0a0a0a]/95 px-4 sm:-mx-6 sm:px-6 md:-mx-8 md:px-8"
+        className="overflow-x-auto sm:overflow-visible"
       >
-        <ul className="flex min-w-max gap-1">
+        <ul className="flex min-w-max gap-1 sm:min-w-0">
           {TABS.map(({ key, label }) => {
             const isActive = activeTab === key;
             return (
