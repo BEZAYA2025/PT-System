@@ -276,6 +276,102 @@ export async function fetchAdminMemberLoginHistory(
   return [];
 }
 
+export interface MemberInvoice {
+  id: string;
+  date?: string | null;
+  created?: string | null;
+  amount_usd?: number | null;
+  amount?: number | null;
+  status?: string | null;
+  hosted_url?: string | null;
+  hosted_invoice_url?: string | null;
+  pdf_url?: string | null;
+  invoice_pdf?: string | null;
+}
+
+export interface MemberTradeStats {
+  total_count?: number | null;
+  win_rate?: number | null;
+  avg_r_multiple?: number | null;
+  total_pnl_usd?: number | null;
+  best_trade?: {
+    symbol?: string | null;
+    pnl_usd?: number | null;
+    roi_pct?: number | null;
+  } | null;
+  worst_trade?: {
+    symbol?: string | null;
+    pnl_usd?: number | null;
+    roi_pct?: number | null;
+  } | null;
+  open_count?: number | null;
+  last_30d?: number | null;
+}
+
+export interface MemberTrade {
+  id: string;
+  symbol?: string | null;
+  side?: "long" | "short" | string | null;
+  entry?: number | null;
+  exit?: number | null;
+  mark_price?: number | null;
+  sl_price?: number | null;
+  tp_price?: number | null;
+  pnl_usd?: number | null;
+  pnl_pct?: number | null;
+  roi_pct?: number | null;
+  status?: "open" | "closed" | string | null;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  duration_seconds?: number | null;
+}
+
+export interface MemberTradesResponse {
+  open: MemberTrade[];
+  closed: MemberTrade[];
+}
+
+export interface MemberEvent {
+  // The events feed merges login / trade / aven / brief signals. Each
+  // entry carries a type string the renderer dispatches on plus a
+  // free-form metadata blob for type-specific detail.
+  timestamp?: string | null;
+  created_at?: string | null;
+  event_type?: string | null;
+  description?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface MemberAuditLogEntry {
+  timestamp?: string | null;
+  created_at?: string | null;
+  action_type?: string | null;
+  description?: string | null;
+  actor?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+export async function fetchAdminMemberEvents(
+  id: string,
+  options: { days?: number; event_type?: string } = {},
+): Promise<MemberEvent[] | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const qs = new URLSearchParams();
+  if (options.days) qs.set("days", String(options.days));
+  if (options.event_type) qs.set("event_type", options.event_type);
+  const path = `/api/admin/members/${encodeURIComponent(id)}/events${qs.toString() ? `?${qs}` : ""}`;
+  const res = await backendFetch<unknown>(path, { method: "GET", token });
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as MemberEvent[];
+  if (d && typeof d === "object") {
+    const arr = (d as { events?: unknown }).events;
+    if (Array.isArray(arr)) return arr as MemberEvent[];
+  }
+  return [];
+}
+
 export interface DiscountCode {
   id: string;
   code: string;

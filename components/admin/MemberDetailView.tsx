@@ -12,9 +12,15 @@ import {
 } from "@tabler/icons-react";
 import { Modal } from "@/components/Modal";
 import { Toast, type ToastState } from "@/components/Toast";
-import type { LoginHistoryEntry, MemberDetail } from "@/lib/admin";
+import type {
+  LoginHistoryEntry,
+  MemberDetail,
+  MemberEvent,
+} from "@/lib/admin";
 import { ActionsMenu } from "./ActionsMenu";
 import { MemberOverviewTab } from "./MemberOverviewTab";
+import { MemberSubscriptionTab } from "./MemberSubscriptionTab";
+import { MemberTradesTab } from "./MemberTradesTab";
 
 type TabKey =
   | "overview"
@@ -66,10 +72,15 @@ function statusBadgeClass(status: string | null | undefined): string {
 
 interface Props {
   member: MemberDetail;
+  events: MemberEvent[];
   loginHistory: LoginHistoryEntry[];
 }
 
-export function MemberDetailView({ member: initialMember, loginHistory }: Props) {
+export function MemberDetailView({
+  member: initialMember,
+  events,
+  loginHistory,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -361,11 +372,14 @@ export function MemberDetailView({ member: initialMember, loginHistory }: Props)
         {activeTab === "overview" && (
           <MemberOverviewTab
             member={member}
+            events={events}
             loginHistory={loginHistory}
           />
         )}
-        {activeTab === "subscription" && <TabPlaceholder name="Subscription" />}
-        {activeTab === "trades" && <TabPlaceholder name="Trades" />}
+        {activeTab === "subscription" && (
+          <MemberSubscriptionTab member={member} />
+        )}
+        {activeTab === "trades" && <MemberTradesTab member={member} />}
         {activeTab === "aven" && <TabPlaceholder name="Aven" />}
         {activeTab === "activity" && <TabPlaceholder name="Activity" />}
         {activeTab === "notes" && <TabPlaceholder name="Notes & Audit" />}

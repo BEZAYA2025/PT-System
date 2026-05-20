@@ -1,17 +1,24 @@
 "use client";
 
 import {
+  IconActivity,
   IconBolt,
   IconChartCandle,
+  IconClipboardCheck,
   IconHeartbeat,
   IconLogin,
   IconMessage,
   IconWallet,
 } from "@tabler/icons-react";
-import type { LoginHistoryEntry, MemberDetail } from "@/lib/admin";
+import type {
+  LoginHistoryEntry,
+  MemberDetail,
+  MemberEvent,
+} from "@/lib/admin";
 
 interface Props {
   member: MemberDetail;
+  events: MemberEvent[];
   loginHistory: LoginHistoryEntry[];
 }
 
@@ -140,7 +147,7 @@ function uaLine(entry: LoginHistoryEntry): string {
   return "Unknown device";
 }
 
-export function MemberOverviewTab({ member, loginHistory }: Props) {
+export function MemberOverviewTab({ member, events, loginHistory }: Props) {
   const health = deriveHealth(member);
   const healthClasses = HEALTH_CLASSES[health.tone];
 
@@ -159,7 +166,13 @@ export function MemberOverviewTab({ member, loginHistory }: Props) {
   const tradesPct = activitySum > 0 ? (trades7 / activitySum) * 100 : 0;
   const briefsPct = activitySum > 0 ? (briefs7 / activitySum) * 100 : 0;
 
-  const recentLogins = loginHistory.slice(0, 10);
+  // Events feed wins when populated — it's the merged signal stream
+  // (logins + trades + Aven starts + brief reads). When the backend
+  // returns an empty array we synth equivalent entries from the
+  // login-history payload so the timeline still has content for
+  // members whose events row is sparse.
+  const timeline = events.length > 0 ? events : loginsAsEvents(loginHistory);
+  const recentTimeline = timeline.slice(0, 12);
 
   return (
     <div className="space-y-6">
@@ -281,55 +294,101 @@ export function MemberOverviewTab({ member, loginHistory }: Props) {
         )}
       </section>
 
-      {/* Recent activity timeline — driven by login-history for now.
-          Once the backend ships a generic events feed, trade-opens,
-          Aven-conversation-starts, and brief-reads will land in this
-          same component. */}
+      {/* Recent activity timeline — driven by the events feed
+          (merged logins / trades / Aven / brief signals). Falls back
+          to raw login-history when the events endpoint returns an
+          empty array. */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
         <header>
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
             Recent activity
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Login history (last 30 days). Trade and Aven events join
-            this feed once the backend events endpoint lands.
+            Last 30 days · logins, trades, Aven conversations, brief reads.
           </p>
         </header>
-        {recentLogins.length === 0 ? (
+        {recentTimeline.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            No logins recorded in the last 30 days.
+            No activity recorded in the last 30 days.
           </p>
         ) : (
           <ol className="mt-4 space-y-3">
-            {recentLogins.map((entry) => (
-              <li
-                key={entry.id}
-                className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5"
-              >
-                <span
-                  aria-hidden
-                  className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-emerald/[0.10] text-emerald"
-                >
-                  <IconLogin size={13} stroke={1.75} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm text-foreground">
-                    Signed in · {uaLine(entry)}
-                  </p>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                    {timeAgo(entry.created_at)}
-                    {entry.ip_address && (
-                      <> · {entry.ip_address}</>
-                    )}
-                  </p>
-                </div>
-              </li>
+            {recentTimeline.map((entry, idx) => (
+              <EventRow key={`${entry.timestamp ?? idx}-${idx}`} entry={entry} />
             ))}
           </ol>
         )}
       </section>
     </div>
   );
+}
+
+function loginsAsEvents(history: LoginHistoryEntry[]): MemberEvent[] {
+  return history.map((entry) => ({
+    timestamp: entry.created_at ?? null,
+    event_type: "login",
+    description: `Signed in · ${uaLine(entry)}`,
+    metadata: { ip_address: entry.ip_address },
+  }));
+}
+
+function EventRow({ entry }: { entry: MemberEvent }) {
+  const { Icon, classes } = iconForEvent(entry.event_type);
+  const ts = entry.timestamp ?? entry.created_at;
+  const ip =
+    entry.metadata && typeof entry.metadata.ip_address === "string"
+      ? (entry.metadata.ip_address as string)
+      : null;
+  return (
+    <li className="flex items-start gap-3 rounded-lg border border-border/60 bg-background px-3 py-2.5">
+      <span
+        aria-hidden
+        className={`mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full ${classes}`}
+      >
+        <Icon size={13} stroke={1.75} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm text-foreground">
+          {entry.description ?? entry.event_type ?? "Event"}
+        </p>
+        <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+          {timeAgo(ts)}
+          {ip && <> · {ip}</>}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function iconForEvent(type: string | null | undefined): {
+  Icon: React.ComponentType<{ size?: number; stroke?: number }>;
+  classes: string;
+} {
+  const t = (type ?? "").toLowerCase();
+  if (t === "login")
+    return {
+      Icon: IconLogin,
+      classes: "bg-emerald/[0.10] text-emerald",
+    };
+  if (t.includes("trade"))
+    return {
+      Icon: IconChartCandle,
+      classes: "bg-sky-400/[0.12] text-sky-300",
+    };
+  if (t.includes("aven") || t.includes("conversation"))
+    return {
+      Icon: IconMessage,
+      classes: "bg-emerald/[0.10] text-emerald",
+    };
+  if (t.includes("brief"))
+    return {
+      Icon: IconClipboardCheck,
+      classes: "bg-amber-500/[0.10] text-amber-300",
+    };
+  return {
+    Icon: IconActivity,
+    classes: "bg-surface text-muted-foreground",
+  };
 }
 
 function KPICard({
