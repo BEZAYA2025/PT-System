@@ -277,25 +277,35 @@ function shapeCommon(raw: unknown, fallbackId: string): CommonTrade | null {
   const closedAt = str(readField(t, ["closed_at", "closedAt", "close_time"]));
 
   const referencePrice = status === "open" ? mark : exit;
+  const sideLower = lowerSide(readField(t, ["side", "direction"]));
+
+  // Same self-compute-on-closed defence as shapePaulEndpointOne — the
+  // backend's `roi_pct` / `realized_pnl_pct` / `pnl_pct` family is
+  // ambiguous on this shared shape (could be asset-ROI pre-leverage or
+  // margin-ROI depending on the upstream endpoint). When the explicit
+  // margin field is missing AND we have entry+exit+leverage we trust
+  // our own math over the ambiguous backend field.
+  const lev = num(readField(t, ["leverage"]));
+  const sideSign = sideLower === "long" ? 1 : -1;
+  const computedMarginRoi =
+    status === "closed" && exit !== null && entry > 0
+      ? ((exit - entry) / entry) * 100 * (lev ?? 1) * sideSign
+      : null;
+  const pnlPct =
+    num(readField(t, ["margin_roi_pct"])) ??
+    computedMarginRoi ??
+    num(readField(t, ["realized_pnl_pct", "roi_pct", "pnl_pct", "roi"])) ??
+    0;
 
   return {
     id: str(readField(t, ["id", "trade_id"])) ?? fallbackId,
     symbol,
-    side: lowerSide(readField(t, ["side", "direction"])),
+    side: sideLower,
     status,
     entry,
     mark: status === "open" ? mark : null,
     exit: status === "closed" ? exit : null,
-    pnlPct:
-      num(
-        readField(t, [
-          "margin_roi_pct",
-          "realized_pnl_pct",
-          "roi_pct",
-          "pnl_pct",
-          "roi",
-        ]),
-      ) ?? 0,
+    pnlPct,
     slPrice,
     tpPrice,
     slDistancePct:
@@ -391,6 +401,30 @@ function shapePaulEndpointOne(
         ? idRaw
         : fallbackId;
 
+  // ROI for Paul's-trades — strict margin-ROI semantics. Backend's
+  // `roi_pct` field on /api/cockpit/paul-trades historically ships
+  // ASSET-ROI (pre-leverage) for some closed trades — Paul caught
+  // his Trade #5 displaying a far-too-small percentage because the
+  // FE was reading `roi_pct` directly when margin_roi_pct was null
+  // (same family of bug as the Sprint-7 my-trades fix). When the
+  // backend doesn't ship margin_roi_pct AND the trade is closed
+  // (so we have entry + exit + leverage), self-compute margin-ROI
+  // ourselves instead of falling back to the ambiguous roi_pct.
+  // Open trades stay on the backend field (mark is null here so we
+  // can't self-compute) — at worst we render the legacy scale until
+  // the trade closes and our self-compute takes over.
+  const lev = num(t.leverage);
+  const sideSign = lowerSide(t.side) === "long" ? 1 : -1;
+  const computedMarginRoi =
+    status === "closed" && exit !== null && entry > 0
+      ? ((exit - entry) / entry) * 100 * (lev ?? 1) * sideSign
+      : null;
+  const pnlPct =
+    num(t.margin_roi_pct) ??
+    computedMarginRoi ??
+    num(t.roi_pct) ??
+    0;
+
   return {
     id,
     owner: "paul",
@@ -400,7 +434,7 @@ function shapePaulEndpointOne(
     entry,
     mark: null, // endpoint doesn't expose live mark price
     exit: status === "closed" ? exit : null,
-    pnlPct: num(t.margin_roi_pct) ?? num(t.roi_pct) ?? 0,
+    pnlPct,
     pnlR: null,
     slPrice: sl,
     tpPrice: tp,
