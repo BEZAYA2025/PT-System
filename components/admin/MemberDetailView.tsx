@@ -418,9 +418,14 @@ export function MemberDetailView({
 
       <nav
         aria-label="Member detail tabs"
-        className="sticky top-0 z-20 -mx-4 overflow-x-auto border-b border-border bg-[#0a0a0a]/95 px-4 backdrop-blur sm:-mx-6 sm:px-6 md:-mx-8 md:px-8"
+        // Horizontal-scroll affordance only on narrow viewports — on
+        // sm+ the six tabs comfortably fit the max-w-6xl container, so
+        // overflow-x-auto + min-w-max combined to render unnecessary
+        // scroll arrows on desktop. sm:overflow-visible + sm:min-w-0
+        // lets the row flex naturally above the mobile breakpoint.
+        className="sticky top-0 z-20 -mx-4 overflow-x-auto border-b border-border bg-[#0a0a0a]/95 px-4 backdrop-blur sm:-mx-6 sm:overflow-visible sm:px-6 md:-mx-8 md:px-8"
       >
-        <ul className="flex min-w-max gap-1">
+        <ul className="flex min-w-max gap-1 sm:min-w-0">
           {TABS.map(({ key, label, star }) => {
             const isActive = activeTab === key;
             return (
