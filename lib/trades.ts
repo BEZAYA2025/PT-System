@@ -277,30 +277,26 @@ function shapeCommon(raw: unknown, fallbackId: string): CommonTrade | null {
   const closedAt = str(readField(t, ["closed_at", "closedAt", "close_time"]));
 
   const referencePrice = status === "open" ? mark : exit;
-  const sideLower = lowerSide(readField(t, ["side", "direction"]));
 
-  // Same self-compute-on-closed defence as shapePaulEndpointOne — the
-  // backend's `roi_pct` / `realized_pnl_pct` / `pnl_pct` family is
-  // ambiguous on this shared shape (could be asset-ROI pre-leverage or
-  // margin-ROI depending on the upstream endpoint). When the explicit
-  // margin field is missing AND we have entry+exit+leverage we trust
-  // our own math over the ambiguous backend field.
-  const lev = num(readField(t, ["leverage"]));
-  const sideSign = sideLower === "long" ? 1 : -1;
-  const computedMarginRoi =
-    status === "closed" && exit !== null && entry > 0
-      ? ((exit - entry) / entry) * 100 * (lev ?? 1) * sideSign
-      : null;
+  // Reverted self-compute fallback — see shapePaulEndpointOne comment.
+  // Backend's roi_pct on this endpoint family is already margin-ROI
+  // (verified post-revert against Paul's Trade #5 which read +3.02%
+  // correctly with the simple chain).
   const pnlPct =
-    num(readField(t, ["margin_roi_pct"])) ??
-    computedMarginRoi ??
-    num(readField(t, ["realized_pnl_pct", "roi_pct", "pnl_pct", "roi"])) ??
-    0;
+    num(
+      readField(t, [
+        "margin_roi_pct",
+        "realized_pnl_pct",
+        "roi_pct",
+        "pnl_pct",
+        "roi",
+      ]),
+    ) ?? 0;
 
   return {
     id: str(readField(t, ["id", "trade_id"])) ?? fallbackId,
     symbol,
-    side: sideLower,
+    side: lowerSide(readField(t, ["side", "direction"])),
     status,
     entry,
     mark: status === "open" ? mark : null,
@@ -401,29 +397,33 @@ function shapePaulEndpointOne(
         ? idRaw
         : fallbackId;
 
-  // ROI for Paul's-trades — strict margin-ROI semantics. Backend's
-  // `roi_pct` field on /api/cockpit/paul-trades historically ships
-  // ASSET-ROI (pre-leverage) for some closed trades — Paul caught
-  // his Trade #5 displaying a far-too-small percentage because the
-  // FE was reading `roi_pct` directly when margin_roi_pct was null
-  // (same family of bug as the Sprint-7 my-trades fix). When the
-  // backend doesn't ship margin_roi_pct AND the trade is closed
-  // (so we have entry + exit + leverage), self-compute margin-ROI
-  // ourselves instead of falling back to the ambiguous roi_pct.
-  // Open trades stay on the backend field (mark is null here so we
-  // can't self-compute) — at worst we render the legacy scale until
-  // the trade closes and our self-compute takes over.
-  const lev = num(t.leverage);
-  const sideSign = lowerSide(t.side) === "long" ? 1 : -1;
-  const computedMarginRoi =
-    status === "closed" && exit !== null && entry > 0
-      ? ((exit - entry) / entry) * 100 * (lev ?? 1) * sideSign
-      : null;
-  const pnlPct =
-    num(t.margin_roi_pct) ??
-    computedMarginRoi ??
-    num(t.roi_pct) ??
-    0;
+  // Reverted: self-compute margin-ROI from entry/exit/leverage was
+  // wrong — Paul saw Trade #5 render +169.40% when true margin-ROI
+  // was +3.02% (factor ~56, smells like double-leverage). Backend
+  // already ships the correct margin-ROI in `roi_pct` for this
+  // endpoint when margin_roi_pct is absent. Trust it. If a specific
+  // trade later shows pre-leverage asset-ROI, that's a backend issue
+  // to clarify — the FE shouldn't second-guess with a self-multiply
+  // that doubles the leverage applied. Dev-mode console.warn fires
+  // for closed trades so the next diagnosis has the raw fields.
+  if (
+    process.env.NODE_ENV !== "production" &&
+    status === "closed" &&
+    typeof console !== "undefined"
+  ) {
+    // eslint-disable-next-line no-console
+    console.warn("[paul-trades] roi fields", {
+      id: t.id ?? t.trade_id,
+      symbol: t.symbol,
+      side: t.side,
+      entry: t.entry,
+      exit: t.exit,
+      leverage: t.leverage,
+      margin_roi_pct: t.margin_roi_pct,
+      roi_pct: t.roi_pct,
+    });
+  }
+  const pnlPct = num(t.margin_roi_pct) ?? num(t.roi_pct) ?? 0;
 
   return {
     id,
