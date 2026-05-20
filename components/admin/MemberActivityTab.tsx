@@ -204,17 +204,22 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             icon={IconBrandTelegram}
             label="Telegram"
             connected={Boolean(member.telegram_connected)}
-            detail={
-              member.telegram_username
-                ? `@${member.telegram_username}`
-                : member.telegram_connected
-                  ? // Backend §25 Auftrag G: telegram_username is always
-                    // null — the Bot API only ships chat_id, never the
-                    // human handle. Surface that explicitly so the
-                    // founder isn't left wondering.
-                    "Linked, username unknown"
-                  : null
-            }
+            detail={(() => {
+              if (member.telegram_username) {
+                return `@${member.telegram_username}`;
+              }
+              if (!member.telegram_connected) return null;
+              // Backend §25 Auftrag G: telegram_username is null
+              // (Bot API only exposes chat_id). Surface the numeric
+              // chat_id instead of "unknown" — at least the founder
+              // can match it to a Telegram identity if needed.
+              const chatId =
+                member.telegram_chat_id ??
+                member.telegram_user_id ??
+                member.telegram_id ??
+                null;
+              return chatId !== null ? `ID: ${chatId}` : "Linked";
+            })()}
           />
           <ConnectionRow
             icon={IconChartCandle}
@@ -222,7 +227,11 @@ export function MemberActivityTab({ member, loginHistory }: Props) {
             connected={exchangeConnected}
             detail={
               exchangeConnected
-                ? `${formatExchangeName(member.exchange_type)} API${
+                ? `${formatExchangeName(
+                    member.exchange_type ??
+                      member.exchange ??
+                      member.exchange_name,
+                  )} API${
                     (member.exchange_api_added_at ??
                       member.binance_api_key_added_at)
                       ? ` · since ${formatDate(member.exchange_api_added_at ?? member.binance_api_key_added_at)}`

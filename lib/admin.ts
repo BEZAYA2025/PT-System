@@ -72,6 +72,11 @@ export interface AdminMembersListEntry {
   /** Per-exchange label (e.g. "binance"/"bitunix"). Optional on the
    *  list endpoint — adoption breakdown groups by this when present. */
   exchange_type?: string | null;
+  /** Backend may also surface the exchange brand under `exchange` or
+   *  `exchange_name` on different endpoints. Reads should chain
+   *  through all three so a key rename doesn't blank the badge. */
+  exchange?: string | null;
+  exchange_name?: string | null;
   tags?: string[] | null;
 }
 
@@ -366,9 +371,18 @@ export interface MemberDetail extends AdminMembersListEntry {
   subscription_period_end?: string | null;
   current_period_end?: string | null;
   /** Backend §25 Auftrag G: ALWAYS null (Telegram-Bot API only
-   *  exposes chat_id, never the human handle). UI renders
-   *  "Linked, username unknown" when telegram_connected && null. */
+   *  exposes chat_id, never the human handle). UI prefers @username
+   *  → falls back to the numeric chat_id when present so the
+   *  founder has SOMETHING addressable to identify a linked member,
+   *  not a useless "unknown". */
   telegram_username?: string | null;
+  /** Numeric Telegram chat_id from the Bot API. Always present when
+   *  telegram_connected is true. Surfaced as "ID: 1351116658" when
+   *  no username exists. May be string or number depending on
+   *  backend serialisation. */
+  telegram_chat_id?: string | number | null;
+  telegram_user_id?: string | number | null;
+  telegram_id?: string | number | null;
   /** Backend §25 Auftrag G alias of binance_api_key_added_at —
    *  generic across exchanges. Read both via `?? ` so renames
    *  don't blank the row. */
