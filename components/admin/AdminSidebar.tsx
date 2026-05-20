@@ -9,6 +9,7 @@ import {
   IconChartCandle,
   IconChartLine,
   IconClipboardCheck,
+  IconClipboardList,
   IconLayoutDashboard,
   IconLogout,
   IconMail,
@@ -33,6 +34,7 @@ const ACTIVE_LINKS: Array<{
   { href: "/admin/communications", label: "Communications", icon: IconMail },
   { href: "/admin/trading", label: "Trading", icon: IconChartCandle },
   { href: "/admin/discount-codes", label: "Discount Codes", icon: IconTicket },
+  { href: "/admin/audit", label: "Audit Log", icon: IconClipboardList },
 ];
 
 const COMING_SOON: Array<{
