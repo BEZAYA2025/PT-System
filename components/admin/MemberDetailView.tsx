@@ -7,6 +7,7 @@ import {
   IconArrowLeft,
   IconCopy,
   IconLoader2,
+  IconLockSquare,
   IconMail,
   IconSend,
 } from "@tabler/icons-react";
@@ -93,6 +94,9 @@ export function MemberDetailView({
   const [confirm, setConfirm] = useState<
     "suspend" | "reactivate" | null
   >(null);
+  const [impersonateOpen, setImpersonateOpen] = useState(false);
+  const [impersonateReason, setImpersonateReason] = useState("");
+  const [impersonateBusy, setImpersonateBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const [copied, setCopied] = useState(false);
@@ -294,6 +298,14 @@ export function MemberDetailView({
               <IconSend size={13} stroke={1.75} />
               Send Telegram
             </button>
+            <button
+              type="button"
+              onClick={() => setImpersonateOpen(true)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.08] px-3 text-xs font-semibold text-amber-200 hover:bg-amber-500/[0.14]"
+            >
+              <IconLockSquare size={13} stroke={1.75} />
+              Impersonate
+            </button>
             <ActionsMenu
               label="Change tier"
               items={[
@@ -464,6 +476,101 @@ export function MemberDetailView({
                 />
               )}
               Reactivate
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={impersonateOpen}
+        onClose={() => !impersonateBusy && setImpersonateOpen(false)}
+        title={`Impersonate ${displayName}?`}
+        description="Read-only session, 1h expiry. All actions are audited."
+        size="sm"
+      >
+        <div className="space-y-4 text-sm text-foreground">
+          <p>
+            You&apos;ll see the dashboard exactly as the member does.
+            Mutating actions stay blocked on the backend even if a UI
+            control isn&apos;t disabled.
+          </p>
+          <label className="block">
+            <span className="text-xs uppercase tracking-wider text-muted-foreground">
+              Reason (required)
+            </span>
+            <textarea
+              value={impersonateReason}
+              onChange={(e) => setImpersonateReason(e.target.value)}
+              rows={3}
+              placeholder="e.g. debugging trade-card visual bug they reported"
+              className="mt-1 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-emerald focus:outline-none"
+            />
+          </label>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setImpersonateOpen(false)}
+              disabled={impersonateBusy}
+              className="inline-flex h-9 items-center rounded-md border border-border bg-background px-3 text-sm font-medium text-foreground disabled:opacity-60"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                if (impersonateBusy) return;
+                if (!impersonateReason.trim()) return;
+                setImpersonateBusy(true);
+                try {
+                  const res = await fetch(
+                    `/api/proxy/admin/members/${encodeURIComponent(member.id)}/impersonate`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        reason: impersonateReason.trim(),
+                      }),
+                    },
+                  );
+                  if (!res.ok) {
+                    const data = (await res.json().catch(() => null)) as {
+                      message?: string;
+                      error?: string;
+                    } | null;
+                    throw new Error(
+                      data?.message ??
+                        data?.error ??
+                        `HTTP ${res.status}`,
+                    );
+                  }
+                  // Hard nav so the new access_token cookie takes
+                  // effect for the next SSR pass.
+                  window.location.href = "/dashboard";
+                } catch (err) {
+                  setToast({
+                    message:
+                      err instanceof Error
+                        ? `Impersonate failed · ${err.message}`
+                        : "Impersonate failed",
+                    tone: "error",
+                  });
+                  setImpersonateBusy(false);
+                }
+              }}
+              disabled={impersonateBusy || !impersonateReason.trim()}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/[0.10] px-3 text-sm font-semibold text-amber-100 hover:bg-amber-500/[0.18] disabled:opacity-60"
+            >
+              {impersonateBusy ? (
+                <IconLoader2
+                  size={14}
+                  stroke={2}
+                  className="animate-spin"
+                  aria-hidden
+                />
+              ) : (
+                <IconLockSquare size={14} stroke={1.75} aria-hidden />
+              )}
+              Confirm impersonate
             </button>
           </div>
         </div>

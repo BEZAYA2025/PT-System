@@ -1,5 +1,6 @@
 import { getInitialNotifications, isFounder, requireUser } from "@/lib/dal";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { PageViewTracker } from "@/components/PageViewTracker";
 import { mockUserView } from "@/lib/mock-dashboard";
 
@@ -16,6 +17,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-svh bg-background">
+      <ImpersonationBanner />
       <DashboardHeader
         displayName={displayName}
         email={user.email}

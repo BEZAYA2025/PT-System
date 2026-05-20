@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { isFounder, requireUser } from "@/lib/dal";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { ImpersonationBanner } from "@/components/ImpersonationBanner";
 import { PageViewTracker } from "@/components/PageViewTracker";
 
 export const metadata: Metadata = {
@@ -28,9 +29,12 @@ export default async function AdminLayout({
   const displayName = user.display_name?.trim() || user.email;
 
   return (
-    <AdminShell displayName={displayName}>
-      {children}
-      <PageViewTracker />
-    </AdminShell>
+    <>
+      <ImpersonationBanner />
+      <AdminShell displayName={displayName}>
+        {children}
+        <PageViewTracker />
+      </AdminShell>
+    </>
   );
 }
