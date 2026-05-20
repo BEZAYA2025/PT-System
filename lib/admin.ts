@@ -37,11 +37,24 @@ export interface AdminMembersListEntry {
   // render rows. Missing values surface as "—" / muted tone, never null
   // crashes in the table.
   engagement_score?: number | null;
+  /** Backend §25 (post-audit): single union count for last-7d activity
+   *  across aven-msg / trades / brief-views — preferred read. The three
+   *  per-source fields below are kept for the tooltip-style breakdown
+   *  on older deploys, but `brief_views_count_7d` is always 0 in
+   *  current backend because the /api/track wire isn't live yet. */
+  activity_7d?: number | null;
   aven_messages_count_7d?: number | null;
   trades_count_7d?: number | null;
   brief_views_count_7d?: number | null;
+  /** Backend §25: float USD lifetime value (post-audit name). The
+   *  `lifetime_value_usd` alias predates the spec rename — keep both
+   *  in reads via `?? `. */
+  ltv_usd?: number | null;
   lifetime_value_usd?: number | null;
   last_active_at?: string | null;
+  /** Backend §25 alias of signup_date — preferred over the older
+   *  `joined_at` / `created_at` chain when present. */
+  joined?: string | null;
   /** Sprint 2 alias for has_exchange_connection — the spec uses
    *  this shorter name; we accept either to stay compatible. */
   exchange_connected?: boolean;
@@ -272,6 +285,14 @@ export interface MemberDetail extends AdminMembersListEntry {
   // ADMIN_API_SPEC.md §13: detail response is the list entry shape
   // plus these audit / engagement / notes fields. All optional —
   // older backend deploys silently degrade rather than 500ing.
+  /** Backend §25 (post-audit): nested engagement object with the
+   *  authoritative `activity_7d_total` (union count). Prefer this
+   *  over the row-level `activity_7d` when present — the row
+   *  flattener may eventually be removed. */
+  engagement?: {
+    activity_7d_total?: number | null;
+    score?: number | null;
+  } | null;
   notes?: MemberNote[] | null;
   total_trades?: number | null;
   win_rate?: number | null;
@@ -363,6 +384,16 @@ export interface MemberInvoice {
   hosted_invoice_url?: string | null;
   pdf_url?: string | null;
   invoice_pdf?: string | null;
+}
+
+/** Wrapper for the invoices endpoint when the member has no Stripe
+ *  customer yet (trial-only, never paid). Backend §25 (post-audit)
+ *  ships `{stripe_customer_missing: true}` instead of a 4xx or an
+ *  empty array so the UI can distinguish "no billing yet" from
+ *  "Stripe API failed". */
+export interface MemberInvoicesResponse {
+  invoices?: MemberInvoice[] | null;
+  stripe_customer_missing?: boolean;
 }
 
 export interface ImpersonationSession {

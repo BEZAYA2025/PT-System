@@ -73,6 +73,11 @@ export function MemberSubscriptionTab({ member }: Props) {
   const [invoices, setInvoices] = useState<MemberInvoice[] | null>(null);
   const [invoicesError, setInvoicesError] = useState<string | null>(null);
   const [invoicesLoading, setInvoicesLoading] = useState(true);
+  // Backend §25 (post-audit) — trial-only members have no Stripe
+  // customer yet, so the endpoint now ships {stripe_customer_missing:
+  // true} instead of erroring. Render that as a calm empty-state
+  // rather than the amber "couldn't load" banner.
+  const [noStripeCustomer, setNoStripeCustomer] = useState(false);
 
   const [refundOpen, setRefundOpen] = useState(false);
   const [refundReason, setRefundReason] = useState("");
@@ -99,12 +104,22 @@ export function MemberSubscriptionTab({ member }: Props) {
       })
       .then((data: unknown) => {
         if (cancelled) return;
-        const list = Array.isArray(data)
-          ? (data as MemberInvoice[])
-          : data && typeof data === "object"
-            ? ((data as { invoices?: MemberInvoice[] }).invoices ?? [])
-            : [];
-        setInvoices(list);
+        if (Array.isArray(data)) {
+          setInvoices(data as MemberInvoice[]);
+          setNoStripeCustomer(false);
+          return;
+        }
+        if (data && typeof data === "object") {
+          const obj = data as {
+            invoices?: MemberInvoice[];
+            stripe_customer_missing?: boolean;
+          };
+          setNoStripeCustomer(Boolean(obj.stripe_customer_missing));
+          setInvoices(obj.invoices ?? []);
+          return;
+        }
+        setInvoices([]);
+        setNoStripeCustomer(false);
       })
       .catch((err: Error) => {
         if (!cancelled) setInvoicesError(err.message);
@@ -346,6 +361,11 @@ export function MemberSubscriptionTab({ member }: Props) {
           <p className="mt-4 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
             <IconAlertCircle size={12} stroke={1.75} aria-hidden />
             Couldn&apos;t load invoices · {invoicesError}
+          </p>
+        ) : noStripeCustomer ? (
+          <p className="mt-4 text-sm text-muted-foreground">
+            No billing history yet — Stripe customer is created on first
+            charge.
           </p>
         ) : !invoices || invoices.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">

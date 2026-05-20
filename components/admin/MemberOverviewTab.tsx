@@ -62,6 +62,43 @@ function timeAgo(iso: string | null | undefined): string {
 
 type HealthTone = "healthy" | "at-risk" | "inactive";
 
+// Backend §25 ships `engagement.activity_7d_total` as the authoritative
+// union count. Older deploys (and the row-level shape) expose the
+// per-source breakdown — read both so the health blurb stays meaningful
+// whichever shape is live.
+function activity7dParts(member: MemberDetail): {
+  total: number;
+  avenMessages: number | null;
+  trades: number | null;
+  hasBreakdown: boolean;
+} {
+  const aven =
+    typeof member.aven_messages_count_7d === "number"
+      ? member.aven_messages_count_7d
+      : null;
+  const trades =
+    typeof member.trades_count_7d === "number" ? member.trades_count_7d : null;
+  const briefs =
+    typeof member.brief_views_count_7d === "number"
+      ? member.brief_views_count_7d
+      : 0;
+  const hasBreakdown = aven !== null || trades !== null;
+  const breakdownSum = (aven ?? 0) + (trades ?? 0) + briefs;
+  const total =
+    member.engagement?.activity_7d_total ??
+    (typeof member.activity_7d === "number" ? member.activity_7d : null) ??
+    (hasBreakdown ? breakdownSum : 0);
+  return { total, avenMessages: aven, trades, hasBreakdown };
+}
+
+function activityBlurb(member: MemberDetail): string {
+  const { total, avenMessages, trades, hasBreakdown } = activity7dParts(member);
+  if (hasBreakdown) {
+    return `${avenMessages ?? 0} Aven messages, ${trades ?? 0} trades last 7d.`;
+  }
+  return `${total} activit${total === 1 ? "y" : "ies"} last 7d.`;
+}
+
 function deriveHealth(member: MemberDetail): {
   tone: HealthTone;
   label: string;
@@ -69,8 +106,7 @@ function deriveHealth(member: MemberDetail): {
 } {
   const score = member.engagement_score ?? null;
   const lastActiveDays = daysSince(member.last_active_at);
-  const avenMessages = member.aven_messages_count_7d ?? 0;
-  const trades = member.trades_count_7d ?? 0;
+  const { total: activityTotal } = activity7dParts(member);
 
   // Inactive trumps everything — if they haven't logged in in three
   // weeks, the score doesn't matter.
@@ -87,35 +123,35 @@ function deriveHealth(member: MemberDetail): {
       return {
         tone: "healthy",
         label: "Healthy 🟢",
-        reason: `Engagement ${score}/100 · ${avenMessages} Aven messages, ${trades} trades last 7d.`,
+        reason: `Engagement ${score}/100 · ${activityBlurb(member)}`,
       };
     }
     if (score < 30) {
       return {
         tone: "at-risk",
         label: "At-Risk 🟡",
-        reason: `Engagement ${score}/100. ${avenMessages} Aven messages, ${trades} trades last 7d — consider a personal nudge.`,
+        reason: `Engagement ${score}/100. ${activityBlurb(member)} Consider a personal nudge.`,
       };
     }
     return {
       tone: "at-risk",
       label: "Mid 🟡",
-      reason: `Engagement ${score}/100. ${avenMessages} Aven messages, ${trades} trades last 7d.`,
+      reason: `Engagement ${score}/100. ${activityBlurb(member)}`,
     };
   }
 
   // No score — fall back on raw activity counts.
-  if (avenMessages + trades === 0 && (lastActiveDays ?? 0) > 7) {
+  if (activityTotal === 0 && (lastActiveDays ?? 0) > 7) {
     return {
       tone: "at-risk",
       label: "Quiet 🟡",
-      reason: "No Aven messages or trades in the last week.",
+      reason: "No activity in the last week.",
     };
   }
   return {
     tone: "healthy",
     label: "Active 🟢",
-    reason: `${avenMessages} Aven messages, ${trades} trades last 7d.`,
+    reason: activityBlurb(member),
   };
 }
 
@@ -158,13 +194,17 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
   const tradesTotal = member.total_trades ?? null;
   const winRate = member.win_rate ?? null;
 
-  const aven7 = member.aven_messages_count_7d ?? 0;
-  const trades7 = member.trades_count_7d ?? 0;
-  const briefs7 = member.brief_views_count_7d ?? 0;
-  const activitySum = aven7 + trades7 + briefs7;
-  const avenPct = activitySum > 0 ? (aven7 / activitySum) * 100 : 0;
-  const tradesPct = activitySum > 0 ? (trades7 / activitySum) * 100 : 0;
-  const briefsPct = activitySum > 0 ? (briefs7 / activitySum) * 100 : 0;
+  const activity = activity7dParts(member);
+  // Stack only renders when backend ships the breakdown (brief_views
+  // is intentionally hidden — it's currently always 0 because the
+  // /api/track wire isn't FE-side live yet; folded back in once it
+  // ships and starts contributing). Otherwise we show a single
+  // headline number.
+  const aven7 = activity.avenMessages ?? 0;
+  const trades7 = activity.trades ?? 0;
+  const stackSum = aven7 + trades7;
+  const avenPct = stackSum > 0 ? (aven7 / stackSum) * 100 : 0;
+  const tradesPct = stackSum > 0 ? (trades7 / stackSum) * 100 : 0;
 
   // Events feed wins when populated — it's the merged signal stream
   // (logins + trades + Aven starts + brief reads). When the backend
@@ -182,7 +222,7 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
         <KPICard
           icon={IconWallet}
           label="Lifetime Value"
-          value={formatUSD(member.lifetime_value_usd)}
+          value={formatUSD(member.ltv_usd ?? member.lifetime_value_usd)}
           hint="Total revenue since signup"
         />
         <KPICard
@@ -236,25 +276,24 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
         </div>
       </section>
 
-      {/* Activity Last 7d — total counts plus a single stacked bar
-          showing the Aven / Trades / Brief-view share. Per-day
-          break-down arrives once the backend ships a daily-counts
-          endpoint; until then this still surfaces the activity
-          composition meaningfully. */}
+      {/* Activity Last 7d — backend §25 (post-audit) ships the union
+          count via engagement.activity_7d_total; older deploys expose
+          the per-source breakdown which we use to colour the stacked
+          bar when present. */}
       <section className="rounded-2xl border border-border bg-surface/40 p-5">
         <header className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-tight text-foreground">
             Activity · Last 7 days
           </h2>
           <p className="font-mono text-[11px] text-muted-foreground">
-            {activitySum} total events
+            {activity.total} total event{activity.total === 1 ? "" : "s"}
           </p>
         </header>
-        {activitySum === 0 ? (
+        {activity.total === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
             No activity in the last 7 days.
           </p>
-        ) : (
+        ) : activity.hasBreakdown && stackSum > 0 ? (
           <>
             <div className="mt-4 flex h-2 w-full overflow-hidden rounded-full bg-background">
               <div
@@ -267,13 +306,8 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
                 className="h-full bg-sky-400"
                 style={{ width: `${tradesPct}%` }}
               />
-              <div
-                aria-label={`${briefs7} brief views`}
-                className="h-full bg-amber-400"
-                style={{ width: `${briefsPct}%` }}
-              />
             </div>
-            <ul className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-3">
+            <ul className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
               <li className="flex items-center gap-2">
                 <span aria-hidden className="size-2 rounded-full bg-emerald" />
                 <span className="text-muted-foreground">Aven messages</span>
@@ -284,13 +318,12 @@ export function MemberOverviewTab({ member, events, loginHistory }: Props) {
                 <span className="text-muted-foreground">Trades</span>
                 <span className="ml-auto font-mono text-foreground">{trades7}</span>
               </li>
-              <li className="flex items-center gap-2">
-                <span aria-hidden className="size-2 rounded-full bg-amber-400" />
-                <span className="text-muted-foreground">Brief views</span>
-                <span className="ml-auto font-mono text-foreground">{briefs7}</span>
-              </li>
             </ul>
           </>
+        ) : (
+          <p className="mt-4 text-sm text-muted-foreground">
+            Union count across logins, Aven messages, trades and brief reads.
+          </p>
         )}
       </section>
 

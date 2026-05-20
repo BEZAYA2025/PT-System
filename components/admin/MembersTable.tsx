@@ -117,6 +117,28 @@ function exchangeConnected(m: AdminMembersListEntry): boolean {
   );
 }
 
+// Field-mapping helpers — backend §25 (post-audit) renamed/added a few
+// fields. Read both shapes so the table renders on either deploy
+// without forcing a backend cut-over.
+function ltvUsd(m: AdminMembersListEntry): number | null {
+  return m.ltv_usd ?? m.lifetime_value_usd ?? null;
+}
+function joinedAt(m: AdminMembersListEntry): string | null {
+  return m.joined ?? m.joined_at ?? m.created_at ?? null;
+}
+function activity7d(m: AdminMembersListEntry): number {
+  // Prefer the §25 union count. Fall back to summing the per-source
+  // fields if backend still ships the old breakdown. brief_views is
+  // intentionally summed too even though it's currently always 0 —
+  // once the /api/track wire lands it starts contributing.
+  if (typeof m.activity_7d === "number") return m.activity_7d;
+  return (
+    (m.aven_messages_count_7d ?? 0) +
+    (m.trades_count_7d ?? 0) +
+    (m.brief_views_count_7d ?? 0)
+  );
+}
+
 function daysSince(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
@@ -193,13 +215,11 @@ function exportCSV(rows: AdminMembersListEntry[]) {
     "display_name",
     "tier",
     "status",
-    "joined_at",
+    "joined",
     "last_active_at",
     "engagement_score",
-    "lifetime_value_usd",
-    "aven_messages_7d",
-    "trades_7d",
-    "brief_views_7d",
+    "ltv_usd",
+    "activity_7d",
     "exchange_connected",
     "telegram_connected",
   ];
@@ -212,13 +232,11 @@ function exportCSV(rows: AdminMembersListEntry[]) {
         csvEscape(m.display_name),
         csvEscape(m.tier),
         csvEscape(m.status),
-        csvEscape(m.joined_at ?? m.created_at),
+        csvEscape(joinedAt(m)),
         csvEscape(m.last_active_at),
         csvEscape(m.engagement_score),
-        csvEscape(m.lifetime_value_usd),
-        csvEscape(m.aven_messages_count_7d),
-        csvEscape(m.trades_count_7d),
-        csvEscape(m.brief_views_count_7d),
+        csvEscape(ltvUsd(m)),
+        csvEscape(activity7d(m)),
         csvEscape(exchangeConnected(m) ? "true" : "false"),
         csvEscape(m.telegram_connected ? "true" : "false"),
       ].join(","),
@@ -290,7 +308,7 @@ export function MembersTable({ initialMembers }: Props) {
 
     if (valueFilter !== "all") {
       list = list.filter((m) => {
-        const ltv = m.lifetime_value_usd ?? 0;
+        const ltv = ltvUsd(m) ?? 0;
         if (valueFilter === "high") return ltv > 500;
         if (valueFilter === "medium") return ltv >= 100 && ltv <= 500;
         return ltv < 100;
@@ -321,8 +339,8 @@ export function MembersTable({ initialMembers }: Props) {
 
     const sorted = list.sort((a, b) => {
       if (sortKey === "joined") {
-        const at = Date.parse(a.joined_at ?? a.created_at ?? "") || 0;
-        const bt = Date.parse(b.joined_at ?? b.created_at ?? "") || 0;
+        const at = Date.parse(joinedAt(a) ?? "") || 0;
+        const bt = Date.parse(joinedAt(b) ?? "") || 0;
         return sortDir === "asc" ? at - bt : bt - at;
       }
       if (sortKey === "lastActive") {
@@ -336,8 +354,8 @@ export function MembersTable({ initialMembers }: Props) {
         return sortDir === "asc" ? ae - be : be - ae;
       }
       if (sortKey === "ltv") {
-        const al = a.lifetime_value_usd ?? -1;
-        const bl = b.lifetime_value_usd ?? -1;
+        const al = ltvUsd(a) ?? -1;
+        const bl = ltvUsd(b) ?? -1;
         return sortDir === "asc" ? al - bl : bl - al;
       }
       const ag = statusGroup(a.status);
@@ -1289,21 +1307,18 @@ function MemberRow({
         )}
       </td>
       <td className="px-4 py-3 text-xs text-muted-foreground">
-        <span
-          title={`${member.aven_messages_count_7d ?? 0} Aven messages, ${member.trades_count_7d ?? 0} trades, ${member.brief_views_count_7d ?? 0} brief views (last 7 days)`}
-        >
-          <span className="mr-1.5">✉️ {member.aven_messages_count_7d ?? 0}</span>
-          <span>📈 {member.trades_count_7d ?? 0}</span>
+        <span title="Union count of Aven messages, trades and brief views (last 7 days)">
+          ⚡ {activity7d(member)}
         </span>
       </td>
       <td
         className="px-4 py-3 font-mono text-xs text-foreground"
         title="Total revenue since signup"
       >
-        {formatUSD(member.lifetime_value_usd)}
+        {formatUSD(ltvUsd(member))}
       </td>
       <td className="px-4 py-3 text-xs text-muted-foreground">
-        {formatDate(member.joined_at ?? member.created_at)}
+        {formatDate(joinedAt(member))}
       </td>
       <td className="px-2 py-3">
         <RowActions
@@ -1384,13 +1399,11 @@ function MemberCard({
                     {member.engagement_score}
                   </span>
                 )}
-              <span>
-                ✉️ {member.aven_messages_count_7d ?? 0}
-                {" · "}
-                📈 {member.trades_count_7d ?? 0}
+              <span title="Activity union count (last 7d)">
+                ⚡ {activity7d(member)}
               </span>
               <span className="font-mono">
-                {formatUSD(member.lifetime_value_usd)}
+                {formatUSD(ltvUsd(member))}
               </span>
             </div>
           </Link>
