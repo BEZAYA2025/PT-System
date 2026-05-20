@@ -6,6 +6,7 @@ import { IconCheck, IconChevronRight, IconCircle } from "@tabler/icons-react";
 import { Toast, type ToastState } from "@/components/Toast";
 import { cardClasses } from "@/lib/ui";
 import { track } from "@/lib/track";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { ConnectTelegramModal } from "./ConnectTelegramModal";
 import { ConnectExchangeModal } from "./ConnectExchangeModal";
 
@@ -39,6 +40,7 @@ export function SetupProgressCard({
   initiallyDismissed,
 }: Props) {
   const router = useRouter();
+  const { active: impersonating } = useImpersonation();
   const [openModal, setOpenModal] = useState<ModalKind>(null);
   const [dismissed, setDismissed] = useState(initiallyDismissed);
   const [busy, setBusy] = useState(false);
@@ -225,7 +227,9 @@ export function SetupProgressCard({
                 <button
                   type="button"
                   onClick={() => handleStepClick(step.kind)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald/40 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold text-emerald transition-colors hover:bg-emerald/[0.14]"
+                  disabled={impersonating}
+                  title={impersonating ? "Disabled during impersonation" : undefined}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald/40 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold text-emerald transition-colors hover:bg-emerald/[0.14] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Connect
                   <IconChevronRight size={12} stroke={2} aria-hidden />
@@ -239,7 +243,8 @@ export function SetupProgressCard({
           <button
             type="button"
             onClick={handleDismiss}
-            disabled={busy}
+            disabled={busy || impersonating}
+            title={impersonating ? "Disabled during impersonation" : undefined}
             className="text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
           >
             I&apos;ll do this later →

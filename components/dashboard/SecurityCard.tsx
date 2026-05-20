@@ -15,6 +15,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { Toast, type ToastState } from "@/components/Toast";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
 const changeSchema = z
@@ -41,6 +42,7 @@ type ChangeInput = z.infer<typeof changeSchema>;
 
 export function SecurityCard() {
   const router = useRouter();
+  const { active: impersonating } = useImpersonation();
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [currentPasswordError, setCurrentPasswordError] = useState<
     string | null
@@ -203,8 +205,9 @@ export function SecurityCard() {
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={isSubmitting || impersonating}
           aria-busy={isSubmitting}
+          title={impersonating ? "Disabled during impersonation" : undefined}
           className={buttonPrimaryClasses}
         >
           {isSubmitting ? (

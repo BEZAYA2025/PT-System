@@ -17,6 +17,7 @@ import {
   submitErrorClasses,
 } from "@/lib/ui";
 import { Toast, type ToastState } from "@/components/Toast";
+import { useImpersonation } from "@/lib/use-impersonation";
 import { SettingsCardHeader } from "./SettingsCardHeader";
 
 interface Props {
@@ -26,6 +27,7 @@ interface Props {
 
 export function AccountSettingsCard({ email, displayName }: Props) {
   const router = useRouter();
+  const { active: impersonating } = useImpersonation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(displayName ?? "");
   const [saving, setSaving] = useState(false);
@@ -113,8 +115,10 @@ export function AccountSettingsCard({ email, displayName }: Props) {
               <button
                 type="button"
                 onClick={startEdit}
+                disabled={impersonating}
+                title={impersonating ? "Disabled during impersonation" : undefined}
                 aria-label="Edit display name"
-                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground"
+                className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-surface hover:text-foreground disabled:opacity-40"
               >
                 <IconPencil size={14} stroke={1.75} />
               </button>
