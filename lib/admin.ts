@@ -222,6 +222,8 @@ export interface MemberDetail extends AdminMembersListEntry {
   last_login_at?: string | null;
   subscription_period_end?: string | null;
   current_period_end?: string | null;
+  telegram_username?: string | null;
+  binance_api_key_added_at?: string | null;
 }
 
 export async function fetchAdminMemberDetail(
@@ -340,6 +342,17 @@ export interface MemberEvent {
   event_type?: string | null;
   description?: string | null;
   metadata?: Record<string, unknown> | null;
+}
+
+export interface AvenConversationSummary {
+  id: string;
+  member_id?: string | null;
+  member_email?: string | null;
+  member_name?: string | null;
+  started_at?: string | null;
+  message_count?: number | null;
+  snippet?: string | null;
+  first_user_message?: string | null;
 }
 
 export interface MemberAuditLogEntry {

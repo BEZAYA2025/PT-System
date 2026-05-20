@@ -21,6 +21,9 @@ import { ActionsMenu } from "./ActionsMenu";
 import { MemberOverviewTab } from "./MemberOverviewTab";
 import { MemberSubscriptionTab } from "./MemberSubscriptionTab";
 import { MemberTradesTab } from "./MemberTradesTab";
+import { MemberAvenTab } from "./MemberAvenTab";
+import { MemberActivityTab } from "./MemberActivityTab";
+import { MemberNotesTab } from "./MemberNotesTab";
 
 type TabKey =
   | "overview"
@@ -380,9 +383,11 @@ export function MemberDetailView({
           <MemberSubscriptionTab member={member} />
         )}
         {activeTab === "trades" && <MemberTradesTab member={member} />}
-        {activeTab === "aven" && <TabPlaceholder name="Aven" />}
-        {activeTab === "activity" && <TabPlaceholder name="Activity" />}
-        {activeTab === "notes" && <TabPlaceholder name="Notes & Audit" />}
+        {activeTab === "aven" && <MemberAvenTab member={member} />}
+        {activeTab === "activity" && (
+          <MemberActivityTab member={member} loginHistory={loginHistory} />
+        )}
+        {activeTab === "notes" && <MemberNotesTab member={member} />}
       </section>
 
       <Modal
@@ -469,11 +474,3 @@ export function MemberDetailView({
   );
 }
 
-function TabPlaceholder({ name }: { name: string }) {
-  return (
-    <div className="rounded-xl border border-dashed border-border bg-surface/30 px-6 py-12 text-center text-sm text-muted-foreground">
-      The <strong className="text-foreground">{name}</strong> tab is wired
-      up in a follow-up commit.
-    </div>
-  );
-}
