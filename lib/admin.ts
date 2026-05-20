@@ -33,6 +33,19 @@ export interface AdminMembersListEntry {
   binance_api_key_connected?: boolean;
   telegram_connected?: boolean;
   has_exchange_connection?: boolean;
+  // Sprint 2 additions — all optional so legacy backend deploys still
+  // render rows. Missing values surface as "—" / muted tone, never null
+  // crashes in the table.
+  engagement_score?: number | null;
+  aven_messages_count_7d?: number | null;
+  trades_count_7d?: number | null;
+  brief_views_count_7d?: number | null;
+  lifetime_value_usd?: number | null;
+  last_active_at?: string | null;
+  /** Sprint 2 alias for has_exchange_connection — the spec uses
+   *  this shorter name; we accept either to stay compatible. */
+  exchange_connected?: boolean;
+  tags?: string[] | null;
 }
 
 export interface AdminMembersResponse {
@@ -179,6 +192,215 @@ export async function fetchAdminSystemHealth(): Promise<SystemHealthResponse | n
     if (status === "degraded") overall = "degraded";
   }
   return { services, overall };
+}
+
+export interface MemberNote {
+  id: string;
+  content: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  author_id?: string | null;
+}
+
+export interface MemberDetail extends AdminMembersListEntry {
+  // ADMIN_API_SPEC.md §13: detail response is the list entry shape
+  // plus these audit / engagement / notes fields. All optional —
+  // older backend deploys silently degrade rather than 500ing.
+  notes?: MemberNote[] | null;
+  total_trades?: number | null;
+  win_rate?: number | null;
+  total_pnl?: number | null;
+  aven_messages?: number | null;
+  aven_conversations?: number | null;
+  total_aven_messages?: number | null;
+  total_conversations?: number | null;
+  stripe_customer_id?: string | null;
+  stripe_subscription_id?: string | null;
+  billing_interval?: "monthly" | "yearly" | null;
+  exchange_type?: string | null;
+  signed_up_at?: string | null;
+  last_login_at?: string | null;
+  subscription_period_end?: string | null;
+  current_period_end?: string | null;
+  telegram_username?: string | null;
+  binance_api_key_added_at?: string | null;
+  payment_method?: {
+    brand?: string | null;
+    last_4?: string | number | null;
+    last4?: string | number | null;
+    exp_month?: number | null;
+    exp_year?: number | null;
+    updated_at?: string | null;
+  } | null;
+}
+
+export async function fetchAdminMemberDetail(
+  id: string,
+): Promise<MemberDetail | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const res = await backendFetch<unknown>(
+    `/api/admin/members/${encodeURIComponent(id)}`,
+    { method: "GET", token },
+  );
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (!d || typeof d !== "object") return null;
+  const inner =
+    (d as { member?: MemberDetail }).member ??
+    (d as MemberDetail);
+  return inner ?? null;
+}
+
+export interface LoginHistoryEntry {
+  id: string;
+  created_at?: string | null;
+  ip_address?: string | null;
+  user_agent_parsed?: {
+    browser?: string | null;
+    os?: string | null;
+    device?: string | null;
+  } | null;
+  user_agent?: string | null;
+}
+
+export async function fetchAdminMemberLoginHistory(
+  id: string,
+  options: { days?: number; limit?: number } = {},
+): Promise<LoginHistoryEntry[] | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const qs = new URLSearchParams();
+  if (options.days) qs.set("days", String(options.days));
+  if (options.limit) qs.set("limit", String(options.limit));
+  const path = `/api/admin/members/${encodeURIComponent(id)}/login-history${qs.toString() ? `?${qs}` : ""}`;
+  const res = await backendFetch<unknown>(path, { method: "GET", token });
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as LoginHistoryEntry[];
+  if (d && typeof d === "object") {
+    const arr = (d as { history?: unknown; entries?: unknown }).history
+      ?? (d as { entries?: unknown }).entries;
+    if (Array.isArray(arr)) return arr as LoginHistoryEntry[];
+  }
+  return [];
+}
+
+export interface MemberInvoice {
+  id: string;
+  date?: string | null;
+  created?: string | null;
+  amount_usd?: number | null;
+  amount?: number | null;
+  status?: string | null;
+  hosted_url?: string | null;
+  hosted_invoice_url?: string | null;
+  pdf_url?: string | null;
+  invoice_pdf?: string | null;
+}
+
+export interface MemberTradeStats {
+  total_count?: number | null;
+  win_rate?: number | null;
+  avg_r_multiple?: number | null;
+  total_pnl_usd?: number | null;
+  best_trade?: {
+    symbol?: string | null;
+    pnl_usd?: number | null;
+    roi_pct?: number | null;
+  } | null;
+  worst_trade?: {
+    symbol?: string | null;
+    pnl_usd?: number | null;
+    roi_pct?: number | null;
+  } | null;
+  open_count?: number | null;
+  last_30d?: number | null;
+}
+
+export interface MemberTrade {
+  id: string;
+  symbol?: string | null;
+  side?: "long" | "short" | string | null;
+  leverage?: number | null;
+  entry?: number | null;
+  exit?: number | null;
+  mark_price?: number | null;
+  // Backend §13.14 uses `sl` / `tp`; older payloads kept `_price`.
+  // Accept both so the column reads from whichever the response carries.
+  sl?: number | null;
+  tp?: number | null;
+  sl_price?: number | null;
+  tp_price?: number | null;
+  pnl_usd?: number | null;
+  pnl_pct?: number | null;
+  roi_pct?: number | null;
+  status?: "open" | "closed" | string | null;
+  opened_at?: string | null;
+  closed_at?: string | null;
+  duration?: number | string | null;
+  duration_seconds?: number | null;
+  exit_reason?: string | null;
+  score?: number | null;
+}
+
+export interface MemberTradesPage {
+  items: MemberTrade[];
+  page?: number | null;
+  pages?: number | null;
+  total?: number | null;
+}
+
+export interface MemberEvent {
+  // The events feed merges login / trade / aven / brief signals. Each
+  // entry carries a type string the renderer dispatches on plus a
+  // free-form metadata blob for type-specific detail.
+  timestamp?: string | null;
+  created_at?: string | null;
+  event_type?: string | null;
+  description?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AvenConversationSummary {
+  id: string;
+  member_id?: string | null;
+  member_email?: string | null;
+  member_name?: string | null;
+  started_at?: string | null;
+  message_count?: number | null;
+  snippet?: string | null;
+  first_user_message?: string | null;
+}
+
+export interface MemberAuditLogEntry {
+  timestamp?: string | null;
+  created_at?: string | null;
+  action_type?: string | null;
+  description?: string | null;
+  actor?: string | null;
+  details?: Record<string, unknown> | null;
+}
+
+export async function fetchAdminMemberEvents(
+  id: string,
+  options: { days?: number; event_type?: string } = {},
+): Promise<MemberEvent[] | null> {
+  const token = await getAccessToken();
+  if (!token) return null;
+  const qs = new URLSearchParams();
+  if (options.days) qs.set("days", String(options.days));
+  if (options.event_type) qs.set("event_type", options.event_type);
+  const path = `/api/admin/members/${encodeURIComponent(id)}/events${qs.toString() ? `?${qs}` : ""}`;
+  const res = await backendFetch<unknown>(path, { method: "GET", token });
+  if (!res.ok) return null;
+  const d = res.data as unknown;
+  if (Array.isArray(d)) return d as MemberEvent[];
+  if (d && typeof d === "object") {
+    const arr = (d as { events?: unknown }).events;
+    if (Array.isArray(arr)) return arr as MemberEvent[];
+  }
+  return [];
 }
 
 export interface DiscountCode {
