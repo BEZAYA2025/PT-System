@@ -1,7 +1,10 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { TrainAvenSparringTab } from "./train-aven/TrainAvenSparringTab";
+// TrainAvenSparringTab kept on disk until Paul verifies the new
+// TrainStudio in production; not imported here so it doesn't ship
+// to the bundle. Will be deleted after verification.
+import { TrainStudio } from "./train-aven/TrainStudio";
 import { TrainAvenCurriculumTab } from "./train-aven/TrainAvenCurriculumTab";
 import { TrainAvenFeedbackTab } from "./train-aven/TrainAvenFeedbackTab";
 import { TrainAvenSystemTab } from "./train-aven/TrainAvenSystemTab";
@@ -99,7 +102,7 @@ export function TrainAvenSectionView() {
       </nav>
 
       <section>
-        {activeTab === "sparring" && <TrainAvenSparringTab />}
+        {activeTab === "sparring" && <TrainStudio />}
         {activeTab === "curriculum" && <TrainAvenCurriculumTab />}
         {activeTab === "voice-notes" && <AvenVoiceNotesTab />}
         {activeTab === "vkb" && <AvenVkbTab />}
