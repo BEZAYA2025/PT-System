@@ -24,6 +24,7 @@ import {
   IconPlayerStopFilled,
 } from "@tabler/icons-react";
 import { AvenStage, type AvenStageState } from "./AvenStage";
+import { StudioAtmosphere } from "./StudioAtmosphere";
 
 type ShowPhase =
   | "intro" // 0.0s — AvenStage awakening
@@ -94,9 +95,13 @@ export function TrainingStage({ onExit, onVoiceTurn }: Props) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35 }}
-      className="relative flex w-full flex-col items-center justify-start px-4 pt-12 pb-10 sm:px-8 sm:pt-16"
+      className="relative flex w-full flex-col items-center justify-start overflow-hidden rounded-3xl px-4 pt-12 pb-10 sm:px-8 sm:pt-16"
       aria-label="Training stage"
     >
+      {/* Atmospheric room — radial emerald glow, vignette, drifting
+          orbs. The wow lives here, not in the Normal mode. */}
+      <StudioAtmosphere state={avenState} />
+
       {/* Exit affordance — quiet, top-right of the room. Leaving
           the stage should feel as deliberate as entering it. */}
       <button

@@ -1,13 +1,18 @@
 "use client";
 
-// QuickCaptureBar — the always-available, casual input for Train-Aven.
-// One row, three affordances: text (auto-growing textarea), mic (tap
-// to start, tap to stop + send), camera (image upload). The send
-// arrow only materialises once there is actual content to send so
-// the row reads as quiet at rest.
+// QuickCaptureBar — the always-available, casual input for Train-Aven
+// Normal mode. One row, four affordances: mic (tap to start, tap to
+// stop + send), camera (image upload), auto-growing textarea, and a
+// SEND ARROW on the right where the founder expects it.
 //
-// Mock-friendly: parent owns the send callbacks. This component only
-// captures input + manages the local recorder lifecycle.
+// Send arrow is always visible but disabled until there's content —
+// that way the input row reads as a normal, complete chatbox and the
+// affordance is unambiguous (not the "search-for-the-button" UX of
+// iteration 2).
+//
+// Start-Training is NOT here anymore. It's a separate, deliberate
+// button at the top of the studio so the input strip is purely about
+// quick conversational capture.
 
 import {
   useEffect,
@@ -17,7 +22,6 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   IconCamera,
   IconMicrophone,
@@ -34,11 +38,10 @@ export interface CapturePayload {
 
 interface Props {
   onSend: (payload: CapturePayload) => void | Promise<void>;
-  onStartTraining: () => void;
   busy?: boolean;
 }
 
-export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
+export function QuickCaptureBar({ onSend, busy }: Props) {
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
@@ -115,7 +118,6 @@ export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
   const handleImagePick = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (file) setPendingImage(file);
-    // Reset so picking the same file twice re-fires onChange
     e.target.value = "";
   };
 
@@ -150,15 +152,10 @@ export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
   return (
     <form
       onSubmit={submit}
-      // Generous, glass-y, sits as a deliberate surface in the
-      // studio — not a thin admin input strip. Soft emerald rim
-      // when active picks up the room's atmosphere.
-      className="rounded-2xl border border-white/[0.08] bg-black/40 p-3 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md transition-colors focus-within:border-emerald/30"
+      className="rounded-2xl border border-border bg-surface p-2.5 transition-colors focus-within:border-emerald/40"
     >
-      {/* Pending attachments preview — sits above the input row so the
-          founder sees what's queued for the next send. */}
       {(pendingImage || recordedBlob) && (
-        <div className="mb-2 flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
           {pendingImage && (
             <AttachmentChip
               label={pendingImage.name}
@@ -177,7 +174,7 @@ export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
       )}
 
       {recordError && (
-        <p className="mb-2 text-xs text-amber-300">{recordError}</p>
+        <p className="mb-2 px-1 text-xs text-amber-300">{recordError}</p>
       )}
 
       <div className="flex items-end gap-2">
@@ -226,47 +223,26 @@ export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKey}
           rows={1}
-          placeholder={
-            recording
-              ? "Recording…"
-              : "Capture a thought, ask Aven, or hit Start Training"
-          }
+          placeholder={recording ? "Recording…" : "Message Aven"}
           disabled={busy || recording}
-          className="min-h-9 flex-1 resize-none rounded-md border border-transparent bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:border-emerald/30 focus:outline-none disabled:opacity-50"
+          className="min-h-9 flex-1 resize-none rounded-md border border-transparent bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50"
         />
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {/* Start Training — always visible, the deliberate ritual
-              entry into the immersive stage. */}
-          <button
-            type="button"
-            onClick={onStartTraining}
-            disabled={busy || recording}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 text-xs font-semibold uppercase tracking-wider text-emerald transition-colors hover:bg-emerald/[0.14] disabled:opacity-50"
-          >
-            Start training
-          </button>
-
-          {/* Send arrow — materialises only when there's content. The
-              quietness at rest is the point. */}
-          <AnimatePresence>
-            {canSend && (
-              <motion.button
-                key="send"
-                type="submit"
-                initial={{ scale: 0.85, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.85, opacity: 0 }}
-                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-                disabled={busy}
-                aria-label="Send"
-                className="inline-flex size-9 items-center justify-center rounded-full bg-emerald text-background hover:bg-emerald-hover disabled:opacity-50"
-              >
-                <IconSend2 size={14} stroke={2} />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Send arrow — always present so the input reads as a complete
+            chatbox. Active when there's content, dimmed otherwise. */}
+        <button
+          type="submit"
+          disabled={!canSend || busy}
+          aria-label="Send"
+          className={[
+            "inline-flex size-9 shrink-0 items-center justify-center rounded-full transition-all",
+            canSend && !busy
+              ? "bg-emerald text-background hover:bg-emerald-hover"
+              : "border border-border bg-background text-muted-foreground/40",
+          ].join(" ")}
+        >
+          <IconSend2 size={14} stroke={2} />
+        </button>
       </div>
     </form>
   );

@@ -1,22 +1,31 @@
 "use client";
 
-// TrainStudio — iteration 2.
+// TrainStudio — iteration 3.
 //
-// Paul opens the tab and lands in Aven's studio, not an admin panel.
-// No "Train Aven" headline, no "classroom" subtitle. The avatar is
-// the centrepiece, breathing inside an ambient emerald glow. The
-// chat history sits below — quiet when empty, present when there's
-// conversation to read. Capture bar floats at the bottom, generous,
-// ready. "Start training" is the deliberate ritual entry into the
-// immersive stage.
+// Two distinct modes, deliberately different in feel:
 //
-// Sparring conversation persists across mode switches — turns in
-// either Quick or Training mode land in the same `messages` state
-// so the day-grouped transcript reads as one continuous record.
+//   · NORMAL (default): a quiet, ordinary chatbox. Small Aven chip in
+//     the header, full chat history in the middle, capture bar with a
+//     send arrow on the right. No big halo, no atmospheric glow — the
+//     emerald shows up only as accent (the chip dot, the send button).
+//     The point is short, casual back-and-forth with Aven, nothing
+//     more.
+//
+//   · TRAINING: tapped via the deliberate "Start training" button at
+//     the top-right. ALL the wow — full-bleed atmosphere, big breathing
+//     avatar, parallax charts, methodology ignition, voice waveform —
+//     lives here. The transition from Normal → Training is the
+//     goosebumps moment: the quiet chatbox gives way to the stage.
+//
+// Sparring conversation persists across the mode switch — turns in
+// either mode land in the same `messages` state.
 
 import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { IconAlertCircle } from "@tabler/icons-react";
+import {
+  IconAlertCircle,
+  IconPlayerPlayFilled,
+} from "@tabler/icons-react";
 import {
   ChatBubbleList,
   type ChatBubbleListMessage,
@@ -26,8 +35,7 @@ import {
   type CapturePayload,
 } from "./QuickCaptureBar";
 import { TrainingStage } from "./TrainingStage";
-import { AvenStage, type AvenStageState } from "./AvenStage";
-import { StudioAtmosphere } from "./StudioAtmosphere";
+import { type AvenStageState } from "./AvenStage";
 
 type Mode = "quick" | "training";
 
@@ -147,102 +155,108 @@ export function TrainStudio() {
     ]);
   }, []);
 
-  const displayState = thinking ? "thinking" : avenState;
+  // Training mode owns the full-bleed atmospheric stage on its own.
+  // It returns a self-contained immersive surface so the Normal-mode
+  // chrome below is not rendered behind it.
+  if (mode === "training") {
+    return (
+      <div className="relative -mx-4 sm:-mx-6 md:-mx-8">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key="training"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="flex min-h-[78vh]"
+          >
+            <TrainingStage
+              onExit={() => {
+                setMode("quick");
+                setAvenState("idle");
+              }}
+              onVoiceTurn={handleVoiceTurn}
+            />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    );
+  }
 
+  // NORMAL mode — a normal chat surface. Quiet, complete, functional.
   return (
-    // Full-bleed studio surface. Negative margins pull the room out
-    // past the admin chrome padding so the atmosphere reaches the
-    // section edges — the founder experiences a "room", not "another
-    // card in the dashboard".
-    <div className="relative -mx-4 sm:-mx-6 md:-mx-8">
-      <div className="relative min-h-[78vh] overflow-hidden rounded-3xl">
-        <StudioAtmosphere state={displayState} />
-
-        <div className="relative z-10 flex min-h-[78vh] flex-col">
-          <AnimatePresence mode="wait">
-            {mode === "training" ? (
-              <motion.div
-                key="training"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.35 }}
-                className="flex flex-1"
-              >
-                <TrainingStage
-                  onExit={() => {
-                    setMode("quick");
-                    setAvenState("idle");
-                  }}
-                  onVoiceTurn={handleVoiceTurn}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="quick"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="flex flex-1 flex-col"
-              >
-                {/* Hero zone — avatar centred, generous breathing
-                    space above and below. The studio reads as a
-                    room with a single figure at its heart. */}
-                <div className="flex flex-col items-center justify-center px-4 pt-14 sm:pt-20">
-                  <AvenStage state={displayState} size={144} />
-                </div>
-
-                {/* Conversation strip — sits between the avatar and
-                    the input. Empty state is a single quiet line so
-                    the room doesn't feel cluttered when there's
-                    nothing to show. */}
-                <div className="mx-auto w-full max-w-3xl px-4 pt-10 sm:px-8">
-                  {messages.length === 0 ? (
-                    <motion.p
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4, duration: 0.6 }}
-                      className="text-center font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground/60"
-                    >
-                      The studio is yours
-                    </motion.p>
-                  ) : (
-                    <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-white/[0.04] bg-black/20 p-5 backdrop-blur-sm">
-                      <ChatBubbleList messages={messages} />
-                    </div>
-                  )}
-                </div>
-
-                {/* Capture bar — anchored to the bottom of the
-                    studio room, generously padded so it reads as a
-                    deliberate surface, not an afterthought. */}
-                <div className="mt-auto px-4 pb-8 pt-10 sm:px-8 sm:pb-10">
-                  <div className="mx-auto w-full max-w-3xl">
-                    {error && (
-                      <p className="mb-3 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
-                        <IconAlertCircle
-                          size={12}
-                          stroke={1.75}
-                          aria-hidden
-                        />
-                        {error}
-                      </p>
-                    )}
-                    <QuickCaptureBar
-                      onSend={handleSend}
-                      onStartTraining={() => {
-                        setMode("training");
-                        setAvenState("awakening");
-                      }}
-                      busy={thinking}
-                    />
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+    <div className="flex h-[78vh] flex-col rounded-2xl border border-border bg-surface/40">
+      {/* Header — small Aven chip on the left, Start-Training on the
+          right. The header is the only place the founder can launch
+          the immersive session, so it's deliberately separated from
+          the input strip. */}
+      <header className="flex items-center justify-between border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2.5">
+          <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
+            A
+            <span
+              className={[
+                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
+                thinking
+                  ? "bg-amber-400"
+                  : avenState === "ready"
+                    ? "bg-emerald"
+                    : "bg-emerald/60",
+              ].join(" ")}
+              aria-hidden
+            />
+          </span>
+          <div className="flex flex-col leading-tight">
+            <span className="text-sm font-medium text-foreground">Aven</span>
+            <span className="text-[11px] text-muted-foreground">
+              {thinking
+                ? "thinking…"
+                : avenState === "ready"
+                  ? "ready"
+                  : "online"}
+            </span>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMode("training");
+            setAvenState("awakening");
+          }}
+          className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald transition-colors hover:bg-emerald/[0.14]"
+        >
+          <IconPlayerPlayFilled size={11} stroke={1.5} />
+          Start training
+        </button>
+      </header>
+
+      {/* Chat scroll — fills the available space. Empty state is a
+          quiet centred line so the box doesn't read as broken when
+          there's nothing yet. */}
+      <div className="flex-1 overflow-y-auto px-5 py-5">
+        {messages.length === 0 ? (
+          <div className="flex h-full items-center justify-center">
+            <p className="text-center text-sm text-muted-foreground/70">
+              Throw Aven a thought, or hit{" "}
+              <span className="font-medium text-emerald">Start training</span>{" "}
+              for a focused session.
+            </p>
+          </div>
+        ) : (
+          <ChatBubbleList messages={messages} />
+        )}
+      </div>
+
+      {/* Input strip — bottom anchored, normal chatbox affordances. */}
+      <div className="border-t border-border px-5 py-4">
+        {error && (
+          <p className="mb-2 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+            <IconAlertCircle size={12} stroke={1.75} aria-hidden />
+            {error}
+          </p>
+        )}
+        <QuickCaptureBar onSend={handleSend} busy={thinking} />
       </div>
     </div>
   );
