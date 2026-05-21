@@ -59,7 +59,13 @@ function isTabKey(v: string | null): v is TabKey {
   );
 }
 
-export function TrainAvenSectionView() {
+interface Props {
+  /** Founder id, threaded down to TrainStudio for the history
+   *  fetch (ADMIN_API_SPEC §30 — ?member_id=<founder>). */
+  founderId: string;
+}
+
+export function TrainAvenSectionView({ founderId }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
@@ -162,7 +168,7 @@ export function TrainAvenSectionView() {
       </div>
 
       <section>
-        {activeTab === "sparring" && <TrainStudio />}
+        {activeTab === "sparring" && <TrainStudio founderId={founderId} />}
         {activeTab === "curriculum" && <TrainAvenCurriculumTab />}
         {activeTab === "voice-notes" && <AvenVoiceNotesTab />}
         {activeTab === "vkb" && <AvenVkbTab />}

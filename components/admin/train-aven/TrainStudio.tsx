@@ -56,7 +56,14 @@ type Mode = "quick" | "training";
 // the wire-shape stays explicit in the URL.
 const HISTORY_LIMIT = 200;
 
-export function TrainStudio() {
+interface Props {
+  /** Founder id used as ?member_id in the history fetch. Server-
+   *  side rendered into the page so the client never has to guess
+   *  who "self" is. */
+  founderId: string;
+}
+
+export function TrainStudio({ founderId }: Props) {
   const [mode, setMode] = useState<Mode>("quick");
   const [messages, setMessages] = useState<StudioMessage[]>([]);
   const [thinking, setThinking] = useState(false);
@@ -78,35 +85,63 @@ export function TrainStudio() {
 
   // ---------------------------------------------------------------
   // History fetch on mount — reload-persistence.
+  //
+  // Surfacing strategy: on HTTP error OR shape-mismatch (response
+  // parses but yields zero messages despite a non-empty backend
+  // payload), set `error` so Paul sees what's failing instead of an
+  // empty chat with no explanation. Console.error keeps a copy for
+  // the deploy logs / devtools network trace.
   // ---------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        // member_id omitted: backend resolves the founder from the
-        // bearer token. If a future caller needs to scope the
-        // transcript to a different member, that's a query-param add
-        // here; for the founder-sparring view the implicit-self is
-        // correct.
-        const res = await fetch(
-          `/api/proxy/admin/aven/conversations?order=asc&limit=${HISTORY_LIMIT}`,
-          { cache: "no-store" },
-        );
-        if (cancelled || !res.ok) {
-          setHistoryLoaded(true);
+        // ADMIN_API_SPEC §30: member_id is required, even when the
+        // requester IS the member (the backend's authorization layer
+        // matches member_id against the bearer's user id and returns
+        // an empty set if it can't bind the two).
+        const url = `/api/proxy/admin/aven/conversations?member_id=${encodeURIComponent(
+          founderId,
+        )}&order=asc&limit=${HISTORY_LIMIT}`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (cancelled) return;
+        if (!res.ok) {
+          const body = await res.text().catch(() => "");
+          console.error(
+            "[TrainStudio] history HTTP non-ok",
+            res.status,
+            body.slice(0, 240),
+          );
+          setError(
+            `History laden fehlgeschlagen · HTTP ${res.status}${
+              body ? ` · ${body.slice(0, 120)}` : ""
+            }`,
+          );
           return;
         }
         const data = await res.json().catch(() => null);
         const { messages: hist, user_display_name } = shapeHistoryResponse(data);
         if (cancelled) return;
-        // Seed dedup so a live block that arrives with the same id
-        // (e.g. a still-in-flight turn from before reload) doesn't
-        // double-render.
+        if (hist.length === 0 && data) {
+          // Backend returned 200 but our shaper extracted nothing.
+          // Most likely a response-shape drift. Dump a preview so
+          // we can adjust the shaper instead of staring at an empty
+          // chat.
+          console.warn(
+            "[TrainStudio] history shape-mismatch — 200 but 0 messages",
+            JSON.stringify(data).slice(0, 240),
+          );
+        }
         for (const m of hist) dedupRef.current.add(m.id);
         setMessages(hist);
         if (user_display_name) setUserDisplayName(user_display_name);
       } catch (err) {
         console.error("[TrainStudio] history fetch failed", err);
+        setError(
+          `History laden fehlgeschlagen · ${
+            err instanceof Error ? err.message : "unknown"
+          }`,
+        );
       } finally {
         if (!cancelled) setHistoryLoaded(true);
       }
@@ -114,7 +149,7 @@ export function TrainStudio() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [founderId]);
 
   // ---------------------------------------------------------------
   // Send a text turn → sparring-chat → push BOTH returned blocks.
