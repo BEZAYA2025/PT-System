@@ -244,28 +244,43 @@ export function TrainStudio() {
             <div className="flex items-center gap-2.5">
               <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
                 A
+                {/* Status dot — solid emerald in idle/ready (alive),
+                    amber when thinking. The wrapping span layers a
+                    soft animate-ping ring under the dot so Aven reads
+                    as actively present instead of statically "on" —
+                    same trick the dashboard live-bar uses for its
+                    SSE status. Ring is suppressed during thinking
+                    so the amber state stands out from "live". */}
                 <span
-                  className={[
-                    "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
-                    thinking
-                      ? "bg-amber-400"
-                      : avenState === "ready"
-                        ? "bg-emerald"
-                        : "bg-emerald/60",
-                  ].join(" ")}
                   aria-hidden
-                />
+                  className="absolute -bottom-0.5 -right-0.5 inline-flex size-2"
+                >
+                  {!thinking && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+                      style={{ animationDuration: "2.2s" }}
+                    />
+                  )}
+                  <span
+                    className={[
+                      "relative inline-flex size-2 rounded-full ring-2 ring-surface",
+                      thinking ? "bg-amber-400" : "bg-emerald",
+                    ].join(" ")}
+                  />
+                </span>
               </span>
               <div className="flex flex-col leading-tight">
                 <span className="text-sm font-medium text-foreground">
                   Aven
                 </span>
-                <span className="text-[11px] text-muted-foreground">
-                  {thinking
-                    ? "thinking…"
-                    : avenState === "ready"
-                      ? "ready"
-                      : "standby"}
+                <span
+                  className={[
+                    "font-mono text-[10px] uppercase tracking-[0.18em]",
+                    thinking ? "text-amber-300/80" : "text-emerald/80",
+                  ].join(" ")}
+                >
+                  {thinking ? "thinking…" : "live"}
                 </span>
               </div>
             </div>
@@ -329,7 +344,10 @@ export function TrainStudio() {
             </p>
           </div>
         ) : (
-          <ChatBubbleList messages={messages} />
+          // userLabel="Du" — Paul ist der Lehrer im Founder-Sparring,
+          // nicht ein "Member". showSource=false weil Sparring web-only
+          // läuft, der Telegram/Web-Pill wäre nur Noise.
+          <ChatBubbleList messages={messages} userLabel="Du" showSource={false} />
         )}
       </div>
 

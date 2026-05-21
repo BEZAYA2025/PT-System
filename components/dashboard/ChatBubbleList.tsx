@@ -199,7 +199,15 @@ export function SourceTag({ source }: { source: MessageSource }) {
   );
 }
 
-function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
+function ReadOnlyBubble({
+  message,
+  userLabel,
+  showSource,
+}: {
+  message: ChatBubbleListMessage;
+  userLabel: string;
+  showSource: boolean;
+}) {
   const isUser = isUserMessage(message);
   const tone = isUser
     ? "rounded-tr-sm bg-emerald/[0.12] text-foreground"
@@ -223,15 +231,19 @@ function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
         <p className="whitespace-pre-line">{body}</p>
       </div>
       <div className="flex items-center gap-2 px-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-        <span>{isUser ? "Member" : "Aven"}</span>
+        <span>{isUser ? userLabel : "Aven"}</span>
         {ts && (
           <>
             <span aria-hidden>·</span>
             <span suppressHydrationWarning>{formatTime(ts)}</span>
           </>
         )}
-        <span aria-hidden>·</span>
-        <SourceTag source={source} />
+        {showSource && (
+          <>
+            <span aria-hidden>·</span>
+            <SourceTag source={source} />
+          </>
+        )}
       </div>
     </div>
   );
@@ -242,8 +254,16 @@ function ReadOnlyBubble({ message }: { message: ChatBubbleListMessage }) {
 // alongside its own animated ChatBubble.
 export function ChatBubbleList({
   messages,
+  userLabel = "Member",
+  showSource = true,
 }: {
   messages: readonly ChatBubbleListMessage[];
+  /** Label rendered under the user-side bubble. Founder-sparring
+   *  passes "Du" since Paul is the teacher, not a "Member". */
+  userLabel?: string;
+  /** Hide the Web/Telegram channel pill — sparring is web-only and
+   *  the pill becomes meaningless noise. */
+  showSource?: boolean;
 }) {
   const days = groupByDay(messages);
   if (days.length === 0) return null;
@@ -253,7 +273,12 @@ export function ChatBubbleList({
         <Fragment key={day}>
           <DaySeparator day={day} />
           {items.map((m, idx) => (
-            <ReadOnlyBubble key={m.id ?? `${day}-${idx}`} message={m} />
+            <ReadOnlyBubble
+              key={m.id ?? `${day}-${idx}`}
+              message={m}
+              userLabel={userLabel}
+              showSource={showSource}
+            />
           ))}
         </Fragment>
       ))}
