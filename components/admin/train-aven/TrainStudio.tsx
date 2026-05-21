@@ -64,15 +64,35 @@ export function TrainStudio() {
         const res = await fetch("/api/proxy/admin/aven/sparring-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text, founder_sparring: true }),
+          // Backend (per VPS-CC) expects `text`. Keep `message` as a
+          // compat alias so older backend builds still resolve. Send
+          // both — the unused key is harmless.
+          body: JSON.stringify({
+            text,
+            message: text,
+            founder_sparring: true,
+          }),
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = (await res.json().catch(() => null)) as {
           reply?: string;
           response?: string;
           content?: string;
+          message?: string;
+          detail?: string;
+          error?: string;
           message_id?: string;
         } | null;
+        if (!res.ok) {
+          // Surface the backend's own error body so a 400 reads as
+          // something diagnosable instead of just "HTTP 400". Try
+          // every common field shape; fall back to the status code.
+          const backendMsg =
+            data?.message ??
+            data?.detail ??
+            data?.error ??
+            `HTTP ${res.status}`;
+          throw new Error(String(backendMsg));
+        }
         const reply =
           data?.reply ??
           data?.response ??

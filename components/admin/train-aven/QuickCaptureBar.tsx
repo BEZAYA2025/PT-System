@@ -85,6 +85,15 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
   const startRecording = async () => {
     if (busy) return;
     setRecordError(null);
+    if (
+      typeof navigator === "undefined" ||
+      !navigator.mediaDevices?.getUserMedia
+    ) {
+      setRecordError(
+        "Voice capture isn't supported in this browser. Try Chrome or Edge.",
+      );
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
@@ -99,15 +108,35 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
       rec.start();
       setRecording(true);
     } catch (err) {
-      setRecordError(
-        err instanceof Error
-          ? err.message
-          : "Microphone access denied",
-      );
+      // getUserMedia throws DOMException with a specific `name` for
+      // the permission denied case — much clearer to map that to a
+      // human message than to surface the raw browser error string.
+      const name =
+        err && typeof err === "object" && "name" in err
+          ? String((err as { name: unknown }).name)
+          : "";
+      if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+        setRecordError(
+          "Microphone permission denied. Allow it in your browser settings, then tap the mic again.",
+        );
+      } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+        setRecordError(
+          "No microphone found. Connect one and tap the mic again.",
+        );
+      } else {
+        setRecordError(
+          err instanceof Error
+            ? `Mic error · ${err.message}`
+            : "Couldn't start recording.",
+        );
+      }
     }
   };
 
   const toggleMic = () => {
+    // Any tap on the mic clears a stale error and tries again — the
+    // founder shouldn't have to hunt for a dismiss control to retry.
+    setRecordError(null);
     if (recording) {
       stopRecording(true);
     } else {
@@ -174,7 +203,23 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
       )}
 
       {recordError && (
-        <p className="mb-2 px-1 text-xs text-amber-300">{recordError}</p>
+        <div className="mb-2 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+          <IconMicrophone
+            size={12}
+            stroke={1.75}
+            className="mt-0.5 shrink-0"
+            aria-hidden
+          />
+          <p className="flex-1 leading-relaxed">{recordError}</p>
+          <button
+            type="button"
+            onClick={() => setRecordError(null)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded-full p-0.5 text-amber-300/70 transition-colors hover:bg-amber-500/10 hover:text-amber-200"
+          >
+            <IconX size={11} stroke={2} />
+          </button>
+        </div>
       )}
 
       <div className="flex items-end gap-2">
