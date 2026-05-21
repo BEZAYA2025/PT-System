@@ -391,8 +391,13 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
             onKeyDown={handleKey}
             rows={1}
             placeholder="Message Aven"
-            disabled={busy}
-            className="block max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald disabled:opacity-50 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent"
+            // Textarea stays focusable while Aven is thinking — same
+            // as the dashboard chat. A disabled element loses focus
+            // on the busy → disabled transition, which is why the
+            // cursor wasn't returning after send. submit() already
+            // guards against double-send via `if (busy || recording)
+            // return`, so the user can queue the next message safely.
+            className="block max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent"
           />
         )}
 

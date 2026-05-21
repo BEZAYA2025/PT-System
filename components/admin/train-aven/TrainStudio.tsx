@@ -344,10 +344,10 @@ export function TrainStudio() {
             </p>
           </div>
         ) : (
-          // userLabel="Du" — Paul ist der Lehrer im Founder-Sparring,
+          // userLabel="PAUL" — Paul ist der Lehrer im Founder-Sparring,
           // nicht ein "Member". showSource=false weil Sparring web-only
           // läuft, der Telegram/Web-Pill wäre nur Noise.
-          <ChatBubbleList messages={messages} userLabel="Du" showSource={false} />
+          <ChatBubbleList messages={messages} userLabel="PAUL" showSource={false} />
         )}
       </div>
 
