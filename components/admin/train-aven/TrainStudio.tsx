@@ -244,43 +244,29 @@ export function TrainStudio() {
             <div className="flex items-center gap-2.5">
               <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
                 A
-                {/* Status dot — solid emerald in idle/ready (alive),
-                    amber when thinking. The wrapping span layers a
-                    soft animate-ping ring under the dot so Aven reads
-                    as actively present instead of statically "on" —
-                    same trick the dashboard live-bar uses for its
-                    SSE status. Ring is suppressed during thinking
-                    so the amber state stands out from "live". */}
+                {/* Status dot — always live: solid emerald with a
+                    soft animate-ping ring underneath. The thinking
+                    state shows up in the chat (typing indicator /
+                    pending bubble), not in the header — that's
+                    Aven's identity strip, not a request-state badge. */}
                 <span
                   aria-hidden
                   className="absolute -bottom-0.5 -right-0.5 inline-flex size-2"
                 >
-                  {!thinking && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
-                      style={{ animationDuration: "2.2s" }}
-                    />
-                  )}
                   <span
-                    className={[
-                      "relative inline-flex size-2 rounded-full ring-2 ring-surface",
-                      thinking ? "bg-amber-400" : "bg-emerald",
-                    ].join(" ")}
+                    aria-hidden
+                    className="absolute inset-0 animate-ping rounded-full bg-emerald opacity-60"
+                    style={{ animationDuration: "2.2s" }}
                   />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald ring-2 ring-surface" />
                 </span>
               </span>
               <div className="flex flex-col leading-tight">
                 <span className="text-sm font-medium text-foreground">
                   Aven
                 </span>
-                <span
-                  className={[
-                    "font-mono text-[10px] uppercase tracking-[0.18em]",
-                    thinking ? "text-amber-300/80" : "text-emerald/80",
-                  ].join(" ")}
-                >
-                  {thinking ? "thinking…" : "live"}
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-emerald/80">
+                  live
                 </span>
               </div>
             </div>

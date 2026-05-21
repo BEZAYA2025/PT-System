@@ -107,6 +107,21 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [text]);
 
+  // Keep cursor in the textarea after every send. The previous
+  // requestAnimationFrame approach raced React's state churn — by
+  // the time rAF fired, the parent had already set busy=true and
+  // some intermediate render had stolen focus. A useEffect tied to
+  // `busy` reliably runs AFTER the React commit when busy goes back
+  // to false (i.e. when Aven's reply has landed), restoring focus
+  // for the next Enter-send-Enter rhythm. Initial mount also lands
+  // here with busy=false → autofocus on page open, which is the
+  // right chat UX.
+  useEffect(() => {
+    if (!busy && !recording) {
+      textareaRef.current?.focus();
+    }
+  }, [busy, recording]);
+
   // Live elapsed counter while recording. Resets to 0 the moment
   // recording toggles off so the panel doesn't flash stale values
   // the next time round.
@@ -397,7 +412,13 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
             // cursor wasn't returning after send. submit() already
             // guards against double-send via `if (busy || recording)
             // return`, so the user can queue the next message safely.
-            className="block max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent"
+            // Scrollbar fully hidden (width 0 + Firefox `scrollbar-
+            // width: none` + transparent track/thumb) so no grey bar
+            // ever appears between the textarea and the send button.
+            // Long content still scrolls via wheel / keyboard /
+            // selection-drag, just without the visible gutter.
+            style={{ scrollbarWidth: "none" }}
+            className="block max-h-32 min-h-[44px] w-full flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus:border-emerald focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald [&::-webkit-scrollbar]:w-0 [&::-webkit-scrollbar]:bg-transparent [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:bg-transparent [&::-webkit-scrollbar-track]:bg-transparent"
           />
         )}
 
