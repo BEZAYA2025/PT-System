@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   IconBook2,
   IconBrandHipchat,
+  IconCheck,
+  IconChevronDown,
   IconLayoutDashboard,
   IconMessage2,
   IconMicrophone,
@@ -27,13 +30,11 @@ type TabKey =
   | "feedback"
   | "system";
 
-// Iteration 2: tabs become a quiet icon-pill cluster floating top-
-// right above the studio. The studio room is the bühne; the tab
-// nav is utility access to adjacent surfaces (curriculum / voice
-// notes / VKB / feedback / system snapshot) and shouldn't compete
-// with the room itself for attention. Labels surface as hover
-// tooltips via the title attr — at-a-glance the row reads as 6
-// quiet glyphs.
+// Iteration 3: the always-on 6-glyph icon strip pulled attention off
+// the chat. Replaced with a single discreet "View ▾" trigger that
+// opens a small popover menu — the adjacent surfaces (curriculum,
+// voice notes, VKB, feedback, system) stay one click away but no
+// longer compete with the chatbox for attention.
 const TABS: ReadonlyArray<{
   key: TabKey;
   label: string;
@@ -63,6 +64,29 @@ export function TrainAvenSectionView() {
   const searchParams = useSearchParams();
   const rawTab = searchParams.get("tab");
   const activeTab: TabKey = isTabKey(rawTab) ? rawTab : "sparring";
+  const activeLabel = TABS.find((t) => t.key === activeTab)?.label ?? "Studio";
+
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (!wrapperRef.current) return;
+      if (!wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", handler);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", handler);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const switchTab = (key: TabKey) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -72,41 +96,70 @@ export function TrainAvenSectionView() {
     router.replace(`/admin/train-aven${qs ? `?${qs}` : ""}`, {
       scroll: false,
     });
+    setOpen(false);
   };
 
   return (
     <div className="space-y-3">
-      {/* Tab strip — quiet icon pills, right-aligned. No admin
-          headline above the studio. The studio IS the page. */}
-      <nav
-        aria-label="Train Aven sections"
-        className="flex justify-end"
-      >
-        <ul className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-black/30 p-1 backdrop-blur-sm">
-          {TABS.map(({ key, label, Icon }) => {
-            const isActive = activeTab === key;
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => switchTab(key)}
-                  aria-current={isActive ? "page" : undefined}
-                  aria-label={label}
-                  title={label}
-                  className={[
-                    "inline-flex size-9 items-center justify-center rounded-full transition-colors",
-                    isActive
-                      ? "bg-emerald/[0.14] text-emerald"
-                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
-                  ].join(" ")}
-                >
-                  <Icon size={15} stroke={1.75} />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+      {/* View switcher — single discreet trigger, right-aligned. The
+          chat surface below stays the focus; this is just utility
+          access to the adjacent admin surfaces. */}
+      <div className="flex justify-end" ref={wrapperRef}>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-haspopup="menu"
+            aria-expanded={open}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface/50 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+          >
+            <span>{activeLabel}</span>
+            <IconChevronDown
+              size={11}
+              stroke={2}
+              className={[
+                "transition-transform",
+                open ? "rotate-180" : "",
+              ].join(" ")}
+            />
+          </button>
+
+          {open && (
+            <div
+              role="menu"
+              aria-label="Train Aven sections"
+              className="absolute right-0 top-full z-30 mt-1.5 w-48 overflow-hidden rounded-xl border border-border bg-surface shadow-[0_18px_48px_-12px_rgba(0,0,0,0.6)]"
+            >
+              <ul className="py-1">
+                {TABS.map(({ key, label, Icon }) => {
+                  const isActive = activeTab === key;
+                  return (
+                    <li key={key}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => switchTab(key)}
+                        className={[
+                          "flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition-colors",
+                          isActive
+                            ? "bg-emerald/[0.08] text-emerald"
+                            : "text-foreground hover:bg-white/[0.04]",
+                        ].join(" ")}
+                      >
+                        <Icon size={14} stroke={1.75} />
+                        <span className="flex-1">{label}</span>
+                        {isActive && (
+                          <IconCheck size={12} stroke={2.25} />
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
 
       <section>
         {activeTab === "sparring" && <TrainStudio />}

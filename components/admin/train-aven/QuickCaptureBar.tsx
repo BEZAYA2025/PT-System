@@ -225,7 +225,11 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
           rows={1}
           placeholder={recording ? "Recording…" : "Message Aven"}
           disabled={busy || recording}
-          className="min-h-9 flex-1 resize-none rounded-md border border-transparent bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50"
+          // Custom scrollbar utility kills the native up/down arrow
+          // buttons that Windows browsers render next to the text
+          // field — those were the "kleine Hoch/Runter-Pfeile" Paul
+          // wanted gone from the input strip.
+          className="min-h-9 flex-1 resize-none rounded-md border border-transparent bg-transparent px-2 py-2 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-button]:hidden [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-track]:bg-transparent"
         />
 
         {/* Send arrow — always present so the input reads as a complete

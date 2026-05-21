@@ -183,14 +183,30 @@ export function TrainStudio() {
     );
   }
 
-  // NORMAL mode — a normal chat surface. Quiet, complete, functional.
+  // NORMAL mode — emerald-bordered chat surface that mirrors the
+  // dashboard's AvenChat card (which Paul already likes). Same
+  // gradient, same glow shadow, same subtle top-left halo — so the
+  // founder-facing admin chat reads as a sibling of the member-facing
+  // chat, not a separate surface in another style.
   return (
-    <div className="flex h-[78vh] flex-col rounded-2xl border border-border bg-surface/40">
+    <div className="relative flex h-[78vh] flex-col overflow-hidden rounded-2xl border border-emerald/30 bg-gradient-to-br from-surface via-surface to-emerald/[0.05] shadow-[0_0_80px_-20px_rgba(16,185,129,0.4),0_8px_36px_-12px_rgba(0,0,0,0.5)]">
+      {/* Subtle ambient halo behind the header — same trick the
+          dashboard chat uses to make the surface feel alive without
+          carrying a heavy pattern. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute -left-12 -top-16 h-48 w-48 rounded-full blur-2xl"
+        style={{
+          background:
+            "radial-gradient(circle, rgba(16,185,129,0.18) 0%, rgba(16,185,129,0.04) 45%, transparent 70%)",
+        }}
+      />
+
       {/* Header — small Aven chip on the left, Start-Training on the
           right. The header is the only place the founder can launch
           the immersive session, so it's deliberately separated from
           the input strip. */}
-      <header className="flex items-center justify-between border-b border-border px-5 py-3">
+      <header className="relative flex items-center justify-between border-b border-emerald/20 px-5 py-3">
         <div className="flex items-center gap-2.5">
           <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
             A
@@ -234,7 +250,7 @@ export function TrainStudio() {
       {/* Chat scroll — fills the available space. Empty state is a
           quiet centred line so the box doesn't read as broken when
           there's nothing yet. */}
-      <div className="flex-1 overflow-y-auto px-5 py-5">
+      <div className="relative flex-1 overflow-y-auto bg-background/40 px-5 py-5">
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-center text-sm text-muted-foreground/70">
@@ -249,7 +265,7 @@ export function TrainStudio() {
       </div>
 
       {/* Input strip — bottom anchored, normal chatbox affordances. */}
-      <div className="border-t border-border px-5 py-4">
+      <div className="relative border-t border-emerald/20 px-5 py-4">
         {error && (
           <p className="mb-2 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
             <IconAlertCircle size={12} stroke={1.75} aria-hidden />
