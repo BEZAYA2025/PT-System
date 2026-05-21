@@ -22,6 +22,7 @@ import type {
   MemberEvent,
 } from "@/lib/admin";
 import { formatDate, relativeShort } from "@/lib/admin-format";
+import { safeLower } from "@/lib/admin-helpers";
 import { ActionsMenu } from "./ActionsMenu";
 import { MemberOverviewTab } from "./MemberOverviewTab";
 import { MemberSubscriptionTab } from "./MemberSubscriptionTab";
@@ -68,7 +69,7 @@ function getInitials(s: string): string {
 }
 
 function statusBadgeClass(status: string | null | undefined): string {
-  const s = (status ?? "").toLowerCase();
+  const s = safeLower(status);
   if (s === "active" || s === "past_due")
     return "border-emerald/30 bg-emerald/[0.08] text-emerald";
   if (s === "trial" || s === "trialing")
@@ -217,7 +218,7 @@ export function MemberDetailView({
     member.subscription_status ??
     member.status ??
     null;
-  const isSuspended = (effectiveStatus ?? "").toLowerCase() === "suspended";
+  const isSuspended = safeLower(effectiveStatus) === "suspended";
   const displayName = member.display_name?.trim() || member.email;
 
   return (

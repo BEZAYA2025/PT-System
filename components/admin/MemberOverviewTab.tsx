@@ -19,6 +19,7 @@ import type {
   MemberEvent,
 } from "@/lib/admin";
 import { bucketByDay, formatDayHeader } from "@/lib/admin-format";
+import { safeLower } from "@/lib/admin-helpers";
 
 interface Props {
   member: MemberDetail;
@@ -509,7 +510,7 @@ function iconForEvent(type: string | null | undefined): {
   Icon: React.ComponentType<{ size?: number; stroke?: number }>;
   classes: string;
 } {
-  const t = (type ?? "").toLowerCase();
+  const t = safeLower(type);
   if (t === "login")
     return {
       Icon: IconLogin,

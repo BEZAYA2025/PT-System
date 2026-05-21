@@ -13,6 +13,7 @@ import {
 import { Modal } from "@/components/Modal";
 import { Toast, type ToastState } from "@/components/Toast";
 import type { MemberDetail, MemberInvoice } from "@/lib/admin";
+import { safeLower } from "@/lib/admin-helpers";
 
 interface Props {
   member: MemberDetail;
@@ -61,7 +62,7 @@ function stripeSubscriptionUrl(subId: string): string {
 // Pill colour for the tier badge — VIP gets the same emerald
 // treatment as the list view + detail header, Standard stays neutral.
 function tierBadgeClass(tier: string | null | undefined): string {
-  return (tier ?? "").toLowerCase() === "vip"
+  return safeLower(tier) === "vip"
     ? "border-emerald/30 bg-emerald/[0.08] text-emerald"
     : "border-border bg-surface text-muted-foreground";
 }
@@ -85,7 +86,7 @@ function effectiveStatusOf(member: MemberDetail): string {
 // detail view reads in the same colour language wherever the member
 // appears.
 function statusPillClass(status: string): string {
-  const s = status.toLowerCase();
+  const s = safeLower(status);
   if (s === "active" || s === "past_due")
     return "border-emerald/30 bg-emerald/[0.08] text-emerald";
   if (s === "trial" || s === "trialing")
@@ -96,7 +97,7 @@ function statusPillClass(status: string): string {
 }
 
 function invoiceStatusClass(status: string | null | undefined): string {
-  const s = (status ?? "").toLowerCase();
+  const s = safeLower(status);
   if (s === "paid")
     return "border-emerald/30 bg-emerald/[0.08] text-emerald";
   if (s === "pending" || s === "open" || s === "draft")

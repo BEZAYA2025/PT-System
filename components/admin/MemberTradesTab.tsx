@@ -16,6 +16,7 @@ import type {
   MemberTradeStats,
   MemberTradesPage,
 } from "@/lib/admin";
+import { safeLower } from "@/lib/admin-helpers";
 
 interface Props {
   member: MemberDetail;
@@ -519,7 +520,7 @@ function StatCard({
 // carries the colour + direction icon together so the eye reads it
 // even before scanning the PnL line.
 function sideBadgeClass(side: string | null | undefined): string {
-  const s = (side ?? "").toLowerCase();
+  const s = safeLower(side);
   if (s === "long")
     return "border-emerald/30 bg-emerald/[0.10] text-emerald";
   if (s === "short")
@@ -543,7 +544,7 @@ function OpenTradeCard({
 }) {
   const pnl = trade.pnl_usd ?? 0;
   const tone = pnl >= 0 ? "text-emerald" : "text-red-300";
-  const side = (trade.side ?? "").toLowerCase();
+  const side = safeLower(trade.side);
   const SideIcon = side === "long" ? IconTrendingUp : IconTrendingDown;
   const mark = markPriceOf(trade);
   return (
@@ -617,7 +618,7 @@ function TradeDetail({
             {trade.side ?? "—"}
             {trade.leverage ? ` · ${trade.leverage}×` : ""}
           </span>
-          {(trade.status ?? "").toLowerCase() === "open" && (
+          {safeLower(trade.status) === "open" && (
             <span className="inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.08] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-emerald">
               <IconCrown size={9} stroke={2} aria-hidden />
               Open
