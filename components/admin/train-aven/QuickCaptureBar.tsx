@@ -29,6 +29,7 @@ import {
 } from "react";
 import {
   IconCamera,
+  IconLoader2,
   IconMicrophone,
   IconPlayerStopFilled,
   IconSend2,
@@ -43,6 +44,14 @@ export interface CapturePayload {
 
 interface Props {
   onSend: (payload: CapturePayload) => void | Promise<void>;
+  /** Optional voice-to-text hook. When provided, releasing the mic
+   *  hands the audio Blob to this callback and inserts the returned
+   *  transcript into the textarea for review/edit. No auto-send —
+   *  Whisper mangles trading jargon (EMA → "Ehema"), so the founder
+   *  must read the transcript before submitting. When omitted, the
+   *  bar falls back to attaching the audio blob to onSend (legacy
+   *  voice-note flow). */
+  onTranscribe?: (audio: Blob) => Promise<string | null>;
   busy?: boolean;
 }
 
@@ -84,9 +93,10 @@ function SoundWaveBars() {
   );
 }
 
-export function QuickCaptureBar({ onSend, busy }: Props) {
+export function QuickCaptureBar({ onSend, onTranscribe, busy }: Props) {
   const [text, setText] = useState("");
   const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [pendingImage, setPendingImage] = useState<File | null>(null);
   const [recordError, setRecordError] = useState<string | null>(null);
@@ -117,10 +127,10 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
   // here with busy=false → autofocus on page open, which is the
   // right chat UX.
   useEffect(() => {
-    if (!busy && !recording) {
+    if (!busy && !recording && !transcribing) {
       textareaRef.current?.focus();
     }
-  }, [busy, recording]);
+  }, [busy, recording, transcribing]);
 
   // Live elapsed counter while recording. Resets to 0 the moment
   // recording toggles off so the panel doesn't flash stale values
@@ -152,10 +162,38 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
       const blob = new Blob(chunksRef.current, { type: "audio/webm" });
       teardownStream();
       setRecording(false);
-      if (autoSend && blob.size > 0) {
-        void onSend({ audio: blob });
+      if (!autoSend || blob.size === 0) {
+        if (blob.size > 0) setRecordedBlob(blob);
+        return;
+      }
+      if (onTranscribe) {
+        // STT round-trip: upload audio, fill the transcript into the
+        // textarea, focus, and STOP. Paul reads/edits — manual
+        // submit is the only way the text reaches Aven. Whisper
+        // mangles trading jargon, so verbatim auto-send would
+        // poison the curriculum.
+        void (async () => {
+          setTranscribing(true);
+          try {
+            const transcript = await onTranscribe(blob);
+            if (transcript && transcript.trim().length > 0) {
+              setText((prev) =>
+                prev.trim().length > 0 ? `${prev} ${transcript}` : transcript,
+              );
+              // Focus the textarea after the transcribing panel
+              // unmounts and the textarea remounts. rAF is enough —
+              // the transcribing-false transition is synchronous in
+              // this same setState batch.
+              requestAnimationFrame(() => textareaRef.current?.focus());
+            }
+          } finally {
+            setTranscribing(false);
+          }
+        })();
       } else {
-        setRecordedBlob(blob);
+        // No STT provider wired — attach the blob to a regular send
+        // so the parent at least receives the voice note.
+        void onSend({ audio: blob });
       }
     };
     rec.stop();
@@ -240,7 +278,7 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
-    if (busy || recording) return;
+    if (busy || recording || transcribing) return;
     const trimmed = text.trim();
     const hasContent =
       trimmed.length > 0 || pendingImage !== null || recordedBlob !== null;
@@ -269,7 +307,8 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
 
   const hasText = text.trim().length > 0;
   const hasAttachment = pendingImage !== null || recordedBlob !== null;
-  const canSend = (hasText || hasAttachment) && !recording;
+  const canSend =
+    (hasText || hasAttachment) && !recording && !transcribing;
 
   return (
     <form onSubmit={submit} className="space-y-2">
@@ -318,8 +357,14 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
         <button
           type="button"
           onClick={toggleMic}
-          disabled={busy}
-          aria-label={recording ? "Stop recording and send" : "Start voice recording"}
+          disabled={busy || transcribing}
+          aria-label={
+            recording
+              ? onTranscribe
+                ? "Stop recording and transcribe"
+                : "Stop recording and send"
+              : "Start voice recording"
+          }
           className={[
             "relative inline-flex shrink-0 items-center justify-center rounded-full border-2 transition-all",
             recording
@@ -395,7 +440,28 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
               Recording {formatRecordingDuration(elapsed)}
             </span>
             <span className="ml-auto hidden font-mono text-[10px] uppercase tracking-wider text-muted-foreground sm:inline">
-              Tap mic to send · X to cancel
+              {onTranscribe
+                ? "Tap mic to transcribe · X to cancel"
+                : "Tap mic to send · X to cancel"}
+            </span>
+          </div>
+        ) : transcribing ? (
+          // STT in flight — mirrors the dashboard's transcribing
+          // panel. Textarea is replaced for the round-trip so a
+          // partial paste from the user doesn't collide with the
+          // transcript we're about to insert.
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex min-h-[44px] flex-1 items-center gap-3 rounded-2xl border border-emerald/40 bg-emerald/[0.06] px-4"
+          >
+            <IconLoader2
+              size={16}
+              className="animate-spin text-emerald"
+              aria-hidden
+            />
+            <span className="font-mono text-sm text-emerald">
+              Transcribing…
             </span>
           </div>
         ) : (

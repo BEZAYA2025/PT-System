@@ -1,6 +1,6 @@
 "use client";
 
-// TrainStudio — iteration 4. ONE page, ONE chatbox as constant.
+// TrainStudio — iteration 5. ONE page, ONE chatbox, persistent history.
 //
 // Architectural principle (Paul's call):
 //   · Regular mode: quiet chatbox, Aven on standby (small chip in
@@ -12,41 +12,49 @@
 //   · The transition is a TRANSFORMATION of the same surface — no
 //     routing, no replacement, no separate screen.
 //
-// Implementation:
-//   · A single outer shell (rounded emerald card) always rendered.
-//   · The shell's top region swaps between a compact header and the
-//     TrainingStage canvas; everything below (chat scroll + input)
-//     stays mounted across both modes.
-//   · StudioAtmosphere overlays the whole shell only in training
-//     mode — the room "ignites" on transformation, then quiets back
-//     down when Paul exits.
-//   · Conversation state (messages) is owned here, so turns from
-//     either mode land in the same continuous transcript.
+// Persistence + dedup model (ADMIN_API_SPEC §30):
+//   · On mount, GET /api/proxy/admin/aven/conversations seeds the
+//     transcript from the backend store — reload-safe.
+//   · POST /api/proxy/admin/aven/sparring-chat returns user_message
+//     + aven_message as full blocks. Both go straight into state;
+//     no second fetch.
+//   · Optimistic local user-bubble (temp-id) is reconciled with the
+//     real user_message when the response lands — the local row is
+//     REPLACED in place, not appended-alongside.
+//   · A dedupRef Set tracks every real message_id we've absorbed.
+//     History + live blocks both check it so duplicates never reach
+//     state.
+//
+// Voice → STT:
+//   · QuickCaptureBar records the audio; its onTranscribe prop
+//     uploads to /api/proxy/admin/aven/sparring-stt, gets back
+//     transcript text, and DOES NOT auto-send. The transcript lands
+//     in the textarea for Paul to verify/edit (Whisper mangles
+//     trading jargon — EMA → "Ehema"), then he submits like any
+//     other text turn.
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import {
-  IconAlertCircle,
-  IconPlayerPlayFilled,
-} from "@tabler/icons-react";
-import {
-  ChatBubbleList,
-  type ChatBubbleListMessage,
-} from "@/components/dashboard/ChatBubbleList";
-import {
-  QuickCaptureBar,
-  type CapturePayload,
-} from "./QuickCaptureBar";
+import { IconAlertCircle, IconPlayerPlayFilled } from "@tabler/icons-react";
+import { ChatBubbleList } from "@/components/dashboard/ChatBubbleList";
+import { QuickCaptureBar, type CapturePayload } from "./QuickCaptureBar";
 import { TrainingStage } from "./TrainingStage";
 import { type AvenStageState } from "./AvenStage";
 import { StudioAtmosphere } from "./StudioAtmosphere";
+import {
+  newLocalId,
+  shapeHistoryResponse,
+  shapeSparringMessage,
+  type SparringChatResponse,
+  type SttResponse,
+  type StudioMessage,
+} from "@/lib/sparring";
 
 type Mode = "quick" | "training";
 
-interface StudioMessage extends ChatBubbleListMessage {
-  localId?: string;
-  status?: "sending" | "sent" | "failed";
-}
+// History request limit. Backend caps at 200; keeping it here so
+// the wire-shape stays explicit in the URL.
+const HISTORY_LIMIT = 200;
 
 export function TrainStudio() {
   const [mode, setMode] = useState<Mode>("quick");
@@ -54,14 +62,68 @@ export function TrainStudio() {
   const [thinking, setThinking] = useState(false);
   const [avenState, setAvenState] = useState<AvenStageState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
 
+  // Dedup set of REAL backend message ids. Optimistic temp-ids stay
+  // out of this set — they get reconciled to a real id (and added
+  // here) when the sparring-chat response lands.
+  const dedupRef = useRef<Set<string>>(new Set());
+
+  // Display name to render under user-side bubbles. Sourced from
+  // the first user message that carries a user_display_name (either
+  // history seed or live response). Falls back to "Du" until the
+  // backend has supplied one.
+  const [userDisplayName, setUserDisplayName] = useState<string | null>(null);
+  const userLabel = userDisplayName ?? "Du";
+
+  // ---------------------------------------------------------------
+  // History fetch on mount — reload-persistence.
+  // ---------------------------------------------------------------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // member_id omitted: backend resolves the founder from the
+        // bearer token. If a future caller needs to scope the
+        // transcript to a different member, that's a query-param add
+        // here; for the founder-sparring view the implicit-self is
+        // correct.
+        const res = await fetch(
+          `/api/proxy/admin/aven/conversations?order=asc&limit=${HISTORY_LIMIT}`,
+          { cache: "no-store" },
+        );
+        if (cancelled || !res.ok) {
+          setHistoryLoaded(true);
+          return;
+        }
+        const data = await res.json().catch(() => null);
+        const { messages: hist, user_display_name } = shapeHistoryResponse(data);
+        if (cancelled) return;
+        // Seed dedup so a live block that arrives with the same id
+        // (e.g. a still-in-flight turn from before reload) doesn't
+        // double-render.
+        for (const m of hist) dedupRef.current.add(m.id);
+        setMessages(hist);
+        if (user_display_name) setUserDisplayName(user_display_name);
+      } catch (err) {
+        console.error("[TrainStudio] history fetch failed", err);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---------------------------------------------------------------
+  // Send a text turn → sparring-chat → push BOTH returned blocks.
+  // Reconciles the optimistic local user-bubble (localId) with the
+  // real user_message in the response — same role + content match
+  // → in-place replace, otherwise append.
+  // ---------------------------------------------------------------
   const sendToBackend = useCallback(
     async (text: string, localId: string) => {
-      // Client-side guard against the trivial 400 cases per VPS-CC's
-      // contract: text must be 1-4000 chars, non-empty after trim.
-      // Belt-and-braces — QuickCaptureBar already blocks the empty
-      // submit, but a stray caller would otherwise round-trip just
-      // to get a "text required" back.
       const trimmed = text.trim();
       if (trimmed.length === 0 || trimmed.length > 4000) {
         setError(
@@ -84,54 +146,75 @@ export function TrainStudio() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           // STRICT per VPS-CC contract: { text: <string> } only.
-          // No `message` alias, no `founder_sparring` meta — extras
-          // can trip the backend's strict validation and produce a
-          // 400 "text required" even when text is in fact present.
+          // Extras can trip the backend's strict validation and
+          // produce a 400 "text required" even when text is present.
           body: JSON.stringify({ text: trimmed }),
         });
-        const data = (await res.json().catch(() => null)) as {
-          reply?: string;
-          response?: string;
-          content?: string;
-          message?: string;
-          detail?: string;
-          error?: string;
-          message_id?: string;
-        } | null;
+        const data = (await res.json().catch(() => null)) as
+          | (Partial<SparringChatResponse> & {
+              message?: string;
+              detail?: string;
+              error?: string;
+            })
+          | null;
         if (!res.ok) {
-          // Surface the backend's own error body so a 400 reads as
-          // something diagnosable instead of just "HTTP 400". Try
-          // every common field shape; fall back to the status code.
           const backendMsg =
-            data?.message ??
-            data?.detail ??
-            data?.error ??
-            `HTTP ${res.status}`;
+            data?.message ?? data?.detail ?? data?.error ?? `HTTP ${res.status}`;
           throw new Error(String(backendMsg));
         }
-        const reply =
-          data?.reply ??
-          data?.response ??
-          data?.content ??
-          "(no reply)";
-        const replyMsg: StudioMessage = {
-          id: data?.message_id ?? `aven-${Date.now()}`,
-          role: "aven",
-          content: reply,
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [
-          ...prev.map((m) =>
-            m.localId === localId ? { ...m, status: "sent" as const } : m,
-          ),
-          replyMsg,
-        ]);
+
+        const userBlock = shapeSparringMessage(data?.user_message);
+        const avenBlock = shapeSparringMessage(data?.aven_message);
+
+        if (!userBlock || !avenBlock) {
+          // Backend should always emit both blocks per §30. If
+          // either is missing it's a contract violation worth
+          // surfacing in-line instead of silently dropping.
+          throw new Error(
+            "Sparring response missing user_message / aven_message block",
+          );
+        }
+
+        // Pick up canonical display name if this is the first time
+        // we see it.
+        if (userBlock.user_display_name && !userDisplayName) {
+          setUserDisplayName(userBlock.user_display_name);
+        }
+
+        setMessages((prev) => {
+          let next = prev;
+
+          // Reconcile the optimistic local row with the real
+          // user_message: if a localId row still exists, replace
+          // it in place with the server-confirmed shape (keeping
+          // its visual position in the transcript). Otherwise (no
+          // optimistic row found — e.g. recovered from a stale
+          // tab), filter any stale duplicates by id and append.
+          if (dedupRef.current.has(userBlock.id)) {
+            next = next.filter((m) => m.localId !== localId);
+          } else {
+            dedupRef.current.add(userBlock.id);
+            const idx = next.findIndex((m) => m.localId === localId);
+            if (idx !== -1) {
+              next = next.slice();
+              next[idx] = { ...userBlock, status: "sent" };
+            } else {
+              next = [...next, { ...userBlock, status: "sent" }];
+            }
+          }
+
+          // Append the aven_message block, dedup-guarded.
+          if (!dedupRef.current.has(avenBlock.id)) {
+            dedupRef.current.add(avenBlock.id);
+            next = [...next, avenBlock];
+          }
+
+          return next;
+        });
         setAvenState("ready");
       } catch (err) {
         const msg =
-          err instanceof Error
-            ? err.message
-            : "Sparring endpoint unreachable";
+          err instanceof Error ? err.message : "Sparring endpoint unreachable";
         setError(msg);
         setMessages((prev) =>
           prev.map((m) =>
@@ -143,21 +226,28 @@ export function TrainStudio() {
         setThinking(false);
       }
     },
-    [],
+    [userDisplayName],
   );
 
+  // ---------------------------------------------------------------
+  // QuickCaptureBar submit. For text payloads we push an optimistic
+  // bubble + fire the sparring-chat round-trip. Image-only / audio-
+  // only payloads (no text) are left as preview-only for now until
+  // backend wires those up.
+  // ---------------------------------------------------------------
   const handleSend = useCallback(
     async (payload: CapturePayload) => {
       const previewBits: string[] = [];
       if (payload.text) previewBits.push(payload.text);
+      if (payload.image)
+        previewBits.push(`(image · ${payload.image.name})`);
       if (payload.audio)
         previewBits.push(
           `(voice note · ${Math.round(payload.audio.size / 1024)}KB)`,
         );
-      if (payload.image)
-        previewBits.push(`(image · ${payload.image.name})`);
-      const localId = `local-${Date.now()}`;
-      const localMsg: StudioMessage = {
+
+      const localId = newLocalId("user");
+      const optimistic: StudioMessage = {
         localId,
         id: localId,
         role: "user",
@@ -165,7 +255,7 @@ export function TrainStudio() {
         created_at: new Date().toISOString(),
         status: "sending",
       };
-      setMessages((prev) => [...prev, localMsg]);
+      setMessages((prev) => [...prev, optimistic]);
 
       if (payload.text) {
         await sendToBackend(payload.text, localId);
@@ -180,8 +270,63 @@ export function TrainStudio() {
     [sendToBackend],
   );
 
+  // ---------------------------------------------------------------
+  // Voice → STT. QuickCaptureBar calls this with the recorded blob
+  // when its mic stops. We upload to the multipart proxy and return
+  // the transcript text — the bar puts it in the textarea for Paul
+  // to verify/edit BEFORE sending. No auto-send (Whisper mangles
+  // trading jargon — EMA → "Ehema" — and unverified transcripts
+  // would corrupt the curriculum).
+  // ---------------------------------------------------------------
+  const transcribeVoice = useCallback(
+    async (audio: Blob): Promise<string | null> => {
+      setError(null);
+      const fd = new FormData();
+      // Backend accepts webm/mp4/ogg — recorder defaults to
+      // audio/webm so the extension matches.
+      const ext =
+        audio.type.includes("mp4") ? "mp4"
+        : audio.type.includes("ogg") ? "ogg"
+        : "webm";
+      fd.append("audio", audio, `voice.${ext}`);
+      fd.append("language", "de");
+      try {
+        const res = await fetch("/api/proxy/admin/aven/sparring-stt", {
+          method: "POST",
+          body: fd,
+        });
+        const data = (await res.json().catch(() => null)) as
+          | (Partial<SttResponse> & {
+              message?: string;
+              detail?: string;
+              error?: string;
+            })
+          | null;
+        if (!res.ok) {
+          const msg =
+            data?.message ?? data?.detail ?? data?.error ?? `HTTP ${res.status}`;
+          throw new Error(String(msg));
+        }
+        const text = typeof data?.text === "string" ? data.text : "";
+        if (text.length === 0) {
+          setError("STT returned an empty transcript. Try recording again.");
+          return null;
+        }
+        return text;
+      } catch (err) {
+        const msg =
+          err instanceof Error ? err.message : "STT endpoint unreachable";
+        setError(`Voice transcription failed · ${msg}`);
+        return null;
+      }
+    },
+    [],
+  );
+
   const handleVoiceTurn = useCallback(async (audio: Blob) => {
-    const localId = `voice-${Date.now()}`;
+    // Training-mode voice console — for now just acknowledges the
+    // turn; backend wiring TBD with the training-stage rebuild.
+    const localId = newLocalId("voice");
     setMessages((prev) => [
       ...prev,
       {
@@ -196,6 +341,12 @@ export function TrainStudio() {
   }, []);
 
   const displayState = thinking ? "thinking" : avenState;
+
+  // ChatBubbleList expects readonly ChatBubbleListMessage[]. Our
+  // StudioMessage is structurally compatible (id/role/content/
+  // created_at/user_display_name). useMemo so the prop reference
+  // is stable across re-renders unless messages actually changes.
+  const renderable = useMemo(() => messages, [messages]);
 
   return (
     <div className="relative flex h-[78vh] flex-col overflow-hidden rounded-2xl border border-emerald/30 bg-gradient-to-br from-surface via-surface to-emerald/[0.05] shadow-[0_0_80px_-20px_rgba(16,185,129,0.4),0_8px_36px_-12px_rgba(0,0,0,0.5)]">
@@ -290,9 +441,6 @@ export function TrainStudio() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
-            // flex-1 means the canvas claims the room above the
-            // chat; min-h-0 keeps it scrollable when content gets
-            // tall.
             className="relative flex-1 min-h-0 overflow-hidden"
           >
             <TrainingStage
@@ -306,11 +454,6 @@ export function TrainStudio() {
         )}
       </AnimatePresence>
 
-      {/* Chat scroll — ALWAYS rendered. In quick mode it gets flex-1
-          and fills the page; in training mode it shrinks to a fixed
-          band at the bottom so the canvas above gets room to
-          breathe while the conversation stays continuously
-          present. */}
       <div
         className={[
           "relative overflow-y-auto bg-background/40 px-5 py-5",
@@ -320,31 +463,36 @@ export function TrainStudio() {
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-center text-sm text-muted-foreground/70">
-              {mode === "quick"
-                ? "Throw Aven a thought, or hit "
-                : "The studio is live. Type or speak — "}
-              <span className="font-medium text-emerald">
-                {mode === "quick" ? "Start training" : "Aven is listening"}
-              </span>
-              {mode === "quick" ? " for a focused session." : "."}
+              {historyLoaded
+                ? mode === "quick"
+                  ? "Throw Aven a thought, or hit "
+                  : "The studio is live. Type or speak — "
+                : "Loading transcript…"}
+              {historyLoaded && (
+                <>
+                  <span className="font-medium text-emerald">
+                    {mode === "quick" ? "Start training" : "Aven is listening"}
+                  </span>
+                  {mode === "quick" ? " for a focused session." : "."}
+                </>
+              )}
             </p>
           </div>
         ) : (
-          // userLabel="PAUL" — Paul ist der Lehrer im Founder-Sparring,
-          // nicht ein "Member". showSource=false weil Sparring web-only
-          // läuft, der Telegram/Web-Pill wäre nur Noise.
-          <ChatBubbleList messages={messages} userLabel="PAUL" showSource={false} />
+          // userLabel sourced from the backend's canonical
+          // user_display_name (first user-bubble that carries one);
+          // "Du" fallback while we wait for the first one. Sparring
+          // is web-only so the Telegram/Web pill is suppressed.
+          <ChatBubbleList
+            messages={renderable}
+            userLabel={userLabel}
+            showSource={false}
+          />
         )}
       </div>
 
       {/* Input strip — ALWAYS rendered. Same affordances in both
-          modes (mic + camera + text + send). The chat affordance is
-          the constant — voice console in the training canvas above
-          is additive, not a replacement.
-          bg-surface-elevated gives the strip a clean, slightly
-          contrasting surface vs the chat scroll above (same trick
-          the dashboard chat uses) so it reads as a defined input
-          area instead of a dark blob with form-fields inside. */}
+          modes. bg-surface-elevated mirrors the dashboard chat. */}
       <div className="relative shrink-0 border-t border-emerald/20 bg-surface-elevated px-5 py-3 sm:px-6 sm:py-3.5">
         {error && (
           <p className="mb-2 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
@@ -352,7 +500,11 @@ export function TrainStudio() {
             {error}
           </p>
         )}
-        <QuickCaptureBar onSend={handleSend} busy={thinking} />
+        <QuickCaptureBar
+          onSend={handleSend}
+          onTranscribe={transcribeVoice}
+          busy={thinking}
+        />
       </div>
     </div>
   );
