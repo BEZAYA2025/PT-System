@@ -57,6 +57,25 @@ export function TrainStudio() {
 
   const sendToBackend = useCallback(
     async (text: string, localId: string) => {
+      // Client-side guard against the trivial 400 cases per VPS-CC's
+      // contract: text must be 1-4000 chars, non-empty after trim.
+      // Belt-and-braces — QuickCaptureBar already blocks the empty
+      // submit, but a stray caller would otherwise round-trip just
+      // to get a "text required" back.
+      const trimmed = text.trim();
+      if (trimmed.length === 0 || trimmed.length > 4000) {
+        setError(
+          trimmed.length === 0
+            ? "Message can't be empty."
+            : "Message too long (max 4000 chars).",
+        );
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.localId === localId ? { ...m, status: "failed" as const } : m,
+          ),
+        );
+        return;
+      }
       setError(null);
       setThinking(true);
       setAvenState("thinking");
@@ -64,14 +83,11 @@ export function TrainStudio() {
         const res = await fetch("/api/proxy/admin/aven/sparring-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // Backend (per VPS-CC) expects `text`. Keep `message` as a
-          // compat alias so older backend builds still resolve. Send
-          // both — the unused key is harmless.
-          body: JSON.stringify({
-            text,
-            message: text,
-            founder_sparring: true,
-          }),
+          // STRICT per VPS-CC contract: { text: <string> } only.
+          // No `message` alias, no `founder_sparring` meta — extras
+          // can trip the backend's strict validation and produce a
+          // 400 "text required" even when text is in fact present.
+          body: JSON.stringify({ text: trimmed }),
         });
         const data = (await res.json().catch(() => null)) as {
           reply?: string;
@@ -320,8 +336,12 @@ export function TrainStudio() {
       {/* Input strip — ALWAYS rendered. Same affordances in both
           modes (mic + camera + text + send). The chat affordance is
           the constant — voice console in the training canvas above
-          is additive, not a replacement. */}
-      <div className="relative shrink-0 border-t border-emerald/20 px-5 py-4">
+          is additive, not a replacement.
+          bg-surface-elevated gives the strip a clean, slightly
+          contrasting surface vs the chat scroll above (same trick
+          the dashboard chat uses) so it reads as a defined input
+          area instead of a dark blob with form-fields inside. */}
+      <div className="relative shrink-0 border-t border-emerald/20 bg-surface-elevated px-5 py-3 sm:px-6 sm:py-3.5">
         {error && (
           <p className="mb-2 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
             <IconAlertCircle size={12} stroke={1.75} aria-hidden />
