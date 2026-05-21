@@ -1,24 +1,27 @@
 "use client";
 
-// TrainStudio — iteration 3.
+// TrainStudio — iteration 4. ONE page, ONE chatbox as constant.
 //
-// Two distinct modes, deliberately different in feel:
+// Architectural principle (Paul's call):
+//   · Regular mode: quiet chatbox, Aven on standby (small chip in
+//     the header). The page IS the chatbox.
+//   · Training mode: SAME page. The header transforms into a wider
+//     canvas where Aven wakes up, charts cascade in, methodology
+//     ignites, voice console arrives — and the chatbox below stays
+//     fully present, becomes part of the immersive context.
+//   · The transition is a TRANSFORMATION of the same surface — no
+//     routing, no replacement, no separate screen.
 //
-//   · NORMAL (default): a quiet, ordinary chatbox. Small Aven chip in
-//     the header, full chat history in the middle, capture bar with a
-//     send arrow on the right. No big halo, no atmospheric glow — the
-//     emerald shows up only as accent (the chip dot, the send button).
-//     The point is short, casual back-and-forth with Aven, nothing
-//     more.
-//
-//   · TRAINING: tapped via the deliberate "Start training" button at
-//     the top-right. ALL the wow — full-bleed atmosphere, big breathing
-//     avatar, parallax charts, methodology ignition, voice waveform —
-//     lives here. The transition from Normal → Training is the
-//     goosebumps moment: the quiet chatbox gives way to the stage.
-//
-// Sparring conversation persists across the mode switch — turns in
-// either mode land in the same `messages` state.
+// Implementation:
+//   · A single outer shell (rounded emerald card) always rendered.
+//   · The shell's top region swaps between a compact header and the
+//     TrainingStage canvas; everything below (chat scroll + input)
+//     stays mounted across both modes.
+//   · StudioAtmosphere overlays the whole shell only in training
+//     mode — the room "ignites" on transformation, then quiets back
+//     down when Paul exits.
+//   · Conversation state (messages) is owned here, so turns from
+//     either mode land in the same continuous transcript.
 
 import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -36,6 +39,7 @@ import {
 } from "./QuickCaptureBar";
 import { TrainingStage } from "./TrainingStage";
 import { type AvenStageState } from "./AvenStage";
+import { StudioAtmosphere } from "./StudioAtmosphere";
 
 type Mode = "quick" | "training";
 
@@ -155,44 +159,30 @@ export function TrainStudio() {
     ]);
   }, []);
 
-  // Training mode owns the full-bleed atmospheric stage on its own.
-  // It returns a self-contained immersive surface so the Normal-mode
-  // chrome below is not rendered behind it.
-  if (mode === "training") {
-    return (
-      <div className="relative -mx-4 sm:-mx-6 md:-mx-8">
-        <AnimatePresence mode="wait">
+  const displayState = thinking ? "thinking" : avenState;
+
+  return (
+    <div className="relative flex h-[78vh] flex-col overflow-hidden rounded-2xl border border-emerald/30 bg-gradient-to-br from-surface via-surface to-emerald/[0.05] shadow-[0_0_80px_-20px_rgba(16,185,129,0.4),0_8px_36px_-12px_rgba(0,0,0,0.5)]">
+      {/* Atmospheric room — ignites only in training mode. Fades out
+          when Paul exits back to the quiet chatbox. Pointer-events-
+          none so it never blocks chat interactions. */}
+      <AnimatePresence>
+        {mode === "training" && (
           <motion.div
-            key="training"
+            key="atmosphere"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex min-h-[78vh]"
+            transition={{ duration: 0.5 }}
+            className="pointer-events-none absolute inset-0"
           >
-            <TrainingStage
-              onExit={() => {
-                setMode("quick");
-                setAvenState("idle");
-              }}
-              onVoiceTurn={handleVoiceTurn}
-            />
+            <StudioAtmosphere state={displayState} />
           </motion.div>
-        </AnimatePresence>
-      </div>
-    );
-  }
+        )}
+      </AnimatePresence>
 
-  // NORMAL mode — emerald-bordered chat surface that mirrors the
-  // dashboard's AvenChat card (which Paul already likes). Same
-  // gradient, same glow shadow, same subtle top-left halo — so the
-  // founder-facing admin chat reads as a sibling of the member-facing
-  // chat, not a separate surface in another style.
-  return (
-    <div className="relative flex h-[78vh] flex-col overflow-hidden rounded-2xl border border-emerald/30 bg-gradient-to-br from-surface via-surface to-emerald/[0.05] shadow-[0_0_80px_-20px_rgba(16,185,129,0.4),0_8px_36px_-12px_rgba(0,0,0,0.5)]">
-      {/* Subtle ambient halo behind the header — same trick the
-          dashboard chat uses to make the surface feel alive without
-          carrying a heavy pattern. */}
+      {/* Ambient halo — always present, gives the regular surface a
+          subtle alive feel without competing with the chat. */}
       <span
         aria-hidden
         className="pointer-events-none absolute -left-12 -top-16 h-48 w-48 rounded-full blur-2xl"
@@ -202,61 +192,104 @@ export function TrainStudio() {
         }}
       />
 
-      {/* Header — small Aven chip on the left, Start-Training on the
-          right. The header is the only place the founder can launch
-          the immersive session, so it's deliberately separated from
-          the input strip. */}
-      <header className="relative flex items-center justify-between border-b border-emerald/20 px-5 py-3">
-        <div className="flex items-center gap-2.5">
-          <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
-            A
-            <span
-              className={[
-                "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
-                thinking
-                  ? "bg-amber-400"
-                  : avenState === "ready"
-                    ? "bg-emerald"
-                    : "bg-emerald/60",
-              ].join(" ")}
-              aria-hidden
+      {/* Top region — transforms between a compact header (quick
+          mode) and the training canvas (training mode). The chat
+          stays mounted underneath either way. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {mode === "quick" ? (
+          <motion.header
+            key="header"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="relative flex shrink-0 items-center justify-between border-b border-emerald/20 px-5 py-3"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="relative inline-flex size-7 items-center justify-center rounded-full bg-emerald/[0.12] text-[11px] font-semibold text-emerald">
+                A
+                <span
+                  className={[
+                    "absolute -bottom-0.5 -right-0.5 size-2 rounded-full ring-2 ring-surface",
+                    thinking
+                      ? "bg-amber-400"
+                      : avenState === "ready"
+                        ? "bg-emerald"
+                        : "bg-emerald/60",
+                  ].join(" ")}
+                  aria-hidden
+                />
+              </span>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm font-medium text-foreground">
+                  Aven
+                </span>
+                <span className="text-[11px] text-muted-foreground">
+                  {thinking
+                    ? "thinking…"
+                    : avenState === "ready"
+                      ? "ready"
+                      : "standby"}
+                </span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode("training");
+                setAvenState("awakening");
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald transition-colors hover:bg-emerald/[0.14]"
+            >
+              <IconPlayerPlayFilled size={11} stroke={1.5} />
+              Start training
+            </button>
+          </motion.header>
+        ) : (
+          <motion.div
+            key="canvas"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            // flex-1 means the canvas claims the room above the
+            // chat; min-h-0 keeps it scrollable when content gets
+            // tall.
+            className="relative flex-1 min-h-0 overflow-hidden"
+          >
+            <TrainingStage
+              onExit={() => {
+                setMode("quick");
+                setAvenState("idle");
+              }}
+              onVoiceTurn={handleVoiceTurn}
             />
-          </span>
-          <div className="flex flex-col leading-tight">
-            <span className="text-sm font-medium text-foreground">Aven</span>
-            <span className="text-[11px] text-muted-foreground">
-              {thinking
-                ? "thinking…"
-                : avenState === "ready"
-                  ? "ready"
-                  : "online"}
-            </span>
-          </div>
-        </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        <button
-          type="button"
-          onClick={() => {
-            setMode("training");
-            setAvenState("awakening");
-          }}
-          className="inline-flex items-center gap-1.5 rounded-full border border-emerald/30 bg-emerald/[0.08] px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-emerald transition-colors hover:bg-emerald/[0.14]"
-        >
-          <IconPlayerPlayFilled size={11} stroke={1.5} />
-          Start training
-        </button>
-      </header>
-
-      {/* Chat scroll — fills the available space. Empty state is a
-          quiet centred line so the box doesn't read as broken when
-          there's nothing yet. */}
-      <div className="relative flex-1 overflow-y-auto bg-background/40 px-5 py-5">
+      {/* Chat scroll — ALWAYS rendered. In quick mode it gets flex-1
+          and fills the page; in training mode it shrinks to a fixed
+          band at the bottom so the canvas above gets room to
+          breathe while the conversation stays continuously
+          present. */}
+      <div
+        className={[
+          "relative overflow-y-auto bg-background/40 px-5 py-5",
+          mode === "quick" ? "flex-1" : "h-[24vh] shrink-0",
+        ].join(" ")}
+      >
         {messages.length === 0 ? (
           <div className="flex h-full items-center justify-center">
             <p className="text-center text-sm text-muted-foreground/70">
-              Throw Aven a thought, or hit{" "}
-              <span className="font-medium text-emerald">Start training</span>{" "}
-              for a focused session.
+              {mode === "quick"
+                ? "Throw Aven a thought, or hit "
+                : "The studio is live. Type or speak — "}
+              <span className="font-medium text-emerald">
+                {mode === "quick" ? "Start training" : "Aven is listening"}
+              </span>
+              {mode === "quick" ? " for a focused session." : "."}
             </p>
           </div>
         ) : (
@@ -264,8 +297,11 @@ export function TrainStudio() {
         )}
       </div>
 
-      {/* Input strip — bottom anchored, normal chatbox affordances. */}
-      <div className="relative border-t border-emerald/20 px-5 py-4">
+      {/* Input strip — ALWAYS rendered. Same affordances in both
+          modes (mic + camera + text + send). The chat affordance is
+          the constant — voice console in the training canvas above
+          is additive, not a replacement. */}
+      <div className="relative shrink-0 border-t border-emerald/20 px-5 py-4">
         {error && (
           <p className="mb-2 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
             <IconAlertCircle size={12} stroke={1.75} aria-hidden />
