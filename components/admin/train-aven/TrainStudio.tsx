@@ -76,6 +76,15 @@ export function TrainStudio({ founderId }: Props) {
   // here) when the sparring-chat response lands.
   const dedupRef = useRef<Set<string>>(new Set());
 
+  // Auto-scroll plumbing — mirror of the dashboard AvenChat pattern.
+  // scrollRef points at the chat-list container; lastBottomKeyRef
+  // tracks the id (or localId) of the most-recent bubble we've
+  // already scrolled to, so we ONLY scroll when a NEW bottom row
+  // arrives — re-renders that don't change the tail (status flips,
+  // userLabel updates) don't yank Paul's scroll position.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lastBottomKeyRef = useRef<string | null>(null);
+
   // Display name to render under user-side bubbles. Sourced from
   // the first user message that carries a user_display_name (either
   // history seed or live response). Falls back to "Du" until the
@@ -377,6 +386,23 @@ export function TrainStudio({ founderId }: Props) {
 
   const displayState = thinking ? "thinking" : avenState;
 
+  // Scroll to bottom whenever a new tail bubble appears — covers
+  // initial history paint, optimistic-user-push, and the live
+  // user_message / aven_message blocks. requestAnimationFrame so
+  // the scrollHeight reflects the just-mounted bubble before we
+  // measure it.
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    const key = last ? (last.localId ?? last.id) : null;
+    if (key === lastBottomKeyRef.current) return;
+    lastBottomKeyRef.current = key;
+    const el = scrollRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [messages, thinking]);
+
   // ChatBubbleList expects readonly ChatBubbleListMessage[]. Our
   // StudioMessage is structurally compatible (id/role/content/
   // created_at/user_display_name). useMemo so the prop reference
@@ -490,6 +516,7 @@ export function TrainStudio({ founderId }: Props) {
       </AnimatePresence>
 
       <div
+        ref={scrollRef}
         className={[
           "relative overflow-y-auto bg-background/40 px-5 py-5",
           mode === "quick" ? "flex-1" : "h-[24vh] shrink-0",
