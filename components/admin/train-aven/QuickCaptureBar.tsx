@@ -238,6 +238,11 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
     setText("");
     setPendingImage(null);
     setRecordedBlob(null);
+    // Re-focus the textarea after submit so Paul can keep typing
+    // without reaching for the mouse — Enter-send-Enter-send rhythm.
+    // requestAnimationFrame so focus lands after React commits the
+    // value reset (otherwise some browsers blur on the value swap).
+    requestAnimationFrame(() => textareaRef.current?.focus());
   };
 
   const handleKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -304,7 +309,10 @@ export function QuickCaptureBar({ onSend, busy }: Props) {
             "relative inline-flex shrink-0 items-center justify-center rounded-full border-2 transition-all",
             recording
               ? "size-12 border-emerald bg-emerald/[0.22] text-emerald shadow-[0_0_32px_-2px_rgba(16,185,129,0.85)]"
-              : "size-11 border-border bg-background text-muted-foreground hover:border-emerald/40 hover:text-foreground",
+              : // Idle: emerald-tinted rim + emerald icon so the mic
+                // reads as the live voice affordance from the first
+                // glance, not as a neutral utility button.
+                "size-11 border-emerald/40 bg-background text-emerald hover:border-emerald hover:bg-emerald/[0.08]",
             busy ? "opacity-50" : "",
           ].join(" ")}
         >
