@@ -22,7 +22,12 @@ import type {
   MemberEvent,
 } from "@/lib/admin";
 import { formatDate, relativeShort } from "@/lib/admin-format";
-import { safeLower } from "@/lib/admin-helpers";
+import {
+  resolveTier,
+  safeLower,
+  tierBadgeClass as tierPillClass,
+  tierBadgeLabel,
+} from "@/lib/admin-helpers";
 import { ActionsMenu } from "./ActionsMenu";
 import { MemberOverviewTab } from "./MemberOverviewTab";
 import { MemberSubscriptionTab } from "./MemberSubscriptionTab";
@@ -246,14 +251,9 @@ export function MemberDetailView({
                   {displayName}
                 </h1>
                 <span
-                  className={[
-                    "inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-                    member.tier === "vip"
-                      ? "border-emerald/30 bg-emerald/[0.08] text-emerald"
-                      : "border-border bg-surface text-muted-foreground",
-                  ].join(" ")}
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tierPillClass(resolveTier(member))}`}
                 >
-                  {member.tier ?? "standard"}
+                  {tierBadgeLabel(resolveTier(member))}
                 </span>
                 <span
                   className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${statusBadgeClass(effectiveStatus)}`}

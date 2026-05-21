@@ -37,6 +37,11 @@ export interface AdminMembersListEntry {
   subscription_status_display?: string | null;
   subscription_status?: string | null;
   is_trial?: boolean | null;
+  /** Founder accounts (Paul) carry an is_founder flag rather than a
+   *  dedicated tier value — the FE renders the tier badge as
+   *  "Founder" (amber pill) when this is true, regardless of the
+   *  underlying `tier` column. */
+  is_founder?: boolean | null;
   joined_at?: string | null;
   created_at?: string | null;
   trial_end?: string | null;

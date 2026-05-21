@@ -35,6 +35,37 @@ export function safeLower(v: unknown): string {
   return String(v).toLowerCase();
 }
 
+// Resolved tier across the member shapes. Founder is a virtual tier
+// (backend stores is_founder bool alongside the tier column). Helps
+// us render the badge with a single source of truth wherever member
+// rows / detail panes show it.
+export type ResolvedTier = "founder" | "vip" | "standard";
+
+export function resolveTier(m: {
+  is_founder?: boolean | null;
+  tier?: string | null;
+}): ResolvedTier {
+  if (m.is_founder) return "founder";
+  return safeLower(m.tier) === "vip" ? "vip" : "standard";
+}
+
+export function tierBadgeLabel(t: ResolvedTier): string {
+  if (t === "founder") return "FOUNDER";
+  if (t === "vip") return "VIP";
+  return "STANDARD";
+}
+
+export function tierBadgeClass(t: ResolvedTier): string {
+  // Founder gets an amber/gold treatment so it reads as distinct
+  // from VIP's emerald — same hierarchy the dashboard's user pill
+  // uses for founder accounts.
+  if (t === "founder")
+    return "border-amber-400/40 bg-amber-400/[0.10] text-amber-200";
+  if (t === "vip")
+    return "border-emerald/30 bg-emerald/[0.08] text-emerald";
+  return "border-border bg-surface text-muted-foreground";
+}
+
 export function parseAvenMessages(data: unknown): AvenMessage[] {
   if (Array.isArray(data)) return data as AvenMessage[];
   if (data && typeof data === "object") {

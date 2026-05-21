@@ -13,7 +13,12 @@ import {
 import { Modal } from "@/components/Modal";
 import { Toast, type ToastState } from "@/components/Toast";
 import type { MemberDetail, MemberInvoice } from "@/lib/admin";
-import { safeLower } from "@/lib/admin-helpers";
+import {
+  resolveTier,
+  safeLower,
+  tierBadgeClass as tierPillClass,
+  tierBadgeLabel,
+} from "@/lib/admin-helpers";
 
 interface Props {
   member: MemberDetail;
@@ -59,13 +64,10 @@ function stripeSubscriptionUrl(subId: string): string {
   return `https://dashboard.stripe.com/subscriptions/${encodeURIComponent(subId)}`;
 }
 
-// Pill colour for the tier badge — VIP gets the same emerald
-// treatment as the list view + detail header, Standard stays neutral.
-function tierBadgeClass(tier: string | null | undefined): string {
-  return safeLower(tier) === "vip"
-    ? "border-emerald/30 bg-emerald/[0.08] text-emerald"
-    : "border-border bg-surface text-muted-foreground";
-}
+// Local tierBadgeClass removed — use the shared resolveTier +
+// tierBadgeClass (aliased to tierPillClass) from admin-helpers so
+// founder accounts paint the amber pill consistently across all
+// three render sites.
 
 // §27 O4 chain: effective_status > display > is_trial→"trialing"
 // > raw. The raw subscription_status reads "active" even for trial
@@ -253,11 +255,16 @@ export function MemberSubscriptionTab({ member }: Props) {
             Plan
           </h2>
           <div className="flex items-center gap-1.5">
-            <span
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tierBadgeClass(member.tier)}`}
-            >
-              {(member.tier ?? "standard").toUpperCase()}
-            </span>
+            {(() => {
+              const t = resolveTier(member);
+              return (
+                <span
+                  className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tierPillClass(t)}`}
+                >
+                  {tierBadgeLabel(t)}
+                </span>
+              );
+            })()}
             {member.billing_interval && (
               <span className="inline-flex items-center rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
                 {member.billing_interval}

@@ -19,6 +19,11 @@ import {
 import { Modal } from "@/components/Modal";
 import { Toast, type ToastState } from "@/components/Toast";
 import type { AdminMembersListEntry } from "@/lib/admin";
+import {
+  resolveTier,
+  tierBadgeClass as tierPillClass,
+  tierBadgeLabel,
+} from "@/lib/admin-helpers";
 import { ActionsMenu } from "./ActionsMenu";
 
 interface Props {
@@ -27,6 +32,7 @@ interface Props {
 
 type StatusFilter =
   | "all"
+  | "online"
   | "active"
   | "trial"
   | "cancelled"
@@ -34,7 +40,7 @@ type StatusFilter =
   | "inactive";
 type RiskFilter = "all" | "healthy" | "at-risk" | "power-user";
 type ValueFilter = "all" | "high" | "medium" | "low";
-type TierFilter = "all" | "standard" | "vip";
+type TierFilter = "all" | "founder" | "standard" | "vip";
 type ConnectionFilter =
   | "all"
   | "exchange-yes"
@@ -47,6 +53,7 @@ type SortDir = "asc" | "desc";
 
 const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
   { key: "all", label: "All" },
+  { key: "online", label: "Online (last 15min)" },
   { key: "active", label: "Active" },
   { key: "trial", label: "Trial" },
   { key: "cancelled", label: "Cancelled" },
@@ -70,6 +77,7 @@ const VALUE_FILTERS: Array<{ key: ValueFilter; label: string }> = [
 
 const TIER_FILTERS: Array<{ key: TierFilter; label: string }> = [
   { key: "all", label: "Any tier" },
+  { key: "founder", label: "Founder" },
   { key: "standard", label: "Standard" },
   { key: "vip", label: "VIP" },
 ];
@@ -85,6 +93,11 @@ const CONNECTION_FILTERS: Array<{ key: ConnectionFilter; label: string }> = [
 const PAGE_SIZE = 25;
 const INACTIVE_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// "Online" threshold — last_active_at within the last 15 minutes
+// counts as currently logged in. Tuned to be short enough to mean
+// "actually at the keyboard" but long enough to bridge a quick tab
+// switch / network hiccup.
+const ONLINE_THRESHOLD_MS = 15 * 60 * 1000;
 
 // Backend §27 O4: the raw `subscription_status` column is "active" for
 // trialing members too (DB stores trial_started_at separately) — using
@@ -300,6 +313,14 @@ export function MembersTable({ initialMembers }: Props) {
 
     if (statusFilter !== "all") {
       list = list.filter((m) => {
+        if (statusFilter === "online") {
+          // Currently logged-in: last_active timestamp within the
+          // last 15 minutes.
+          if (!m.last_active_at) return false;
+          const t = Date.parse(m.last_active_at);
+          if (!Number.isFinite(t)) return false;
+          return Date.now() - t < ONLINE_THRESHOLD_MS;
+        }
         const g = statusGroup(memberStatusOf(m));
         if (statusFilter === "inactive") {
           const d = daysSince(m.last_active_at);
@@ -329,7 +350,15 @@ export function MembersTable({ initialMembers }: Props) {
     }
 
     if (tierFilter !== "all") {
-      list = list.filter((m) => (m.tier ?? "standard") === tierFilter);
+      list = list.filter((m) => {
+        // Founder is a virtual tier — backend stores it as
+        // is_founder bool alongside whatever the underlying tier
+        // column carries. The filter honours the founder flag
+        // first, then falls back to the tier column.
+        if (tierFilter === "founder") return Boolean(m.is_founder);
+        if (m.is_founder) return false; // founders don't show under standard/vip
+        return (m.tier ?? "standard") === tierFilter;
+      });
     }
 
     if (connFilter !== "all") {
@@ -1281,16 +1310,16 @@ function MemberRow({
       </td>
       <td className="px-4 py-3 text-muted-foreground">{member.email}</td>
       <td className="px-4 py-3">
-        <span
-          className={[
-            "inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider",
-            member.tier === "vip"
-              ? "border-emerald/30 bg-emerald/[0.08] text-emerald"
-              : "border-border bg-surface text-muted-foreground",
-          ].join(" ")}
-        >
-          {member.tier ?? "standard"}
-        </span>
+        {(() => {
+          const t = resolveTier(member);
+          return (
+            <span
+              className={`inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider ${tierPillClass(t)}`}
+            >
+              {tierBadgeLabel(t)}
+            </span>
+          );
+        })()}
       </td>
       <td className="px-4 py-3">
         {(() => {
