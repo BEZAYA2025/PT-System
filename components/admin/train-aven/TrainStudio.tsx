@@ -42,9 +42,11 @@ import { TrainingStage } from "./TrainingStage";
 import { type AvenStageState } from "./AvenStage";
 import { StudioAtmosphere } from "./StudioAtmosphere";
 import {
+  fileToBase64,
   newLocalId,
   shapeHistoryResponse,
   shapeSparringMessage,
+  validateImage,
   type SparringChatResponse,
   type SttResponse,
   type StudioMessage,
@@ -167,14 +169,25 @@ export function TrainStudio({ founderId }: Props) {
   // → in-place replace, otherwise append.
   // ---------------------------------------------------------------
   const sendToBackend = useCallback(
-    async (text: string, localId: string) => {
+    async (text: string, image: File | null, localId: string) => {
       const trimmed = text.trim();
-      if (trimmed.length === 0 || trimmed.length > 4000) {
-        setError(
-          trimmed.length === 0
-            ? "Message can't be empty."
-            : "Message too long (max 4000 chars).",
+
+      // Text contract: 1-4000 chars. Image-only sends are allowed
+      // frontend-side (we send an empty text + the image); if the
+      // backend rejects "text required" we'll see it in the error
+      // chip and tighten this guard. ADMIN_API_SPEC edge-case still
+      // pending VPS confirmation.
+      if (!image && trimmed.length === 0) {
+        setError("Message can't be empty.");
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.localId === localId ? { ...m, status: "failed" as const } : m,
+          ),
         );
+        return;
+      }
+      if (trimmed.length > 4000) {
+        setError("Message too long (max 4000 chars).");
         setMessages((prev) =>
           prev.map((m) =>
             m.localId === localId ? { ...m, status: "failed" as const } : m,
@@ -185,14 +198,46 @@ export function TrainStudio({ founderId }: Props) {
       setError(null);
       setThinking(true);
       setAvenState("thinking");
+
+      // Encode image → raw base64 (no data: URI prefix) BEFORE the
+      // fetch so we can validate / surface encoding errors as the
+      // same in-line chip as a network failure.
+      let imageBase64: string | undefined;
+      let imageMediaType: string | undefined;
+      if (image) {
+        try {
+          const enc = await fileToBase64(image);
+          imageBase64 = enc.base64;
+          imageMediaType = enc.media_type;
+        } catch (err) {
+          setError(
+            `Bild-Encoding fehlgeschlagen · ${
+              err instanceof Error ? err.message : "unknown"
+            }`,
+          );
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.localId === localId ? { ...m, status: "failed" as const } : m,
+            ),
+          );
+          setThinking(false);
+          setAvenState("idle");
+          return;
+        }
+      }
+
       try {
+        const body: Record<string, unknown> = { text: trimmed };
+        if (imageBase64 && imageMediaType) {
+          // ADMIN_API_SPEC T1: multimodal turn shape.
+          body.image_base64 = imageBase64;
+          body.image_media_type = imageMediaType;
+          body.message_type = "user_image";
+        }
         const res = await fetch("/api/proxy/admin/aven/sparring-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          // STRICT per VPS-CC contract: { text: <string> } only.
-          // Extras can trip the backend's strict validation and
-          // produce a 400 "text required" even when text is present.
-          body: JSON.stringify({ text: trimmed }),
+          body: JSON.stringify(body),
         });
         const data = (await res.json().catch(() => null)) as
           | (Partial<SparringChatResponse> & {
@@ -211,29 +256,35 @@ export function TrainStudio({ founderId }: Props) {
         const avenBlock = shapeSparringMessage(data?.aven_message);
 
         if (!userBlock || !avenBlock) {
-          // Backend should always emit both blocks per §30. If
-          // either is missing it's a contract violation worth
-          // surfacing in-line instead of silently dropping.
           throw new Error(
             "Sparring response missing user_message / aven_message block",
           );
         }
 
-        // Pick up canonical display name if this is the first time
-        // we see it.
+        // Preserve the locally-uploaded image bytes on the bubble
+        // even if the backend doesn't echo them back in the
+        // response. Without this fallback the chart would vanish
+        // the instant the optimistic row reconciles with the
+        // server-shaped block (live UX, not reload — reload
+        // depends on what the history endpoint returns).
+        const userWithImage: StudioMessage = {
+          ...userBlock,
+          status: "sent",
+          ...(imageBase64 && !userBlock.image_base64 && !userBlock.image_url
+            ? {
+                image_base64: imageBase64,
+                image_media_type: imageMediaType,
+                has_image: true,
+              }
+            : {}),
+        };
+
         if (userBlock.user_display_name && !userDisplayName) {
           setUserDisplayName(userBlock.user_display_name);
         }
 
         setMessages((prev) => {
           let next = prev;
-
-          // Reconcile the optimistic local row with the real
-          // user_message: if a localId row still exists, replace
-          // it in place with the server-confirmed shape (keeping
-          // its visual position in the transcript). Otherwise (no
-          // optimistic row found — e.g. recovered from a stale
-          // tab), filter any stale duplicates by id and append.
           if (dedupRef.current.has(userBlock.id)) {
             next = next.filter((m) => m.localId !== localId);
           } else {
@@ -241,18 +292,15 @@ export function TrainStudio({ founderId }: Props) {
             const idx = next.findIndex((m) => m.localId === localId);
             if (idx !== -1) {
               next = next.slice();
-              next[idx] = { ...userBlock, status: "sent" };
+              next[idx] = userWithImage;
             } else {
-              next = [...next, { ...userBlock, status: "sent" }];
+              next = [...next, userWithImage];
             }
           }
-
-          // Append the aven_message block, dedup-guarded.
           if (!dedupRef.current.has(avenBlock.id)) {
             dedupRef.current.add(avenBlock.id);
             next = [...next, avenBlock];
           }
-
           return next;
         });
         setAvenState("ready");
@@ -274,36 +322,64 @@ export function TrainStudio({ founderId }: Props) {
   );
 
   // ---------------------------------------------------------------
-  // QuickCaptureBar submit. For text payloads we push an optimistic
-  // bubble + fire the sparring-chat round-trip. Image-only / audio-
-  // only payloads (no text) are left as preview-only for now until
-  // backend wires those up.
+  // QuickCaptureBar submit. Text and/or image both feed sparring-
+  // chat (multimodal turn via image_base64). Voice-only payloads
+  // arrive here too — those still preview locally; the voice path
+  // proper goes through STT → text into the textarea before submit.
   // ---------------------------------------------------------------
   const handleSend = useCallback(
     async (payload: CapturePayload) => {
-      const previewBits: string[] = [];
-      if (payload.text) previewBits.push(payload.text);
-      if (payload.image)
-        previewBits.push(`(image · ${payload.image.name})`);
-      if (payload.audio)
-        previewBits.push(
-          `(voice note · ${Math.round(payload.audio.size / 1024)}KB)`,
-        );
+      // Pre-flight image validation surfaced as an in-line error
+      // instead of round-tripping for the 413/400.
+      if (payload.image) {
+        const v = validateImage(payload.image);
+        if (v) {
+          setError(
+            v.kind === "too_large"
+              ? `Bild zu groß (${Math.round(v.size / 1024 / 1024)} MB) — max 10 MB`
+              : `Falscher Bild-Typ (${v.type}) — nur PNG oder JPEG`,
+          );
+          return;
+        }
+      }
 
       const localId = newLocalId("user");
+
+      // Optimistic bubble: content is the actual text Paul typed
+      // (or empty when it's image-only). Image preview rides along
+      // via image_base64 (encoded lazily inside sendToBackend) — for
+      // the moment we keep the optimistic image visible via an
+      // object URL so it shows instantly, then sendToBackend swaps
+      // in the encoded version on reconciliation.
       const optimistic: StudioMessage = {
         localId,
         id: localId,
         role: "user",
-        content: previewBits.join(" "),
+        content: payload.text ?? "",
         created_at: new Date().toISOString(),
         status: "sending",
+        ...(payload.image
+          ? {
+              has_image: true,
+              // Object URL is faster than waiting for base64 encode;
+              // the chat renderer accepts image_url too. The URL is
+              // revoked when the bubble is replaced or the page
+              // unmounts (browser cleans up blob: URLs at
+              // navigation).
+              image_url: URL.createObjectURL(payload.image),
+              image_media_type: payload.image.type,
+            }
+          : {}),
       };
       setMessages((prev) => [...prev, optimistic]);
 
-      if (payload.text) {
-        await sendToBackend(payload.text, localId);
+      const hasText = (payload.text ?? "").trim().length > 0;
+      const hasImage = !!payload.image;
+
+      if (hasText || hasImage) {
+        await sendToBackend(payload.text ?? "", payload.image ?? null, localId);
       } else {
+        // Voice-only fallback (no STT wired here) — preview only.
         setMessages((prev) =>
           prev.map((m) =>
             m.localId === localId ? { ...m, status: "sent" as const } : m,

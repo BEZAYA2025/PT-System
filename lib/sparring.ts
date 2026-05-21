@@ -28,6 +28,17 @@ export interface SparringMessage {
    *  own name). undefined on optimistic local rows until the real
    *  user_message replaces them. */
   user_display_name?: string;
+  /** Multimodal: backend sets has_image=true on user turns that
+   *  carried a chart screenshot. The image data itself may also
+   *  come back as image_base64 + image_media_type (live response
+   *  echo) or as an image_url (history reload from storage) — the
+   *  bubble renderer picks whichever is present. has_image alone
+   *  drives the "[Chart attached]" placeholder when the backend
+   *  doesn't include the image bytes themselves. */
+  has_image?: boolean;
+  image_base64?: string;
+  image_media_type?: string;
+  image_url?: string;
 }
 
 export interface StudioMessage extends SparringMessage {
@@ -57,6 +68,62 @@ export interface SttResponse {
 
 export function newLocalId(prefix: "user" | "voice" = "user"): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Multimodal image-upload limits per ADMIN_API_SPEC T1:
+//   · decoded bytes ≤ 10 MB (oversize → backend returns 413)
+//   · PNG or JPEG only
+//   · invalid base64 → 400
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const IMAGE_ACCEPTED_TYPES = ["image/png", "image/jpeg"] as const;
+
+export type ImageValidationError =
+  | { kind: "too_large"; size: number }
+  | { kind: "wrong_type"; type: string };
+
+/** Frontend pre-flight: catches the obvious 413 / 400 cases before
+ *  the network round-trip. Returns null when the file is acceptable. */
+export function validateImage(file: File): ImageValidationError | null {
+  if (file.size > IMAGE_MAX_BYTES) {
+    return { kind: "too_large", size: file.size };
+  }
+  if (
+    !(IMAGE_ACCEPTED_TYPES as readonly string[]).includes(file.type)
+  ) {
+    return { kind: "wrong_type", type: file.type };
+  }
+  return null;
+}
+
+/** Read a File as base64 WITHOUT the data: URI prefix.
+ *
+ *  Backend contract (ADMIN_API_SPEC T1) takes raw base64 in
+ *  `image_base64` and a separate `image_media_type` field for the
+ *  MIME — sending the data: URI prefix would double-encode the type
+ *  and most likely produce the 400 "invalid base64" path.
+ *
+ *  If a future backend revision wants the data: prefix, swap this
+ *  helper to return the full result.split(",", 1)[0] + "," + base64
+ *  — single point of change. */
+export function fileToBase64(
+  file: File,
+): Promise<{ base64: string; media_type: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("FileReader returned non-string"));
+        return;
+      }
+      // result is "data:image/png;base64,iVBORw0KG..."
+      const comma = result.indexOf(",");
+      const base64 = comma >= 0 ? result.slice(comma + 1) : result;
+      resolve({ base64, media_type: file.type });
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 // Read a string from a few plausible field names. Backend has
@@ -91,11 +158,30 @@ export function shapeSparringMessage(raw: unknown): SparringMessage | null {
   const id = typeof r.id === "string" ? r.id : String(r.id ?? "");
   if (!id) return null;
   const content = pickContent(r);
-  if (!content) return null;
+  // Image-only bubbles are legitimate (Paul drops a chart with no
+  // caption). Don't reject on empty content if the row carries an
+  // image flag instead.
+  const has_image = r.has_image === true;
+  if (!content && !has_image) return null;
   const created_at = pickTimestamp(r);
   const user_display_name =
     typeof r.user_display_name === "string" ? r.user_display_name : undefined;
-  return { id, role, content, created_at, user_display_name };
+  const image_base64 =
+    typeof r.image_base64 === "string" ? r.image_base64 : undefined;
+  const image_media_type =
+    typeof r.image_media_type === "string" ? r.image_media_type : undefined;
+  const image_url = typeof r.image_url === "string" ? r.image_url : undefined;
+  return {
+    id,
+    role,
+    content,
+    created_at,
+    user_display_name,
+    ...(has_image ? { has_image: true } : {}),
+    ...(image_base64 ? { image_base64 } : {}),
+    ...(image_media_type ? { image_media_type } : {}),
+    ...(image_url ? { image_url } : {}),
+  };
 }
 
 export interface HistoryResponse {

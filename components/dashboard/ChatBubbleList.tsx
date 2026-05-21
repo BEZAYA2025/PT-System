@@ -46,6 +46,15 @@ export interface ChatBubbleListMessage {
   channel?: string | null;
   via?: string | null;
   platform?: string | null;
+  // Multimodal — populated by Train-Aven sparring turns that carry a
+  // chart screenshot. has_image alone (no bytes) renders a small
+  // "[Chart attached]" placeholder so the founder still sees that
+  // an image was part of the turn; image_url (live optimistic blob:
+  // URL) or image_base64 (history echo) render the actual chart.
+  has_image?: boolean | null;
+  image_url?: string | null;
+  image_base64?: string | null;
+  image_media_type?: string | null;
 }
 
 // Helpers exported so the live-chat caller can reuse exactly the same
@@ -199,6 +208,15 @@ export function SourceTag({ source }: { source: MessageSource }) {
   );
 }
 
+function bubbleImageSrc(m: ChatBubbleListMessage): string | null {
+  if (m.image_url) return m.image_url;
+  if (m.image_base64) {
+    const mt = m.image_media_type ?? "image/png";
+    return `data:${mt};base64,${m.image_base64}`;
+  }
+  return null;
+}
+
 function ReadOnlyBubble({
   message,
   userLabel,
@@ -215,6 +233,8 @@ function ReadOnlyBubble({
   const ts = messageTimestamp(message);
   const body = messageContent(message);
   const source = messageSource(message);
+  const imageSrc = bubbleImageSrc(message);
+  const hasImageMarker = !!message.has_image && !imageSrc;
   return (
     <div
       className={[
@@ -228,7 +248,28 @@ function ReadOnlyBubble({
           tone,
         ].join(" ")}
       >
-        <p className="whitespace-pre-line">{body}</p>
+        {imageSrc && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageSrc}
+            alt="Attached chart"
+            className={[
+              "max-h-72 rounded-xl border border-emerald/20 object-contain",
+              body ? "mb-2" : "",
+            ].join(" ")}
+          />
+        )}
+        {hasImageMarker && (
+          <p
+            className={[
+              "inline-flex items-center gap-1 rounded-full border border-emerald/30 bg-emerald/[0.06] px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald/80",
+              body ? "mb-2" : "",
+            ].join(" ")}
+          >
+            Chart attached
+          </p>
+        )}
+        {body && <p className="whitespace-pre-line">{body}</p>}
       </div>
       <div className="flex items-center gap-2 px-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
         <span>{isUser ? userLabel : "Aven"}</span>

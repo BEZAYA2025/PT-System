@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type ClipboardEvent,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -270,11 +271,75 @@ export function QuickCaptureBar({ onSend, onTranscribe, busy }: Props) {
     }
   };
 
+  // Frontend pre-flight for an image candidate (file-picker OR
+  // clipboard paste). Returns true when the image is set; false +
+  // sets an inline error chip otherwise.
+  const tryAttachImage = (file: File): boolean => {
+    if (file.size > 10 * 1024 * 1024) {
+      setRecordError(
+        `Bild zu groß (${Math.round(file.size / 1024 / 1024)} MB) — max 10 MB`,
+      );
+      return false;
+    }
+    if (file.type !== "image/png" && file.type !== "image/jpeg") {
+      setRecordError(`Bild-Typ ${file.type} nicht unterstützt — nur PNG/JPEG`);
+      return false;
+    }
+    setRecordError(null);
+    setPendingImage(file);
+    return true;
+  };
+
   const handleImagePick = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
-    if (file) setPendingImage(file);
+    if (file) tryAttachImage(file);
     e.target.value = "";
   };
+
+  // Paste-from-clipboard support — chart screenshots from TradingView
+  // land in the clipboard as image/png; intercepting the textarea's
+  // paste event and grabbing the first image item gives Paul a
+  // one-keystroke (Ctrl+V) attach. Non-image paste falls through
+  // unchanged so normal text-paste keeps working.
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const blob = item.getAsFile();
+        if (blob) {
+          e.preventDefault();
+          // Pasted clipboard files come as "image.png" with no
+          // metadata — rename so the chip / send shows something
+          // intentional and timestamped.
+          const ext = item.type.split("/")[1] ?? "png";
+          const renamed = new File(
+            [blob],
+            `chart-${Date.now()}.${ext}`,
+            { type: item.type },
+          );
+          tryAttachImage(renamed);
+        }
+        return;
+      }
+    }
+  };
+
+  // Object-URL lifecycle for the image preview. Each pendingImage
+  // change rebuilds the URL; the cleanup return frees the previous
+  // one so the browser doesn't accumulate blob URLs as Paul cycles
+  // through screenshots.
+  const [pendingImageUrl, setPendingImageUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!pendingImage) {
+      setPendingImageUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(pendingImage);
+    setPendingImageUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [pendingImage]);
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault();
@@ -312,22 +377,36 @@ export function QuickCaptureBar({ onSend, onTranscribe, busy }: Props) {
 
   return (
     <form onSubmit={submit} className="space-y-2">
-      {(pendingImage || recordedBlob) && (
+      {pendingImage && pendingImageUrl && (
+        // Full thumbnail preview — Paul pastes a chart from
+        // TradingView and immediately sees what he's about to
+        // annotate. A tiny filename chip would force him to
+        // remember which screenshot was on the clipboard;
+        // showing the chart itself is the whole point of the
+        // paste-to-chat flow.
+        <div className="relative inline-block max-w-xs">
+          <img
+            src={pendingImageUrl}
+            alt={pendingImage.name}
+            className="max-h-40 rounded-xl border border-emerald/30 object-contain"
+          />
+          <button
+            type="button"
+            onClick={() => setPendingImage(null)}
+            aria-label="Remove image"
+            className="absolute -right-2 -top-2 inline-flex size-6 items-center justify-center rounded-full border border-border bg-surface text-foreground shadow-md transition-colors hover:bg-surface/80"
+          >
+            <IconX size={12} stroke={2} />
+          </button>
+        </div>
+      )}
+      {recordedBlob && (
         <div className="flex flex-wrap items-center gap-2">
-          {pendingImage && (
-            <AttachmentChip
-              label={pendingImage.name}
-              icon={<IconCamera size={11} stroke={1.75} />}
-              onRemove={() => setPendingImage(null)}
-            />
-          )}
-          {recordedBlob && (
-            <AttachmentChip
-              label={`Voice note · ${Math.round(recordedBlob.size / 1024)}KB`}
-              icon={<IconMicrophone size={11} stroke={1.75} />}
-              onRemove={() => setRecordedBlob(null)}
-            />
-          )}
+          <AttachmentChip
+            label={`Voice note · ${Math.round(recordedBlob.size / 1024)}KB`}
+            icon={<IconMicrophone size={11} stroke={1.75} />}
+            onRemove={() => setRecordedBlob(null)}
+          />
         </div>
       )}
 
@@ -470,8 +549,9 @@ export function QuickCaptureBar({ onSend, onTranscribe, busy }: Props) {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKey}
+            onPaste={handlePaste}
             rows={1}
-            placeholder="Message Aven"
+            placeholder="Message Aven · paste a chart with Ctrl+V"
             // Textarea stays focusable while Aven is thinking — same
             // as the dashboard chat. A disabled element loses focus
             // on the busy → disabled transition, which is why the
