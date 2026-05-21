@@ -1,24 +1,18 @@
 "use client";
 
-// TrainStudio — the top-level Train-Aven workspace.
+// TrainStudio — iteration 2.
 //
-// Two modes share the same surface:
-//   · Quick Capture (default): low-friction text / voice / image
-//     drop. The QuickCaptureBar lives at the bottom; sent turns
-//     stack above in the shared ChatBubbleList.
-//   · Training (immersive): TrainingStage takes over the canvas
-//     with the ~3s opening cinematic, then the voice console.
-//     Exiting drops the founder back into Quick Capture with the
-//     conversation history preserved.
+// Paul opens the tab and lands in Aven's studio, not an admin panel.
+// No "Train Aven" headline, no "classroom" subtitle. The avatar is
+// the centrepiece, breathing inside an ambient emerald glow. The
+// chat history sits below — quiet when empty, present when there's
+// conversation to read. Capture bar floats at the bottom, generous,
+// ready. "Start training" is the deliberate ritual entry into the
+// immersive stage.
 //
-// Sparring conversation persistence: turns the founder sends in
-// either mode land in the same `messages` state, so the day-grouped
-// transcript reads as one continuous record of the Train-Aven
-// session.
-//
-// Backend wiring: /api/proxy/admin/aven/sparring-chat. The Show
-// itself is still pure choreography — we'll bind it to the real
-// bridge-chart / methodology snapshot once that lands.
+// Sparring conversation persists across mode switches — turns in
+// either Quick or Training mode land in the same `messages` state
+// so the day-grouped transcript reads as one continuous record.
 
 import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
@@ -33,13 +27,10 @@ import {
 } from "./QuickCaptureBar";
 import { TrainingStage } from "./TrainingStage";
 import { AvenStage, type AvenStageState } from "./AvenStage";
+import { StudioAtmosphere } from "./StudioAtmosphere";
 
-// Mode of the studio surface — Quick is the default rest state.
 type Mode = "quick" | "training";
 
-// Message extends the shared shape so the same ChatBubbleList can
-// render it. localId tracks optimistic founder messages until the
-// server gives them a real message_id.
 interface StudioMessage extends ChatBubbleListMessage {
   localId?: string;
   status?: "sending" | "sent" | "failed";
@@ -81,8 +72,6 @@ export function TrainStudio() {
           content: reply,
           created_at: new Date().toISOString(),
         };
-        // Flip the founder message from "sending" to "sent" and
-        // append the reply in the same render pass.
         setMessages((prev) => [
           ...prev.map((m) =>
             m.localId === localId ? { ...m, status: "sent" as const } : m,
@@ -111,10 +100,6 @@ export function TrainStudio() {
 
   const handleSend = useCallback(
     async (payload: CapturePayload) => {
-      // For now we only send the text portion to the backend.
-      // Audio + image attachments stack into the UI so the founder
-      // sees them captured, but the multimodal wiring lands in a
-      // follow-up — backend is being refactored in parallel.
       const previewBits: string[] = [];
       if (payload.text) previewBits.push(payload.text);
       if (payload.audio)
@@ -134,9 +119,6 @@ export function TrainStudio() {
       };
       setMessages((prev) => [...prev, localMsg]);
 
-      // Only call backend if there's text. Pure attachment turns are
-      // recorded locally for now — backend will accept them once
-      // the multimodal route lands.
       if (payload.text) {
         await sendToBackend(payload.text, localId);
       } else {
@@ -150,122 +132,118 @@ export function TrainStudio() {
     [sendToBackend],
   );
 
-  const handleVoiceTurn = useCallback(
-    async (audio: Blob) => {
-      // Voice turn from the training stage. Same envelope as a
-      // capture-bar audio drop — recorded locally for now, will be
-      // routed through STT once backend exposes the audio sparring
-      // endpoint. The founder still sees the turn land in the
-      // transcript so the conversation has continuity.
-      const localId = `voice-${Date.now()}`;
-      setMessages((prev) => [
-        ...prev,
-        {
-          localId,
-          id: localId,
-          role: "user",
-          content: `(voice turn · ${Math.round(audio.size / 1024)}KB)`,
-          created_at: new Date().toISOString(),
-          status: "sent",
-        },
-      ]);
-    },
-    [],
-  );
+  const handleVoiceTurn = useCallback(async (audio: Blob) => {
+    const localId = `voice-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        localId,
+        id: localId,
+        role: "user",
+        content: `(voice turn · ${Math.round(audio.size / 1024)}KB)`,
+        created_at: new Date().toISOString(),
+        status: "sent",
+      },
+    ]);
+  }, []);
+
+  const displayState = thinking ? "thinking" : avenState;
 
   return (
-    <div className="space-y-6">
-      {/* Header: a one-line intent statement plus a quiet "live"
-          indicator so the founder always knows whether the studio
-          is in Quick mode (avatar idle) or Training (active). */}
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Aven's classroom
-          </h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Quick capture for stray thoughts; training mode when you
-            want a focused lesson.
-          </p>
-        </div>
-      </header>
+    // Full-bleed studio surface. Negative margins pull the room out
+    // past the admin chrome padding so the atmosphere reaches the
+    // section edges — the founder experiences a "room", not "another
+    // card in the dashboard".
+    <div className="relative -mx-4 sm:-mx-6 md:-mx-8">
+      <div className="relative min-h-[78vh] overflow-hidden rounded-3xl">
+        <StudioAtmosphere state={displayState} />
 
-      {error && (
-        <p className="inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
-          <IconAlertCircle size={12} stroke={1.75} aria-hidden />
-          {error}
-        </p>
-      )}
-
-      <AnimatePresence mode="wait">
-        {mode === "training" ? (
-          <motion.div
-            key="training"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.25 }}
-          >
-            <TrainingStage
-              onExit={() => {
-                setMode("quick");
-                setAvenState("idle");
-              }}
-              onVoiceTurn={handleVoiceTurn}
-            />
-          </motion.div>
-        ) : (
-          <motion.div
-            key="quick"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="space-y-4"
-          >
-            {/* Quiet companion row — small avatar + transcript
-                scroller. Sits above the capture bar so it reads
-                like a contained workspace, not a chat-app. */}
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[120px_1fr]">
-              <div className="flex justify-center pt-2 lg:pt-6">
-                <AvenStage
-                  state={thinking ? "thinking" : avenState}
-                  size={56}
+        <div className="relative z-10 flex min-h-[78vh] flex-col">
+          <AnimatePresence mode="wait">
+            {mode === "training" ? (
+              <motion.div
+                key="training"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.35 }}
+                className="flex flex-1"
+              >
+                <TrainingStage
+                  onExit={() => {
+                    setMode("quick");
+                    setAvenState("idle");
+                  }}
+                  onVoiceTurn={handleVoiceTurn}
                 />
-              </div>
-              <div className="min-h-[280px] rounded-2xl border border-border bg-surface/30 p-4">
-                {messages.length === 0 ? (
-                  <div className="flex h-full min-h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
-                    <div>
-                      <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground/80">
-                        Studio at rest
-                      </p>
-                      <p className="mt-2 max-w-sm">
-                        Drop a thought, ask Aven something, or step
-                        into the training stage when you're ready to
-                        teach.
-                      </p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="max-h-[480px] overflow-y-auto sm:max-h-[420px]">
-                    <ChatBubbleList messages={messages} />
-                  </div>
-                )}
-              </div>
-            </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="quick"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                className="flex flex-1 flex-col"
+              >
+                {/* Hero zone — avatar centred, generous breathing
+                    space above and below. The studio reads as a
+                    room with a single figure at its heart. */}
+                <div className="flex flex-col items-center justify-center px-4 pt-14 sm:pt-20">
+                  <AvenStage state={displayState} size={144} />
+                </div>
 
-            <QuickCaptureBar
-              onSend={handleSend}
-              onStartTraining={() => {
-                setMode("training");
-                setAvenState("awakening");
-              }}
-              busy={thinking}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+                {/* Conversation strip — sits between the avatar and
+                    the input. Empty state is a single quiet line so
+                    the room doesn't feel cluttered when there's
+                    nothing to show. */}
+                <div className="mx-auto w-full max-w-3xl px-4 pt-10 sm:px-8">
+                  {messages.length === 0 ? (
+                    <motion.p
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4, duration: 0.6 }}
+                      className="text-center font-mono text-[11px] uppercase tracking-[0.3em] text-muted-foreground/60"
+                    >
+                      The studio is yours
+                    </motion.p>
+                  ) : (
+                    <div className="max-h-[44vh] overflow-y-auto rounded-2xl border border-white/[0.04] bg-black/20 p-5 backdrop-blur-sm">
+                      <ChatBubbleList messages={messages} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Capture bar — anchored to the bottom of the
+                    studio room, generously padded so it reads as a
+                    deliberate surface, not an afterthought. */}
+                <div className="mt-auto px-4 pb-8 pt-10 sm:px-8 sm:pb-10">
+                  <div className="mx-auto w-full max-w-3xl">
+                    {error && (
+                      <p className="mb-3 inline-flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-xs text-amber-200">
+                        <IconAlertCircle
+                          size={12}
+                          stroke={1.75}
+                          aria-hidden
+                        />
+                        {error}
+                      </p>
+                    )}
+                    <QuickCaptureBar
+                      onSend={handleSend}
+                      onStartTraining={() => {
+                        setMode("training");
+                        setAvenState("awakening");
+                      }}
+                      busy={thinking}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }

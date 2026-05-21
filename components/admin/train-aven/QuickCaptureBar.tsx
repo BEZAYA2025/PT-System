@@ -150,7 +150,10 @@ export function QuickCaptureBar({ onSend, onStartTraining, busy }: Props) {
   return (
     <form
       onSubmit={submit}
-      className="rounded-2xl border border-border bg-surface/40 p-3 backdrop-blur-sm"
+      // Generous, glass-y, sits as a deliberate surface in the
+      // studio — not a thin admin input strip. Soft emerald rim
+      // when active picks up the room's atmosphere.
+      className="rounded-2xl border border-white/[0.08] bg-black/40 p-3 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-md transition-colors focus-within:border-emerald/30"
     >
       {/* Pending attachments preview — sits above the input row so the
           founder sees what's queued for the next send. */}

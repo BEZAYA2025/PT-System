@@ -1,6 +1,14 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  IconBook2,
+  IconBrandHipchat,
+  IconLayoutDashboard,
+  IconMessage2,
+  IconMicrophone,
+  IconShieldCheck,
+} from "@tabler/icons-react";
 // TrainAvenSparringTab kept on disk until Paul verifies the new
 // TrainStudio in production; not imported here so it doesn't ship
 // to the bundle. Will be deleted after verification.
@@ -19,13 +27,24 @@ type TabKey =
   | "feedback"
   | "system";
 
-const TABS: ReadonlyArray<{ key: TabKey; label: string }> = [
-  { key: "sparring", label: "Sparring Chat" },
-  { key: "curriculum", label: "Curriculum" },
-  { key: "voice-notes", label: "Voice Notes" },
-  { key: "vkb", label: "VKB Studio" },
-  { key: "feedback", label: "Feedback Reviewer" },
-  { key: "system", label: "System View" },
+// Iteration 2: tabs become a quiet icon-pill cluster floating top-
+// right above the studio. The studio room is the bühne; the tab
+// nav is utility access to adjacent surfaces (curriculum / voice
+// notes / VKB / feedback / system snapshot) and shouldn't compete
+// with the room itself for attention. Labels surface as hover
+// tooltips via the title attr — at-a-glance the row reads as 6
+// quiet glyphs.
+const TABS: ReadonlyArray<{
+  key: TabKey;
+  label: string;
+  Icon: React.ComponentType<{ size?: number; stroke?: number }>;
+}> = [
+  { key: "sparring", label: "Studio", Icon: IconBrandHipchat },
+  { key: "curriculum", label: "Curriculum", Icon: IconBook2 },
+  { key: "voice-notes", label: "Voice Notes", Icon: IconMicrophone },
+  { key: "vkb", label: "VKB", Icon: IconLayoutDashboard },
+  { key: "feedback", label: "Feedback", Icon: IconMessage2 },
+  { key: "system", label: "System", Icon: IconShieldCheck },
 ];
 
 function isTabKey(v: string | null): v is TabKey {
@@ -56,23 +75,15 @@ export function TrainAvenSectionView() {
   };
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
-          Train Aven
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Spar with Aven, edit curriculum, record voice notes, manage
-          VKB, review feedback, and inspect the active system snapshot.
-        </p>
-      </header>
-
+    <div className="space-y-3">
+      {/* Tab strip — quiet icon pills, right-aligned. No admin
+          headline above the studio. The studio IS the page. */}
       <nav
-        aria-label="Train Aven tabs"
-        className="overflow-x-auto sm:overflow-visible"
+        aria-label="Train Aven sections"
+        className="flex justify-end"
       >
-        <ul className="flex min-w-max gap-1 sm:min-w-0">
-          {TABS.map(({ key, label }) => {
+        <ul className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-black/30 p-1 backdrop-blur-sm">
+          {TABS.map(({ key, label, Icon }) => {
             const isActive = activeTab === key;
             return (
               <li key={key}>
@@ -80,20 +91,16 @@ export function TrainAvenSectionView() {
                   type="button"
                   onClick={() => switchTab(key)}
                   aria-current={isActive ? "page" : undefined}
+                  aria-label={label}
+                  title={label}
                   className={[
-                    "relative inline-flex h-11 items-center px-3 text-sm font-medium",
+                    "inline-flex size-9 items-center justify-center rounded-full transition-colors",
                     isActive
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground",
+                      ? "bg-emerald/[0.14] text-emerald"
+                      : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
                   ].join(" ")}
                 >
-                  {label}
-                  {isActive && (
-                    <span
-                      aria-hidden
-                      className="absolute inset-x-0 -bottom-px h-0.5 bg-emerald"
-                    />
-                  )}
+                  <Icon size={15} stroke={1.75} />
                 </button>
               </li>
             );

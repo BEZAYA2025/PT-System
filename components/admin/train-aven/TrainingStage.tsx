@@ -1,16 +1,19 @@
 "use client";
 
-// TrainingStage — the immersive "studio" view. Choreographs the
-// ~3s opening cinematic (AvenStage awakens → charts cascade in →
-// methodology glow → ready), then settles into the voice console
-// where the founder can keep sparring.
+// TrainingStage — iteration 2: the goosebumps moment.
 //
-// All choreography here is VISUAL/MOCK. The captions, timeframe
-// chips and methodology badges are not (yet) tied to real backend
-// data — they're the stage we'll wire up to the bridge-chart pull
-// and methodology snapshot in a follow-up pass. For now the show
-// IS the point: it has to land, feel deliberate, and make Paul
-// want to step into it.
+// When Paul hits "Start training" the room transforms. The avatar
+// blooms larger and brighter, the caption narrates the awakening,
+// chart frames glide in with z-depth and parallax (different sizes
+// for foreground vs background, different durations + delays so
+// the eye reads cascade-with-perspective, not five identical
+// tiles), the methodology chips ignite in sequence like an
+// instrument cockpit booting up, and the room settles into a
+// focused, ready state with the voice console live at the centre.
+//
+// Choreography is pure visual / mock — the captions, chart frames
+// and methodology badges will bind to real bridge-chart pulls +
+// methodology snapshots in a follow-up. The Show is the scaffold.
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -23,10 +26,10 @@ import {
 import { AvenStage, type AvenStageState } from "./AvenStage";
 
 type ShowPhase =
-  | "intro" // 0.0s — AvenStage awakening, container fades in
-  | "charts" // 0.7s — TF charts cascade
-  | "methodik" // 1.9s — methodology badges glow
-  | "ready"; // 2.9s — settle, voice console active
+  | "intro" // 0.0s — AvenStage awakening
+  | "charts" // 0.9s — TF charts cascade in with z-depth
+  | "methodik" // 2.2s — methodology badges ignite in sequence
+  | "ready"; // 3.4s — settle, voice console active
 
 const TIMEFRAMES = ["5m", "15m", "1H", "4H", "Daily"] as const;
 const METHODIK = [
@@ -38,21 +41,27 @@ const METHODIK = [
   "Vector Candles",
 ] as const;
 
-// Phase timing — total ~3s. Each step yields enough room for the
-// previous one to settle before the next starts.
 const PHASE_TIMING_MS: Record<ShowPhase, number> = {
   intro: 0,
-  charts: 700,
-  methodik: 1900,
-  ready: 2900,
+  charts: 900,
+  methodik: 2200,
+  ready: 3400,
 };
 
+// Per-chart parallax/depth metadata. Outer charts (5m / Daily) sit
+// further back — slightly smaller, more blurred, slower entrance
+// — while the middle (1H) sits forward, sharp and prompt. Reads as
+// a cascade with perspective rather than five identical tiles.
+const CHART_DEPTH = [
+  { y: 32, blur: 2, scale: 0.88, opacityRest: 0.55, delay: 0.0 },
+  { y: 22, blur: 1, scale: 0.94, opacityRest: 0.75, delay: 0.12 },
+  { y: 14, blur: 0, scale: 1.0, opacityRest: 1.0, delay: 0.24 }, // 1H — hero
+  { y: 22, blur: 1, scale: 0.94, opacityRest: 0.75, delay: 0.36 },
+  { y: 32, blur: 2, scale: 0.88, opacityRest: 0.55, delay: 0.48 },
+];
+
 interface Props {
-  /** Called when the founder closes the stage and returns to
-   *  Quick-Capture. */
   onExit: () => void;
-  /** Called when the founder hits the mic to start a voice turn.
-   *  Receives the recorded blob. */
   onVoiceTurn?: (audio: Blob) => void | Promise<void>;
 }
 
@@ -61,9 +70,6 @@ export function TrainingStage({ onExit, onVoiceTurn }: Props) {
   const [phase, setPhase] = useState<ShowPhase>("intro");
   const [avenState, setAvenState] = useState<AvenStageState>("awakening");
 
-  // Choreograph the opening. Skips straight to "ready" when the
-  // user prefers reduced motion so we don't dump an animation on
-  // them they explicitly opted out of.
   useEffect(() => {
     if (reduce) {
       setPhase("ready");
@@ -84,158 +90,193 @@ export function TrainingStage({ onExit, onVoiceTurn }: Props) {
 
   return (
     <motion.section
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-      className="relative overflow-hidden rounded-3xl border border-emerald/15 bg-gradient-to-b from-surface/40 via-background to-background p-8 sm:p-12"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.35 }}
+      className="relative flex w-full flex-col items-center justify-start px-4 pt-12 pb-10 sm:px-8 sm:pt-16"
       aria-label="Training stage"
     >
-      {/* Exit affordance — quiet, top-right. Stage is opt-in;
-          leaving it should feel as deliberate as entering. */}
+      {/* Exit affordance — quiet, top-right of the room. Leaving
+          the stage should feel as deliberate as entering it. */}
       <button
         type="button"
         onClick={onExit}
         aria-label="Exit training mode"
-        className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-border bg-background/60 px-3 py-1 text-[11px] font-mono uppercase tracking-wider text-muted-foreground transition-colors hover:border-emerald/30 hover:text-foreground"
+        className="absolute right-5 top-5 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-black/30 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground backdrop-blur-sm transition-colors hover:border-emerald/40 hover:text-foreground"
       >
         <IconArrowsMinimize size={11} stroke={1.75} aria-hidden />
         Exit
       </button>
 
-      <div className="flex flex-col items-center gap-8">
-        <AvenStage state={avenState} size={112} />
+      <AvenStage state={avenState} size={160} hideLabel />
 
-        {/* Caption layer — one line at a time, fades through the
-            phases. The mono small-caps reads as a system narration
-            rather than a chat message. */}
-        <div className="h-6">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={phase}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.3 }}
-              className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground"
-            >
-              {phase === "intro" && "Initialising training context"}
-              {phase === "charts" && "Pulling your charts"}
-              {phase === "methodik" && "Loading methodology"}
-              {phase === "ready" && "Ready when you are"}
-            </motion.p>
-          </AnimatePresence>
-        </div>
+      {/* Caption layer — the narration. One line at a time, fades
+          through the phases. Mono small-caps reads as system
+          narration rather than a chat message. */}
+      <div className="mt-8 h-6">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={phase}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.4 }}
+            className="font-mono text-[11px] uppercase tracking-[0.3em] text-emerald/80"
+          >
+            {phase === "intro" && "Initialising training context"}
+            {phase === "charts" && "Pulling your charts"}
+            {phase === "methodik" && "Loading methodology"}
+            {phase === "ready" && "Ready when you are"}
+          </motion.p>
+        </AnimatePresence>
+      </div>
 
-        {/* Chart cascade — 5 timeframe placeholders that glide in
-            staggered. Each is a thin frame with the TF label; later
-            this becomes the actual bridge-chart preview. */}
-        <div className="grid w-full max-w-2xl grid-cols-2 gap-3 sm:grid-cols-5">
-          {TIMEFRAMES.map((tf, i) => (
+      {/* Chart cascade — five timeframe frames that glide in with
+          parallax. The middle (1H) is the hero, larger and sharp;
+          the outer pair sit back, smaller, blurred, drifting in
+          slower. Reads as depth — not a flat row of tiles. */}
+      <div className="mt-12 flex w-full max-w-3xl items-end justify-center gap-3 sm:gap-4">
+        {TIMEFRAMES.map((tf, i) => {
+          const d = CHART_DEPTH[i];
+          return (
             <motion.div
               key={tf}
-              initial={{ opacity: 0, y: 16, scale: 0.96 }}
+              initial={{
+                opacity: 0,
+                y: 40,
+                scale: d.scale * 0.85,
+                filter: `blur(${d.blur + 4}px)`,
+              }}
               animate={
                 phase === "intro"
-                  ? { opacity: 0, y: 16, scale: 0.96 }
-                  : { opacity: 1, y: 0, scale: 1 }
-              }
-              transition={{
-                duration: 0.5,
-                delay: phase === "intro" ? 0 : 0.15 * i,
-                ease: [0.16, 1, 0.3, 1],
-              }}
-              className="flex aspect-[4/3] flex-col justify-between rounded-xl border border-border bg-surface/60 p-3"
-            >
-              <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-                {tf}
-              </span>
-              <IconChartCandle
-                size={20}
-                stroke={1.5}
-                className="self-end text-emerald/60"
-                aria-hidden
-              />
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Methodology row — 6 small chips. Each gets a brief
-            emerald flash in sequence during the methodik phase. */}
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {METHODIK.map((label, i) => (
-            <motion.span
-              key={label}
-              initial={{
-                opacity: 0.4,
-                borderColor: "rgba(255,255,255,0.06)",
-                color: "rgba(148,163,184,1)",
-              }}
-              animate={
-                phase === "methodik" || phase === "ready"
                   ? {
-                      opacity: 1,
-                      borderColor: [
-                        "rgba(16,185,129,0.0)",
-                        "rgba(16,185,129,0.6)",
-                        "rgba(16,185,129,0.25)",
-                      ],
-                      color: [
-                        "rgba(148,163,184,1)",
-                        "rgba(110,231,183,1)",
-                        "rgba(148,163,184,1)",
-                      ],
+                      opacity: 0,
+                      y: 40,
+                      scale: d.scale * 0.85,
+                      filter: `blur(${d.blur + 4}px)`,
                     }
-                  : { opacity: 0.4 }
+                  : {
+                      opacity: d.opacityRest,
+                      y: d.y,
+                      scale: d.scale,
+                      filter: `blur(${d.blur}px)`,
+                    }
               }
               transition={{
                 duration: 0.9,
-                delay:
-                  phase === "methodik" ? 0.12 * i : 0,
-                ease: "easeInOut",
+                delay: phase === "intro" ? 0 : d.delay,
+                ease: [0.16, 1, 0.3, 1],
               }}
-              className="rounded-full border bg-background px-3 py-1 font-mono text-[10px] uppercase tracking-wider"
+              className="flex aspect-[4/3] w-[18%] min-w-[88px] flex-col justify-between rounded-xl border border-emerald/15 bg-gradient-to-b from-surface/70 to-background/90 p-3 shadow-[0_8px_30px_-12px_rgba(16,185,129,0.4)]"
             >
-              {label}
-            </motion.span>
-          ))}
-        </div>
-
-        {/* Voice console — appears when the show settles. The
-            single big mic is the entry to the live conversation;
-            the affordance reads as "step up and speak". */}
-        <AnimatePresence>
-          {phase === "ready" && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-2 flex flex-col items-center gap-3"
-            >
-              <VoiceConsole
-                onTurn={onVoiceTurn}
-                onListeningChange={(listening) =>
-                  setAvenState(listening ? "listening" : "ready")
-                }
+              <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-emerald/70">
+                {tf}
+              </span>
+              <IconChartCandle
+                size={22}
+                stroke={1.5}
+                className="self-end text-emerald/80"
+                aria-hidden
               />
-              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                Tap to speak · tap again to send
-              </p>
             </motion.div>
-          )}
-        </AnimatePresence>
+          );
+        })}
       </div>
+
+      {/* Methodology row — six chips. Each gets a sequenced bright
+          flash during the methodik phase, like cockpit instruments
+          booting up one by one. Once ignited they hold a steady
+          dim emerald so the founder sees the cockpit ready. */}
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
+        {METHODIK.map((label, i) => (
+          <motion.span
+            key={label}
+            initial={{
+              opacity: 0.25,
+              borderColor: "rgba(255,255,255,0.05)",
+              color: "rgba(148,163,184,0.6)",
+              boxShadow: "0 0 0 rgba(16,185,129,0)",
+            }}
+            animate={
+              phase === "methodik"
+                ? {
+                    opacity: [0.25, 1, 0.85],
+                    borderColor: [
+                      "rgba(16,185,129,0)",
+                      "rgba(16,185,129,0.8)",
+                      "rgba(16,185,129,0.35)",
+                    ],
+                    color: [
+                      "rgba(148,163,184,0.6)",
+                      "rgba(167,243,208,1)",
+                      "rgba(110,231,183,0.95)",
+                    ],
+                    boxShadow: [
+                      "0 0 0 rgba(16,185,129,0)",
+                      "0 0 24px rgba(16,185,129,0.6)",
+                      "0 0 8px rgba(16,185,129,0.2)",
+                    ],
+                  }
+                : phase === "ready"
+                  ? {
+                      opacity: 0.85,
+                      borderColor: "rgba(16,185,129,0.35)",
+                      color: "rgba(110,231,183,0.95)",
+                      boxShadow: "0 0 8px rgba(16,185,129,0.2)",
+                    }
+                  : {
+                      opacity: 0.25,
+                      borderColor: "rgba(255,255,255,0.05)",
+                      color: "rgba(148,163,184,0.6)",
+                      boxShadow: "0 0 0 rgba(16,185,129,0)",
+                    }
+            }
+            transition={{
+              duration: 1.0,
+              delay: phase === "methodik" ? 0.14 * i : 0,
+              ease: "easeInOut",
+            }}
+            className="rounded-full border bg-black/30 px-3.5 py-1 font-mono text-[10px] uppercase tracking-[0.15em] backdrop-blur-sm"
+          >
+            {label}
+          </motion.span>
+        ))}
+      </div>
+
+      {/* Voice console — materialises only when the show settles.
+          The single big mic in the centre of the room is the
+          invitation: step up and speak. */}
+      <AnimatePresence>
+        {phase === "ready" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-12 flex flex-col items-center gap-4"
+          >
+            <VoiceConsole
+              onTurn={onVoiceTurn}
+              onListeningChange={(listening) =>
+                setAvenState(listening ? "listening" : "ready")
+              }
+            />
+            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-muted-foreground/70">
+              Tap to speak · tap again to send
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.section>
   );
 }
 
 // VoiceConsole — toggle mic (tap-to-record / tap-to-stop+send).
-// Wave-bar visual while recording so the founder sees the mic is
-// actually picking up audio (it's a confidence affordance, not a
-// real-time analyser yet — feeding the live MediaStream into the
-// canvas is a follow-up). Mocks the conversation tap when no
-// onTurn prop is given.
+// Wave-bars during recording give the founder a "the mic is alive"
+// signal. Feeding the real MediaStream into a canvas analyser is a
+// follow-up; for now the bars dance organically without claiming
+// to be a real spectrum.
 function VoiceConsole({
   onTurn,
   onListeningChange,
@@ -293,53 +334,48 @@ function VoiceConsole({
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-3">
       <button
         type="button"
         onClick={recording ? stop : () => void start()}
         aria-label={recording ? "Stop and send" : "Start speaking"}
         className={[
-          "relative inline-flex size-16 items-center justify-center rounded-full transition-colors",
+          "relative inline-flex size-20 items-center justify-center rounded-full transition-colors shadow-[0_0_40px_-6px_rgba(16,185,129,0.6)]",
           recording
-            ? "bg-red-500/[0.18] text-red-200"
-            : "bg-emerald/[0.14] text-emerald hover:bg-emerald/[0.20]",
+            ? "bg-red-500/[0.18] text-red-200 shadow-[0_0_40px_-6px_rgba(248,113,113,0.6)]"
+            : "bg-emerald/[0.15] text-emerald hover:bg-emerald/[0.22]",
         ].join(" ")}
       >
         {recording ? (
-          <IconPlayerStopFilled size={22} stroke={1.75} />
+          <IconPlayerStopFilled size={26} stroke={1.75} />
         ) : (
-          <IconMicrophone size={22} stroke={1.75} />
+          <IconMicrophone size={26} stroke={1.75} />
         )}
         {recording && (
           <motion.span
             aria-hidden
             className="absolute inset-0 rounded-full border border-red-400/60"
-            animate={{ scale: [1, 1.18, 1], opacity: [0.6, 0, 0.6] }}
+            animate={{ scale: [1, 1.25, 1], opacity: [0.6, 0, 0.6] }}
             transition={{ duration: 1.4, repeat: Infinity, ease: "easeOut" }}
           />
         )}
       </button>
       {recording && <WaveBars />}
-      {error && (
-        <p className="text-xs text-amber-300">{error}</p>
-      )}
+      {error && <p className="text-xs text-amber-300">{error}</p>}
     </div>
   );
 }
 
-// Decorative wave-bars — three columns with offset breath, gives
-// the founder a "the mic is alive" signal without claiming to be a
-// real spectrum analyser.
 function WaveBars() {
   return (
-    <div className="flex items-end gap-1 h-5">
-      {[0, 0.15, 0.3].map((delay, i) => (
+    <div className="flex h-6 items-end gap-1">
+      {[0, 0.12, 0.24, 0.36, 0.48].map((delay, i) => (
         <motion.span
           key={i}
           className="block w-1 rounded-full bg-red-300/70"
-          animate={{ height: ["20%", "100%", "40%", "80%", "20%"] }}
+          animate={{ height: ["20%", "100%", "40%", "85%", "30%", "70%", "20%"] }}
           transition={{
-            duration: 1.1,
+            duration: 1.2,
             repeat: Infinity,
             delay,
             ease: "easeInOut",
