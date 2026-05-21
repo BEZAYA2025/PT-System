@@ -60,8 +60,14 @@ function deviceLabel(entry: LoginHistoryEntry): string {
 // hint when the column came back null but the member is otherwise
 // flagged as having an exchange — that mismatch is itself useful info
 // (most likely a stale connection where the type field was cleared).
-function formatExchangeName(type: string | null | undefined): string {
-  if (!type) return "Exchange (unknown)";
+function formatExchangeName(type: unknown): string {
+  // Hardened against non-string backend payloads — if any of the
+  // chained read fields lands as an object/number/etc, .toLowerCase()
+  // would have crashed the whole Activity tab into the admin error
+  // boundary. Type-check first.
+  if (typeof type !== "string" || !type.trim()) {
+    return "Exchange (unknown)";
+  }
   const lower = type.toLowerCase();
   const map: Record<string, string> = {
     binance: "Binance",
